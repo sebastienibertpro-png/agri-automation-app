@@ -169,16 +169,26 @@ class DataLoader:
         # Load Ref Intrants (User said 'REF_INTRANTS' has the data)
         df_ref = self.get_intrants()
         
+        # Load Ref Intrants (User said 'REF_INTRANTS' has the data)
+        df_ref = self.get_intrants()
+        
         # Create a mapping Product -> Formulation
-        # Assuming cols in REF_INTRANTS: 'Nom_Intrant', 'Formulation' (or 'Type')
+        # Assuming cols in REF_INTRANTS: 'Nom_Intrant', 'Formulation'
+        # User insists on 'Formulation' column only.
         form_map = {}
         if not df_ref.empty:
-            # Normalize cols to find best match for formulation
-            # Possible cols: 'Formulation', 'Type', 'Composition', 'Unité'
-            target_col = 'Formulation'
-            if 'Formulation' not in df_ref.columns and 'Type' in df_ref.columns:
-                 target_col = 'Type'
-                 
+            # Normalize cols to match user request exactly
+            # We look for a column that contains "Formulation" (case insensitive)
+            target_col = None
+            for col in df_ref.columns:
+                if "formulation" in str(col).lower():
+                    target_col = col
+                    break
+            
+            # If not found, double check 'Type' just in case but prioritize Formulation
+            if not target_col:
+                target_col = 'Formulation' # Hope for the best or it will be empty
+                
             for _, row in df_ref.iterrows():
                 # Name is likely 'Nom_Intrant' or 'Produit'
                 p_name_ref = str(row.get('Nom_Intrant', row.get('Produit', ''))).strip().lower()
