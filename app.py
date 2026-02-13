@@ -174,7 +174,8 @@ try:
              with col_p1:
                 selected_mix_lbl = st.selectbox("Choisir l'intervention prévue :", mix_options)
              with col_p2:
-                vol_ha_input = st.number_input("Volume Bouillie (L/ha)", value=150, step=10)
+                # No manual input, automatic from Journal
+                pass
              
              if st.button("Générer Fiche Préparation"):
                  # Prepare Data
