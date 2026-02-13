@@ -150,7 +150,8 @@ class DataLoader:
             df['Statut'] = df['Etat']
             
         if 'Statut' in df.columns:
-            df = df[df['Statut'].astype(str).str.lower() == "prévu"]
+            # Flexible check for "Prévu", "Prévue", "prévu "
+            df = df[df['Statut'].astype(str).str.strip().str.lower().str.startswith("prév")]
         
         df = df[df['Nature_Intervention'] == "Traitement"]
         return df
