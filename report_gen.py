@@ -537,8 +537,9 @@ class ReportGenerator:
             dose_str = f"{dose_ha} {unite}"
             qty_str = f"{qty_total:.2f} {unite}"
             
-            # Checkbox placeholder (Empty square)
-            checkbox = "⬜" 
+            # Checkbox placeholder (Empty square for pen check)
+            # Unicode empty square
+            checkbox = "☐" # or u"\u2610" 
             
             table_data.append([checkbox, str(idx), p_name, form, dose_str, qty_str])
             
