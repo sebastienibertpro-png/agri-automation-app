@@ -37,8 +37,7 @@ st.markdown("Outil de génération de rapports : **ITK**, **Ferti** et **Registr
 
 # --- CONFIG ---
 # URL de l'application pour le QR Code
-# A MODIFIER SI BESOIN (ex: https://mon-app.streamlit.app)
-APP_BASE_URL = "https://agri-automation-app.streamlit.app"
+APP_BASE_URL = "https://agri-automation-app-kwz7hjkyb8hjxwhe9w7rsv.streamlit.app"
 
 # --- Authentication & Setup ---
 # Load Credentials from Secrets (Streamlit Cloud) or Local File
