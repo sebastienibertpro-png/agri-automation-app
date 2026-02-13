@@ -23,15 +23,17 @@ class DataLoader:
                 creds = None
                 if self.credentials_dict:
                     # Priority 1: Dict provided (Streamlit Secrets)
-                     creds = ServiceAccountCredentials.from_json_keyfile_dict(self.credentials_dict, scope)
+                    # Create credentials object from dict
+                    creds = ServiceAccountCredentials.from_json_keyfile_dict(self.credentials_dict, scope)
                 elif os.path.exists(self.credentials_path):
                     # Priority 2: Local file
                     creds = ServiceAccountCredentials.from_json_keyfile_name(self.credentials_path, scope)
                 
                 if creds:
+                    # Authorize gspread directly with credentials object
                     self.gc = gspread.authorize(creds)
-                    # Open by name (assuming filename without extension matches or hardcoded name)
-                    # User said "MASTER_EXPLOITATION" is the sheet name.
+                    
+                    # Open by name
                     self.sh = self.gc.open("MASTER_EXPLOITATION") 
                     print("Connexion Cloud réussie !")
                     return True
