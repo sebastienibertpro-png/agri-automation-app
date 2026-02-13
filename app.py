@@ -128,46 +128,6 @@ if intervention_id:
 
     st.divider()
 
-# --- DEBUG MODE (Hidden by default) ---
-with st.expander("🛠️ DEBUG - Vérification Formulations (v14)", expanded=False):
-    st.write("### 1. Analyse REF_INTRANTS")
-    try:
-        df_debug = loader.get_intrants()
-        st.write(f"Colonnes: {list(df_debug.columns)}")
-        
-        # Check if 'Formulation' exists
-        target_col_d = None
-        for col in df_debug.columns:
-            if "formulation" in str(col).lower():
-                target_col_d = col
-                break
-        st.write(f"Colonne Cible détectée : **{target_col_d}**")
-
-        st.write("#### 5 Premiers Produits dans REF_INTRANTS (Nom -> Formulation)")
-        # Print first 5 rows of names to check for whitespace/case
-        sample_rows = []
-        for _, row in df_debug.head(10).iterrows():
-            p_n_raw = str(row.get('Nom_Produit', row.get('Nom_Intrant', 'MISSING_NAME')))
-            p_n_clean = p_n_raw.strip().lower()
-            f_v = str(row.get(target_col_d, ''))
-            sample_rows.append({"Raw Name": f"'{p_n_raw}'", "Clean Key": f"'{p_n_clean}'", "Form": f_v})
-        st.table(sample_rows)
-
-    except Exception as e:
-        st.error(f"Erreur chargement REF_INTRANTS : {e}")
-
-    st.write("### 2. Produits de l'Intervention (Si sélectionnée)")
-    if 'sorted_prods' in locals():
-         st.write("Produits trouvés dans la dernière génération :")
-         debug_prods = []
-         for p in sorted_prods:
-             p_n_raw = p.get('Produit', 'Unknown')
-             p_n_clean = str(p_n_raw).strip().lower()
-             debug_prods.append({"Raw Name": f"'{p_n_raw}'", "Clean Key": f"'{p_n_clean}'", "Form Found": p.get('Formulation', 'Non')})
-         st.table(debug_prods)
-    else:
-        st.info("Lancez une génération (bouton ci-dessous) pour voir les produits de l'intervention.")
-
 # --- Generation Section ---
 st.divider()
 st.subheader("📄 Génération de Rapports")
