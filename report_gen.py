@@ -463,5 +463,127 @@ class ReportGenerator:
         self.doc.build(self.elements)
         print(f"PDF Generated: {self.filename}")
 
-import pandas as pd # Needed
+
+    def generate_prep_sheet(self, campaign, intervention_data):
+        """
+        Generates the Phyto Preparation Sheet (Fiche de Préparation de Bouillie).
+        intervention_data: dict containing:
+            'Parcelle': str
+            'Surface': float
+            'Date': datetime
+            'Volume_Bouillie_Ha': float (optional, default 150)
+            'Products': list of dicts (Nom_Produit, Dose_Ha, Formulation, etc.) sorted by mixing order
+            'Intervention_ID': str (unique ID for QR)
+        """
+        self.doc.pagesize = A4 # Portrait
+        
+        # --- Header ---
+        parcelle = intervention_data.get('Parcelle', 'Inconnue')
+        surface = float(intervention_data.get('Surface', 0))
+        date_prevue = intervention_data.get('Date')
+        date_str = date_prevue.strftime('%d/%m/%Y') if date_prevue else "Non définie"
+        
+        self.add_title(f"Fiche de Préparation Phyto - {date_str}")
+        
+        # --- Parcelle Info & Volume ---
+        vol_ha = float(intervention_data.get('Volume_Bouillie_Ha', 100)) # Default 100L/ha if missing
+        vol_total = surface * vol_ha
+        
+        header_table_data = [
+            [f"PARCELLE : {parcelle}", f"SURFACE : {surface:.2f} ha"],
+            [f"Volume Bouillie / ha : {vol_ha:.0f} L/ha", f"VOLUME TOTAL CUVE : {vol_total:.0f} Litres"]
+        ]
+        
+        t_header = Table(header_table_data, colWidths=[9*cm, 9*cm])
+        t_header.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.lightgrey),
+            ('TEXTCOLOR', (0,0), (-1,-1), colors.black),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 12),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+            ('TOPPADDING', (0,0), (-1,-1), 10),
+        ]))
+        self.elements.append(t_header)
+        self.elements.append(Spacer(1, 15))
+        
+        # --- Sécurité (EPI) ---
+        # Text based icons for robustness
+        epi_text = "⚠️ SÉCURITÉ / EPI OBLIGATOIRES ⚠️"
+        epi_details = "🧤 Gants Nitrile   😷 Masque (A2P3)   🥽 Lunettes   🥼 Combinaison"
+        
+        self.elements.append(Paragraph(epi_text, self.styles['Heading2']))
+        self.elements.append(Paragraph(epi_details, ParagraphStyle('EPI', parent=self.styles['Normal'], fontSize=12, alignment=1, textColor=colors.red)))
+        self.elements.append(Spacer(1, 15))
+        
+        # --- Checklist Produits (Mixing Order) ---
+        self.elements.append(Paragraph("<b>🛠️ ORDRE D'INCORPORATION & DOSAGES</b>", self.styles['Heading3']))
+        
+        # Columns: [ ] Check, Ordre, Produit, Formulation, Dose/ha, Qté Totale
+        table_data = [['OK', 'Ordre', 'Produit', 'Formulation', 'Dose/ha', 'Qté TOTALE']]
+        
+        products = intervention_data.get('Products', [])
+        
+        for idx, prod in enumerate(products, 1):
+            p_name = prod.get('Nom_Produit', 'Inconnu')
+            form = prod.get('Formulation', '-')
+            dose_ha = float(prod.get('Dose_Ha', 0))
+            unite = prod.get('Unité_Dose', '')
+            
+            qty_total = dose_ha * surface
+            
+            # Format numbers
+            dose_str = f"{dose_ha} {unite}"
+            qty_str = f"{qty_total:.2f} {unite}"
+            
+            # Checkbox placeholder (Empty square)
+            checkbox = "⬜" 
+            
+            table_data.append([checkbox, str(idx), p_name, form, dose_str, qty_str])
+            
+        t_prods = Table(table_data, colWidths=[1.5*cm, 1.5*cm, 6*cm, 2.5*cm, 3*cm, 3.5*cm])
+        t_prods.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2E7D32')), # Agri Green
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 10),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ('FONTSIZE', (0,1), (-1,-1), 11),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+            # Bold Total Quantity
+            ('FONTNAME', (-1,1), (-1,-1), 'Helvetica-Bold'),
+        ]))
+        self.elements.append(t_prods)
+        self.elements.append(Spacer(1, 25))
+        
+        # --- QR Code & Validation ---
+        import qrcode
+        from reportlab.lib.utils import ImageReader
+        import io
+        
+        intervention_id = intervention_data.get('Intervention_ID', 'test')
+        
+        qr_payload = f"https://share.streamlit.io/?validate_phyto={intervention_id}" 
+        # Note: Ideally we want the specific app url. We'll use a generic text for now.
+        
+        qr = qrcode.QRCode(box_size=10, border=4)
+        qr.add_data(qr_payload)
+        qr.make(fit=True)
+        img_qr = qr.make_image(fill='black', back_color='white')
+        
+        # Convert to ReportLab Image
+        img_buffer = io.BytesIO()
+        img_qr.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        # Draw QR
+        im = Image(img_buffer, width=4*cm, height=4*cm)
+        self.elements.append(im)
+        self.elements.append(Paragraph(f"Scan pour valider : {intervention_id}", self.styles['Normal']))
+        
+        self.doc.build(self.elements)
+        print(f"PDF Generated: {self.filename}")
 

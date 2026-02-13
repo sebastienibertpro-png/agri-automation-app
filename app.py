@@ -92,8 +92,144 @@ else:
     target_parcelles = [selected_parcelle]
 
 # --- Generation Section ---
+
+# --- QR Action Logic (Must be at top) ---
+# Check for 'validate_phyto' in query params
+q_params = st.query_params
+if "validate_phyto" in q_params:
+    intervention_id = q_params["validate_phyto"]
+    st.info(f"🔍 Scan détecté pour l'intervention : {intervention_id}")
+    
+    if st.button("✅ Confirmer : Traitement RÉALISÉ"):
+        with st.spinner("Mise à jour du statut..."):
+            success = loader.update_intervention_status(intervention_id, "Réalisé")
+            if success:
+                st.success("Statut mis à jour avec succès ! Vous pouvez fermer.")
+                # Clear param to avoid re-trigger on reload? 
+                # st.experimental_set_query_params() # Deprecated/removed in new Streamlit
+                # Just show success message.
+            else:
+                st.error("Échec de la mise à jour (Vérifiez les logs ou la connexion).")
+    st.divider()
+
+
+# --- Generation Section ---
 st.divider()
 st.subheader("📄 Génération de Rapports")
+
+
+# --- FICHE PREPARATION PHYTO ---
+st.markdown("#### 🧪 Fiche de Préparation Phyto")
+try:
+    df_planned = loader.get_planned_treatments(selected_campaign)
+    
+    if not df_planned.empty:
+        # Filter by selected parcelle if not "Toutes"
+        if selected_parcelle != "Toutes":
+            df_planned = df_planned[df_planned['ID_Parcelle'] == selected_parcelle]
+            
+        if df_planned.empty:
+             st.info("Aucune intervention 'Prévue' pour cette sélection.")
+        else:
+             # Group by Date + Parcelle to form unique "Mixes"
+             # We need a selector.
+             # Create a list of options: "YYYY-MM-DD - Parcelle (X produits)"
+             
+             # Grouping
+             # Key: (DateStr, Parcelle)
+             # Value: List of rows
+             mixes = {}
+             for _, row in df_planned.iterrows():
+                 d_val = row['Date']
+                 d_str = d_val.strftime('%Y-%m-%d') if not pd.isnull(d_val) else "Date Inconnue"
+                 p_id = row['ID_Parcelle']
+                 key = (d_str, p_id)
+                 
+                 if key not in mixes: mixes[key] = []
+                 mixes[key].append(row)
+             
+             # Create Options
+             mix_options = []
+             mix_map = {}
+             for k, rows in mixes.items():
+                 date_lbl, p_lbl = k
+                 nb_p = len(rows)
+                 label = f"{date_lbl} - {p_lbl} ({nb_p} produits)"
+                 mix_options.append(label)
+                 mix_map[label] = (k, rows)
+             
+             mix_options = sorted(mix_options, reverse=True)
+             
+             col_p1, col_p2 = st.columns([2, 1])
+             with col_p1:
+                selected_mix_lbl = st.selectbox("Choisir l'intervention prévue :", mix_options)
+             with col_p2:
+                vol_ha_input = st.number_input("Volume Bouillie (L/ha)", value=150, step=10)
+             
+             if st.button("Générer Fiche Préparation"):
+                 # Prepare Data
+                 key, rows = mix_map[selected_mix_lbl]
+                 date_str, p_id = key
+                 
+                 # Get Metadata (Surface)
+                 # We need efficient way. usage of loader.get_parcel_metadata might be slow if fetching all?
+                 # Let's fetch specific or rely on cached.
+                 # Actually we can use the existing `active_loader` method but it gets ALL for campaign.
+                 # Optimized: Just get what we need. 
+                 # Or assume `metadata_map` from report logic is available? It's inside a function.
+                 # Let's call it here.
+                 meta_map = active_loader.get_parcel_metadata(selected_campaign)
+                 p_meta = meta_map.get(p_id, {})
+                 surface = float(p_meta.get('Surface', 0))
+                 
+                 # Prepare Products List
+                 prods = []
+                 for r in rows:
+                     prods.append(r.to_dict())
+                 
+                 # Sort
+                 sorted_prods = loader.sort_products_by_formulation(prods)
+                 
+                 # Parse Date
+                 date_obj = rows[0]['Date'] # Take first
+                 
+                 # ID for QR
+                 # "PARCELLE_YYYYMMDD"
+                 clean_date = date_str.replace("-", "")
+                 intervention_id = f"{p_id}_{clean_date}"
+                 
+                 payload = {
+                     'Parcelle': p_id,
+                     'Surface': surface,
+                     'Date': date_obj,
+                     'Volume_Bouillie_Ha': vol_ha_input,
+                     'Products': sorted_prods,
+                     'Intervention_ID': intervention_id
+                 }
+                 
+                 # Generate
+                 with tempfile.TemporaryDirectory() as tmpdirname:
+                     fname = f"Fiche_Prep_{intervention_id}.pdf"
+                     fpath = os.path.join(tmpdirname, fname)
+                     
+                     gen = ReportGenerator(fpath)
+                     gen.generate_prep_sheet(selected_campaign, payload)
+                     
+                     with open(fpath, "rb") as f:
+                        st.download_button(
+                            label="⬇️ Télécharger Fiche",
+                            data=f,
+                            file_name=fname,
+                            mime="application/pdf"
+                        )
+                 st.success("Fiche générée ! Vérifiez l'ordre d'incorporation.")
+                 
+    else:
+        st.info("Pas d'interventions planifiées trouvées pour cette campagne.")
+except Exception as e:
+    st.error(f"Erreur chargement planning: {e}")
+
+st.divider()
 
 # Helper for PDF Generation
 def generate_and_download(report_type):
