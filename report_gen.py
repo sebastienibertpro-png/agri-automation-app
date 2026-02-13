@@ -14,13 +14,21 @@ class ReportGenerator:
         self.styles = getSampleStyleSheet()
         
         # --- LOGO INTEGRATION ---
+        # --- LOGO INTEGRATION ---
         base_dir = os.path.dirname(os.path.abspath(__file__))
+        cwd = os.getcwd()
+        search_dirs = [base_dir, cwd]
+        
         logo_path = None
-        for ext in ['png', 'jpg', 'jpeg']:
-            p = os.path.join(base_dir, f'logo.{ext}')
-            if os.path.exists(p):
-                logo_path = p
-                break
+        for d in search_dirs:
+            for ext in ['png', 'jpg', 'jpeg']:
+                p = os.path.join(d, f'logo.{ext}')
+                if os.path.exists(p):
+                    logo_path = p
+                    break
+            if logo_path: break
+            
+        print(f"Logo search paths: {search_dirs}. Found: {logo_path}")
         
         if logo_path:
             try:
