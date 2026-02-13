@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 
 class DataLoader:
     def __init__(self, file_path, use_cloud=True, credentials_dict=None):
@@ -15,7 +15,11 @@ class DataLoader:
 
     def load_source(self):
         """Loads data source: Google Sheets if available/requested, else local Excel."""
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        # Correct scopes for google-auth
+        scopes = [
+            'https://www.googleapis.com/auth/spreadsheets',
+            'https://www.googleapis.com/auth/drive'
+        ]
         
         if self.use_cloud:
             print(f"Tentative de connexion Google Sheets...")
@@ -23,26 +27,21 @@ class DataLoader:
                 creds = None
                 if self.credentials_dict:
                     # Priority 1: Dict provided (Streamlit Secrets)
-                    # Create credentials object from dict
-                    creds = ServiceAccountCredentials.from_json_keyfile_dict(self.credentials_dict, scope)
+                    creds = Credentials.from_service_account_info(self.credentials_dict, scopes=scopes)
                 elif os.path.exists(self.credentials_path):
                     # Priority 2: Local file
-                    creds = ServiceAccountCredentials.from_json_keyfile_name(self.credentials_path, scope)
+                    creds = Credentials.from_service_account_file(self.credentials_path, scopes=scopes)
                 
                 if creds:
-                    # Authorize gspread directly with credentials object
+                    # Authorize gspread
                     self.gc = gspread.authorize(creds)
                     
                     # Open by name
                     self.sh = self.gc.open("MASTER_EXPLOITATION") 
                     print("Connexion Cloud réussie !")
                     return True
-                else:
-                    print("Aucun identifiant Cloud trouvé (ni fichier, ni dict).")
             except Exception as e:
                 print(f"Erreur connexion Cloud: {e}. Passage en mode Local.")
-        
-        # Fallback or Local Mode
         
         # Fallback or Local Mode
         if not os.path.exists(self.file_path):
