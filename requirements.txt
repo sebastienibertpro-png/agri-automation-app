@@ -1,6 +1,6 @@
 streamlit
 pandas
 reportlab
-gspread>=6.0.0
-google-auth>=2.0.0
+gspread==5.10.0
+oauth2client==4.1.3
 openpyxl
