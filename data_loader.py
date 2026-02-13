@@ -249,7 +249,7 @@ class DataLoader:
             
         try:
             # 1. Read fresh data
-            df = self.conn.read(worksheet="JOURNAL_INTERVENTION", ttl=0)
+            df = self.conn.read(worksheet="JOURNAL_INTERVENTION", ttl=0, spreadsheet="MASTER_EXPLOITATION")
             
             # 2. Parse ID to find rows
             # Expected ID Format: "P-{parcelle}_D-{date_str}" (Updates all treatments for this parcelle/date)
@@ -278,7 +278,7 @@ class DataLoader:
                 # Update
                 df.loc[mask, 'Statut'] = new_status
                 # Write back
-                self.conn.update(worksheet="JOURNAL_INTERVENTION", data=df)
+                self.conn.update(worksheet="JOURNAL_INTERVENTION", data=df, spreadsheet="MASTER_EXPLOITATION")
                 return True
             else:
                 st.warning("Aucune intervention correspondante trouvée (ou déjà réalisée).")
