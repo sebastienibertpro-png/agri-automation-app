@@ -202,6 +202,8 @@ class DataLoader:
             
             return 99 # Unknown/Last
             
+        return sorted(products_list, key=get_rank)
+
     def update_intervention_status(self, intervention_id, new_status="Réalisé"):
         """
         Updates the status of an intervention (or group) in the source.
@@ -262,5 +264,3 @@ class DataLoader:
         except Exception as e:
             st.error(f"Erreur mise à jour: {e}")
             return False
-
-```
