@@ -3,3 +3,5 @@ pandas
 reportlab
 st-gsheets-connection
 openpyxl
+qrcode
+Pillow
