@@ -126,7 +126,7 @@ def generate_and_download(report_type):
         df_phyto = df_campaign[df_campaign['Nature_Intervention'] == "Traitement"]
         df_phyto = df_phyto[df_phyto['ID_Parcelle'].isin(target_parcelles)]
         df_phyto = patch_surface_column(df_phyto)
-        
+        df_phyto = df_phyto.fillna("")
         grouped_data = {}
         for p in df_phyto['ID_Parcelle'].unique():
             subset = df_phyto[df_phyto['ID_Parcelle'] == p].sort_values(by='Date')
@@ -140,7 +140,7 @@ def generate_and_download(report_type):
         df_ferti = df_campaign[df_campaign['Nature_Intervention'] == "Fertilisation"]
         df_ferti = df_ferti[df_ferti['ID_Parcelle'].isin(target_parcelles)]
         df_ferti = patch_surface_column(df_ferti)
-        
+        df_ferti = df_ferti.fillna("")
         grouped_data = {}
         for p in df_ferti['ID_Parcelle'].unique():
             p_meta = metadata_map.get(p, {})
@@ -156,7 +156,7 @@ def generate_and_download(report_type):
     elif report_type == "ITK":
         df_itk = df_campaign[df_campaign['ID_Parcelle'].isin(target_parcelles)]
         df_itk = patch_surface_column(df_itk)
-        
+        df_itk = df_itk.fillna("")
         grouped_data = {}
         if not df_itk.empty:
             for p in df_itk['ID_Parcelle'].unique():
@@ -243,4 +243,5 @@ with col_pdf2:
     handle_pdf_action("PHYTO", "🛡️ Registre Phyto")
 with col_pdf3:
     handle_pdf_action("FERTI", "🧪 Bilan Ferti")
+
 
