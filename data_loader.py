@@ -1,50 +1,40 @@
 import pandas as pd
 import os
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import streamlit as st # Ajouté pour afficher les erreurs
+import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 
 class DataLoader:
     def __init__(self, file_path, use_cloud=True, credentials_dict=None):
         self.file_path = file_path
-        self.use_cloud = use_cloud and (credentials_dict or os.path.exists("credentials.json"))
-        self.credentials_dict = credentials_dict
+        self.use_cloud = use_cloud
+        self.conn = None
         self.xl = None
-        self.gc = None
-        self.sh = None
-        self.credentials_path = "credentials.json"
 
     def load_source(self):
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        
         if self.use_cloud:
             try:
-                creds = None
-                if self.credentials_dict:
-                    creds = ServiceAccountCredentials.from_json_keyfile_dict(self.credentials_dict, scope)
-                elif os.path.exists(self.credentials_path):
-                    creds = ServiceAccountCredentials.from_json_keyfile_name(self.credentials_path, scope)
-                
-                if creds:
-                    self.gc = gspread.authorize(creds)
-                    self.sh = self.gc.open("MASTER_EXPLOITATION") 
-                    return True
+                # Connexion simple et robuste via Streamlit
+                self.conn = st.connection("gsheets", type=GSheetsConnection)
+                print("Connexion Cloud initialisée via st.connection")
+                return True
             except Exception as e:
-                st.error(f"Erreur Connexion Cloud : {e}") # Affiche l'erreur en rouge
+                st.error(f"Erreur init connexion: {e}. Passage en mode Local.")
         
         if not os.path.exists(self.file_path):
-            st.warning("Fichier local absent et connexion Cloud échouée.")
             return False
-            
         self.xl = pd.ExcelFile(self.file_path)
         return False
 
     def _get_data(self, sheet_name):
-        if self.sh:
+        # Nom de votre fichier Google Sheets
+        SPREADSHEET_NAME = "MASTER_EXPLOITATION" 
+        
+        if self.conn:
             try:
-                return pd.DataFrame(self.sh.worksheet(sheet_name).get_all_records())
+                # Lecture directe et optimisée
+                return self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME)
             except Exception as e:
-                st.error(f"Erreur lecture onglet '{sheet_name}' : {e}") # Affiche l'erreur précise
+                st.error(f"Erreur lecture onglet '{sheet_name}' : {e}")
                 return pd.DataFrame()
         elif self.xl:
             return pd.read_excel(self.file_path, sheet_name=sheet_name)
