@@ -465,7 +465,7 @@ class ReportGenerator:
         print(f"PDF Generated: {self.filename}")
 
 
-    def generate_prep_sheet(self, campaign, intervention_data):
+    def generate_prep_sheet(self, campaign, intervention_data, base_url="https://share.streamlit.io"):
         """
         Generates the Phyto Preparation Sheet (Fiche de Préparation de Bouillie).
         intervention_data: dict containing:
@@ -475,6 +475,7 @@ class ReportGenerator:
             'Volume_Bouillie_Ha': float (optional, default 150)
             'Products': list of dicts (Nom_Produit, Dose_Ha, Formulation, etc.) sorted by mixing order
             'Intervention_ID': str (unique ID for QR)
+        base_url: str (Base URL of the Streamlit App for QR link)
         """
         self.doc.pagesize = A4 # Portrait
         
@@ -570,8 +571,12 @@ class ReportGenerator:
         
         intervention_id = intervention_data.get('Intervention_ID', 'test')
         
-        qr_payload = f"https://share.streamlit.io/?validate_phyto={intervention_id}" 
-        # Note: Ideally we want the specific app url. We'll use a generic text for now.
+        # QR Payload with dynamic Base URL
+        # Ensure trailing slash handling
+        if not base_url.endswith('/'):
+            base_url += '/'
+        
+        qr_payload = f"{base_url}?validate_phyto={intervention_id}" 
         
         qr = qrcode.QRCode(box_size=10, border=4)
         qr.add_data(qr_payload)
