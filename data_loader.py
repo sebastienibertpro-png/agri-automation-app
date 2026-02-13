@@ -60,7 +60,7 @@ class DataLoader:
     def get_interventions(self):
         try:
             if self.conn:
-                df = self.conn.read(worksheet="JOURNAL_INTERVENTION", ttl=600)
+                df = self.conn.read(worksheet="JOURNAL_INTERVENTION", ttl=600, spreadsheet="MASTER_EXPLOITATION")
             else:
                 df = self.xl.parse("JOURNAL_INTERVENTION")
             return df
@@ -79,7 +79,7 @@ class DataLoader:
     def get_assolement(self, campaign=None):
         try:
             if self.conn:
-                df = self.conn.read(worksheet="ASSOLEMENT", ttl=600)
+                df = self.conn.read(worksheet="ASSOLEMENT", ttl=600, spreadsheet="MASTER_EXPLOITATION")
             else:
                 df = self.xl.parse("ASSOLEMENT")
             
@@ -96,9 +96,9 @@ class DataLoader:
             if self.conn:
                 # Assuming tab name is 'Produits' or 'Référentiel Produits'. Let's try 'Produits' first then 'Referentiel'
                 try:
-                    df = self.conn.read(worksheet="Produits", ttl=600)
+                    df = self.conn.read(worksheet="Produits", ttl=600, spreadsheet="MASTER_EXPLOITATION")
                 except:
-                    df = self.conn.read(worksheet="Référentiel Produits", ttl=600)
+                    df = self.conn.read(worksheet="Référentiel Produits", ttl=600, spreadsheet="MASTER_EXPLOITATION")
             else:
                 # Local
                 try:
