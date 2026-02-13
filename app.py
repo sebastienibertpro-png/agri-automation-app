@@ -4,6 +4,7 @@ import os
 from data_loader import DataLoader
 from report_gen import ReportGenerator
 import json
+import tempfile
 from datetime import datetime
 
 # Page Configuration
