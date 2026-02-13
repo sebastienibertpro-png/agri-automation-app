@@ -190,8 +190,8 @@ class DataLoader:
                 target_col = 'Formulation' # Hope for the best or it will be empty
                 
             for _, row in df_ref.iterrows():
-                # Name is likely 'Nom_Intrant' or 'Produit'
-                p_name_ref = str(row.get('Nom_Intrant', row.get('Produit', ''))).strip().lower()
+                # Name is 'Nom_Produit' based on debug output
+                p_name_ref = str(row.get('Nom_Produit', row.get('Nom_Intrant', ''))).strip().lower()
                 form_val = str(row.get(target_col, '')).strip().upper()
                 if p_name_ref:
                     form_map[p_name_ref] = form_val
@@ -202,9 +202,15 @@ class DataLoader:
         # Let's assume Formulation field might contain "Sachet" or code "SB", "WS"?
         # Standard logic: Use specific codes if known, else keywords.
         
+        
         def get_rank(p_item):
-            p_name = p_item.get('Nom_Produit', '').strip().lower()
+            # Try multiple keys for product name
+            p_name = str(p_item.get('Produit', p_item.get('Nom_Produit', ''))).strip().lower()
             form = form_map.get(p_name, '')
+            
+            # --- CRITICAL FIX: Inject Formulation back into item ---
+            p_item['Formulation'] = form
+            # -------------------------------------------------------
             
             # 1. Sachets
             if 'SACHET' in form or 'HYDROSOLUBLE' in form or form in ['WS', 'SB']: return 1
