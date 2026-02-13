@@ -111,8 +111,6 @@ if "validate_phyto" in q_params:
                 # Just show success message.
             else:
                 st.error("Échec de la mise à jour (Vérifiez les logs ou la connexion).")
-            else:
-                st.error("Échec de la mise à jour (Vérifiez les logs ou la connexion).")
     st.divider()
 
 # --- DEBUG MODE (Hidden by default) ---
