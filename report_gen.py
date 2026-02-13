@@ -538,9 +538,13 @@ class ReportGenerator:
             qty_str = f"{qty_total:.2f} {unite}"
             
             # Checkbox placeholder (Empty square for pen check)
-            # Checkbox placeholder (Empty square for pen check)
-            # Use Brackets for safety
-            checkbox = "[    ]"
+            # Checkbox - Graphic Rectangle
+            from reportlab.graphics.shapes import Drawing, Rect
+            from reportlab.lib import colors
+            
+            d = Drawing(10, 10)
+            d.add(Rect(0, 0, 10, 10, fillColor=colors.white, strokeColor=colors.black))
+            checkbox = d
             
             table_data.append([checkbox, str(idx), p_name, form, dose_str, qty_str])
             
