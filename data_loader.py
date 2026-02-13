@@ -166,19 +166,25 @@ class DataLoader:
         4. EC (Emulsions)
         5. SL (Liquides)
         """
-        # Load Ref
-        df_ref = self.get_products_ref()
+        # Load Ref Intrants (User said 'REF_INTRANTS' has the data)
+        df_ref = self.get_intrants()
         
         # Create a mapping Product -> Formulation
-        # Assuming cols: 'Nom_Produit', 'Formulation'
+        # Assuming cols in REF_INTRANTS: 'Nom_Intrant', 'Formulation' (or 'Type')
         form_map = {}
         if not df_ref.empty:
-            # Normalize cols
-            # ...
+            # Normalize cols to find best match for formulation
+            # Possible cols: 'Formulation', 'Type', 'Composition', 'Unité'
+            target_col = 'Formulation'
+            if 'Formulation' not in df_ref.columns and 'Type' in df_ref.columns:
+                 target_col = 'Type'
+                 
             for _, row in df_ref.iterrows():
-                p_name = str(row.get('Nom_Produit', '')).strip().lower()
-                form = str(row.get('Formulation', '')).strip().upper()
-                form_map[p_name] = form
+                # Name is likely 'Nom_Intrant' or 'Produit'
+                p_name_ref = str(row.get('Nom_Intrant', row.get('Produit', ''))).strip().lower()
+                form_val = str(row.get(target_col, '')).strip().upper()
+                if p_name_ref:
+                    form_map[p_name_ref] = form_val
         
         # Define Priority
         # We need to map actual codes (WG, EC...) to 1, 2, 3...
