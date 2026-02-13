@@ -259,7 +259,9 @@ class DataLoader:
             
             # Helper to parse ID
             # Let's assume ID is "P_DATE" e.g. "Parcelle1_20240415"
-            parts = intervention_id.split('_')
+            # FIX: Use rsplit to allow underscores in Parcelle Name
+            # (If parcelle is "A2_Buissons", ID is "A2_Buissons_20240415", rsplit gives ["A2_Buissons", "20240415"])
+            parts = intervention_id.rsplit('_', 1) 
             if len(parts) < 2: return False
             
             p_target = parts[0]
