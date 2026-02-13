@@ -2,11 +2,11 @@ import pandas as pd
 import os
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import streamlit as st # Ajouté pour afficher les erreurs
 
 class DataLoader:
     def __init__(self, file_path, use_cloud=True, credentials_dict=None):
         self.file_path = file_path
-        # Force cloud off if no creds
         self.use_cloud = use_cloud and (credentials_dict or os.path.exists("credentials.json"))
         self.credentials_dict = credentials_dict
         self.xl = None
@@ -15,7 +15,6 @@ class DataLoader:
         self.credentials_path = "credentials.json"
 
     def load_source(self):
-        # ANCIENNE METHODE ROBUSTE
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         
         if self.use_cloud:
@@ -31,12 +30,10 @@ class DataLoader:
                     self.sh = self.gc.open("MASTER_EXPLOITATION") 
                     return True
             except Exception as e:
-                print(f"Erreur Cloud: {e}")
+                st.error(f"Erreur Connexion Cloud : {e}") # Affiche l'erreur en rouge
         
-        # Fallback Local
         if not os.path.exists(self.file_path):
-            # Si on est sur le cloud et qu'on a pas trouvé le fichier local, on crée un DataFrame vide pour éviter le crash immédiat
-            print("Fichier local Absent")
+            st.warning("Fichier local absent et connexion Cloud échouée.")
             return False
             
         self.xl = pd.ExcelFile(self.file_path)
@@ -46,7 +43,8 @@ class DataLoader:
         if self.sh:
             try:
                 return pd.DataFrame(self.sh.worksheet(sheet_name).get_all_records())
-            except:
+            except Exception as e:
+                st.error(f"Erreur lecture onglet '{sheet_name}' : {e}") # Affiche l'erreur précise
                 return pd.DataFrame()
         elif self.xl:
             return pd.read_excel(self.file_path, sheet_name=sheet_name)
