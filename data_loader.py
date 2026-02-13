@@ -280,14 +280,37 @@ class DataLoader:
                     return False
 
             # Filter
-            mask = (df['ID_Parcelle'] == p_target) & \
-                   (df['Date'].dt.strftime('%Y%m%d') == d_target_str) & \
-                   (df['Nature_Intervention'] == 'Traitement') & \
-                   (df[status_col].astype(str).str.lower().str.startswith('prév'))
+            # Debugging - Show matches for each condition
+            st.write(f"DEBUG: Recherche pour Parcelle='**{p_target}**' & Date='**{d_target_str}**'")
+            
+            m_p = df['ID_Parcelle'] == p_target
+            st.write(f"DEBUG: {m_p.sum()} lignes pour la parcelle.")
+            
+            # Date Matching (Flexible)
+            df['Target_Date_Str'] = df['Date'].dt.strftime('%Y%m%d')
+            m_d = df['Target_Date_Str'] == d_target_str
+            st.write(f"DEBUG: {m_d.sum()} lignes pour la date.")
+            
+            m_n = df['Nature_Intervention'] == 'Traitement'
+            # Note: Maybe it's 'Phyto' or something else in the data?
+            st.write(f"DEBUG: {m_n.sum()} lignes pour Nature='Traitement'. (Total Nature: {df['Nature_Intervention'].unique()})")
+
+            # Status Matching (Flexible 'prév')
+            m_s = df[status_col].astype(str).str.lower().str.startswith('prév')
+            st.write(f"DEBUG: {m_s.sum()} lignes pour Statut~='prév'. (Total Statuts: {df[status_col].unique()})")
+            
+            mask = m_p & m_d & m_n & m_s
+            st.write(f"DEBUG: **{mask.sum()}** lignes trouvées au total.")
                    
             if not df[mask].empty:
                 # Update
+                st.info(f"Mise à jour de {len(df[mask])} lignes...")
                 df.loc[mask, status_col] = new_status
+                
+                # Cleanup temporary column
+                if 'Target_Date_Str' in df.columns:
+                     df = df.drop(columns=['Target_Date_Str'])
+                     
                 # Write back
                 self.conn.update(worksheet="JOURNAL_INTERVENTION", data=df, spreadsheet="MASTER_EXPLOITATION")
                 return True
