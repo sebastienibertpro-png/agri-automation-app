@@ -3,6 +3,7 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
+from reportlab.graphics.shapes import Drawing, Rect
 from datetime import datetime
 import os
 
@@ -539,9 +540,6 @@ class ReportGenerator:
             
             # Checkbox placeholder (Empty square for pen check)
             # Checkbox - Graphic Rectangle
-            from reportlab.graphics.shapes import Drawing, Rect
-            from reportlab.lib import colors
-            
             d = Drawing(10, 10)
             d.add(Rect(0, 0, 10, 10, fillColor=colors.white, strokeColor=colors.black))
             checkbox = d
