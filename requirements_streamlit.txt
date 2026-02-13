@@ -1,0 +1,6 @@
+streamlit
+pandas
+reportlab
+gspread
+oauth2client
+openpyxl
