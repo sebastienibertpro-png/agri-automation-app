@@ -141,7 +141,16 @@ try:
              mixes = {}
              for _, row in df_planned.iterrows():
                  d_val = row['Date']
-                 d_str = d_val.strftime('%Y-%m-%d') if not pd.isnull(d_val) else "Date Inconnue"
+                 # Ensure d_val is datetime
+                 d_str = "Date Inconnue"
+                 if pd.notnull(d_val):
+                     try:
+                        if isinstance(d_val, str):
+                            d_val = pd.to_datetime(d_val)
+                        d_str = d_val.strftime('%Y-%m-%d')
+                     except:
+                        d_str = str(d_val)
+                        
                  p_id = row['ID_Parcelle']
                  key = (d_str, p_id)
                  
@@ -192,10 +201,20 @@ try:
                  
                  # Parse Date
                  date_obj = rows[0]['Date'] # Take first
-                 
+                 # Ensure Date is datetime
+                 if isinstance(date_obj, str):
+                     try:
+                        date_obj = pd.to_datetime(date_obj)
+                     except:
+                        pass # Fallback
+                        
                  # ID for QR
                  # "PARCELLE_YYYYMMDD"
-                 clean_date = date_str.replace("-", "")
+                 if hasattr(date_obj, 'strftime'):
+                     clean_date = date_obj.strftime('%Y%m%d')
+                 else:
+                     clean_date = "00000000"
+                     
                  intervention_id = f"{p_id}_{clean_date}"
                  
                  payload = {
