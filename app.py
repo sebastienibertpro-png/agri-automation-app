@@ -35,6 +35,11 @@ st.markdown("""
 st.title("🚜 Agri Automation")
 st.markdown("Outil de génération de rapports : **ITK**, **Ferti** et **Registre Phyto**.")
 
+# --- CONFIG ---
+# URL de l'application pour le QR Code
+# A MODIFIER SI BESOIN (ex: https://mon-app.streamlit.app)
+APP_BASE_URL = "https://agri-automation-app.streamlit.app"
+
 # --- Authentication & Setup ---
 # Load Credentials from Secrets (Streamlit Cloud) or Local File
 credentials_dict = None
@@ -96,9 +101,19 @@ else:
 
 # --- QR Action Logic (Must be at top) ---
 # Check for 'validate_phyto' in query params
+# Check for 'validate_phyto' in query params
 q_params = st.query_params
-if "validate_phyto" in q_params:
-    intervention_id = q_params["validate_phyto"]
+val_param = q_params.get("validate_phyto", None)
+
+# Handle list vs string (Streamlit versions differ)
+intervention_id = None
+if val_param:
+    if isinstance(val_param, list):
+        intervention_id = val_param[0]
+    else:
+        intervention_id = val_param
+
+if intervention_id:
     st.info(f"🔍 Scan détecté pour l'intervention : {intervention_id}")
     
     if st.button("✅ Confirmer : Traitement RÉALISÉ"):
@@ -284,7 +299,7 @@ try:
                      fpath = os.path.join(tmpdirname, fname)
                      
                      gen = ReportGenerator(fpath)
-                     gen.generate_prep_sheet(selected_campaign, payload)
+                     gen.generate_prep_sheet(selected_campaign, payload, base_url=APP_BASE_URL)
                      
                      with open(fpath, "rb") as f:
                         st.download_button(
