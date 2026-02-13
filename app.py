@@ -111,9 +111,46 @@ if "validate_phyto" in q_params:
                 # Just show success message.
             else:
                 st.error("Échec de la mise à jour (Vérifiez les logs ou la connexion).")
+            else:
+                st.error("Échec de la mise à jour (Vérifiez les logs ou la connexion).")
     st.divider()
 
+# --- DEBUG MODE (Hidden by default) ---
+with st.expander("🛠️ DEBUG - Vérification des Données (Formulations)", expanded=False):
+    st.write("### 1. Données brutes de REF_INTRANTS")
+    try:
+        df_debug = loader.get_intrants()
+        st.dataframe(df_debug)
+        st.write(f"Colonnes trouvées : {list(df_debug.columns)}")
+    except Exception as e:
+        st.error(f"Erreur chargement REF_INTRANTS : {e}")
 
+    st.write("### 2. Test Mapping Formulations")
+    try:
+        # Load Ref
+        df_ref_d = loader.get_intrants()
+        form_map_d = {}
+        target_col_d = None
+        for col in df_ref_d.columns:
+            if "formulation" in str(col).lower():
+                target_col_d = col
+                break
+        if not target_col_d: target_col_d = 'Formulation'
+        
+        st.write(f"Colonne Cible détectée pour la formulation : **{target_col_d}**")
+
+        for _, row in df_ref_d.iterrows():
+            p_n = str(row.get('Nom_Intrant', row.get('Produit', ''))).strip().lower()
+            f_v = str(row.get(target_col_d, '')).strip().upper()
+            if p_n: form_map_d[p_n] = f_v
+            
+        st.write(f"Nombre de produits mappés : {len(form_map_d)}")
+        
+        # Test against selected mix
+        st.write("### 3. Produits dans l'intervention sélectionnée")
+        # Need to select a mix first broadly...
+    except Exception as e:
+        st.error(f"Erreur debug mapping : {e}")
 # --- Generation Section ---
 st.divider()
 st.subheader("📄 Génération de Rapports")
