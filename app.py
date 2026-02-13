@@ -64,7 +64,9 @@ try:
          st.warning("Aucune donnée d'intervention trouvée.")
          st.stop()
          
-    available_campaigns = sorted(df_intervention['Campagne'].unique(), reverse=True)
+    # Clean Campaign Column
+    df_intervention['Campagne'] = pd.to_numeric(df_intervention['Campagne'], errors='coerce').fillna(0).astype(int)
+    available_campaigns = sorted(df_intervention[df_intervention['Campagne'] > 0]['Campagne'].unique(), reverse=True)
 except Exception as e:
     st.error(f"Erreur lecture campagnes: {e}")
     st.stop()
@@ -126,7 +128,8 @@ def generate_and_download(report_type):
         df_phyto = df_campaign[df_campaign['Nature_Intervention'] == "Traitement"]
         df_phyto = df_phyto[df_phyto['ID_Parcelle'].isin(target_parcelles)]
         df_phyto = patch_surface_column(df_phyto)
-        df_phyto = df_phyto.fillna("")
+        df_phyto = df_phyto.fillna("") # Clean NaNs
+        
         grouped_data = {}
         for p in df_phyto['ID_Parcelle'].unique():
             subset = df_phyto[df_phyto['ID_Parcelle'] == p].sort_values(by='Date')
@@ -140,7 +143,8 @@ def generate_and_download(report_type):
         df_ferti = df_campaign[df_campaign['Nature_Intervention'] == "Fertilisation"]
         df_ferti = df_ferti[df_ferti['ID_Parcelle'].isin(target_parcelles)]
         df_ferti = patch_surface_column(df_ferti)
-        df_ferti = df_ferti.fillna("")
+        df_ferti = df_ferti.fillna("") # Clean NaNs
+        
         grouped_data = {}
         for p in df_ferti['ID_Parcelle'].unique():
             p_meta = metadata_map.get(p, {})
@@ -156,7 +160,8 @@ def generate_and_download(report_type):
     elif report_type == "ITK":
         df_itk = df_campaign[df_campaign['ID_Parcelle'].isin(target_parcelles)]
         df_itk = patch_surface_column(df_itk)
-        df_itk = df_itk.fillna("")
+        df_itk = df_itk.fillna("") # Clean NaNs
+        
         grouped_data = {}
         if not df_itk.empty:
             for p in df_itk['ID_Parcelle'].unique():
@@ -243,5 +248,3 @@ with col_pdf2:
     handle_pdf_action("PHYTO", "🛡️ Registre Phyto")
 with col_pdf3:
     handle_pdf_action("FERTI", "🧪 Bilan Ferti")
-
-
