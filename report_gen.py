@@ -20,13 +20,21 @@ class ReportGenerator:
         search_dirs = [base_dir, cwd]
         
         logo_path = None
+        
+        # Robust case-insensitive search
         for d in search_dirs:
-            for ext in ['png', 'jpg', 'jpeg']:
-                p = os.path.join(d, f'logo.{ext}')
-                if os.path.exists(p):
-                    logo_path = p
-                    break
-            if logo_path: break
+            if not os.path.exists(d): continue
+            try:
+                # Scan directory for any file matching 'logo.*' (case insensitive)
+                for entry in os.scandir(d):
+                    if entry.is_file():
+                        fname_lower = entry.name.lower()
+                        if fname_lower in ['logo.png', 'logo.jpg', 'logo.jpeg']:
+                            logo_path = entry.path
+                            break
+                if logo_path: break
+            except Exception as e:
+                print(f"Error scanning directory {d}: {e}")
             
         print(f"Logo search paths: {search_dirs}. Found: {logo_path}")
         
