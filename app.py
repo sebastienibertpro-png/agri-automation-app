@@ -181,16 +181,26 @@ try:
                  key, rows = mix_map[selected_mix_lbl]
                  date_str, p_id = key
                  
-                 # Get Metadata (Surface)
-                 # We need efficient way. usage of loader.get_parcel_metadata might be slow if fetching all?
-                 # Let's fetch specific or rely on cached.
-                 # Actually we can use the existing `active_loader` method but it gets ALL for campaign.
-                 # Optimized: Just get what we need. 
-                 # Or assume `metadata_map` from report logic is available? It's inside a function.
-                 # Let's call it here.
-                 meta_map = active_loader.get_parcel_metadata(selected_campaign)
-                 p_meta = meta_map.get(p_id, {})
-                 surface = float(p_meta.get('Surface', 0))
+                 # Get Metadata (Surface) and Volume from Journal !
+                 # User Request: Use Surface_Travaillée_Ha and Volume_Bouillie_L_Ha from Journal
+                 # We take from the first row of the mix (assuming consistent for the intervention)
+                 try:
+                     first_row = rows[0]
+                     # Surface
+                     surf_val = first_row.get('Surface_Travaillée_Ha', 0)
+                     surface = float(surf_val) if pd.notnull(surf_val) else 0.0
+                     
+                     # Volume Bouillie
+                     vol_val = first_row.get('Volume_Bouillie_L_Ha', 0) # Fallback 0
+                     vol_ha_input = float(vol_val) if pd.notnull(vol_val) else 0.0
+                     
+                     if vol_ha_input == 0:
+                         st.warning("⚠️ Attention : Volume Bouillie / ha non renseigné dans le journal (ou égal à 0).")
+                         
+                 except Exception as ex_parse:
+                     surface = 0.0
+                     vol_ha_input = 0.0
+                     st.warning(f"Erreur lecture données (Surface/Volume): {ex_parse}")
                  
                  # Prepare Products List
                  prods = []
