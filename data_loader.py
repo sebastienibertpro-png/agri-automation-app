@@ -268,15 +268,26 @@ class DataLoader:
             # Normalize Date in DF
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
             
+            # Determine Status Column
+            status_col = 'Statut_Intervention'
+            if 'Statut_Intervention' not in df.columns:
+                if 'Statut' in df.columns:
+                    status_col = 'Statut'
+                elif 'Etat' in df.columns:
+                    status_col = 'Etat'
+                else:
+                    st.error("Colonne 'Statut_Intervention', 'Statut' ou 'Etat' introuvable dans JOURNAL_INTERVENTION.")
+                    return False
+
             # Filter
             mask = (df['ID_Parcelle'] == p_target) & \
                    (df['Date'].dt.strftime('%Y%m%d') == d_target_str) & \
                    (df['Nature_Intervention'] == 'Traitement') & \
-                   (df['Statut'].astype(str).str.lower() == 'prévu')
+                   (df[status_col].astype(str).str.lower().str.startswith('prév'))
                    
             if not df[mask].empty:
                 # Update
-                df.loc[mask, 'Statut'] = new_status
+                df.loc[mask, status_col] = new_status
                 # Write back
                 self.conn.update(worksheet="JOURNAL_INTERVENTION", data=df, spreadsheet="MASTER_EXPLOITATION")
                 return True
