@@ -45,7 +45,6 @@ if "gcp_service_account" in st.secrets:
 loader = DataLoader("dummy_path.xlsx", use_cloud=True, credentials_dict=credentials_dict)
 
 # Cache data loading to avoid re-fetching on every interaction
-@st.cache_data(ttl=600) # Cache for 10 minutes
 def load_data():
     if loader.load_source():
         return loader
@@ -244,3 +243,4 @@ with col_pdf2:
     handle_pdf_action("PHYTO", "🛡️ Registre Phyto")
 with col_pdf3:
     handle_pdf_action("FERTI", "🧪 Bilan Ferti")
+
