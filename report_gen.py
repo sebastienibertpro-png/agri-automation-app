@@ -6,6 +6,7 @@ from reportlab.lib.units import cm
 from reportlab.graphics.shapes import Drawing, Rect
 from datetime import datetime
 import os
+import pandas as pd
 
 class ReportGenerator:
     def __init__(self, filename):
