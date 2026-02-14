@@ -143,15 +143,18 @@ class DataLoader:
         df = df[df['Campagne'] == int(campaign)]
         
         # Filter Planned & Treatment
-        # Status column might be "Statut" or "Etat". Assuming "Statut" based on request.
-        # If column doesn't exist, we might need to check.
-        # User said "Statut 'Prévu'".
-        if 'Statut' not in df.columns and 'Etat' in df.columns:
-            df['Statut'] = df['Etat']
+        # Status column might be "Stat_Intervention", "Statut_Intervention", "Statut" or "Etat".
+        status_col = None
+        cols_to_check = ['Stat_Intervention', 'Statut_Intervention', 'Statut', 'Etat']
+        
+        for col in cols_to_check:
+            if col in df.columns:
+                status_col = col
+                break
             
-        if 'Statut' in df.columns:
+        if status_col:
             # Flexible check for "Prévu", "Prévue", "prévu "
-            df = df[df['Statut'].astype(str).str.strip().str.lower().str.startswith("prév")]
+            df = df[df[status_col].astype(str).str.strip().str.lower().str.startswith("prév")]
         
         df = df[df['Nature_Intervention'] == "Traitement"]
         return df
