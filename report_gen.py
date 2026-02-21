@@ -5,6 +5,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from datetime import datetime
 import os
+import pandas as pd
 
 class ReportGenerator:
     def __init__(self, filename):
@@ -329,7 +330,11 @@ class ReportGenerator:
             # 1. Travail du Sol
             # Cols: Date, Nature, Outil, Obs
             def map_sol(r):
-                d = r['Date'].strftime('%d/%m/%Y') if not pd.isnull(r['Date']) else ""
+                d_val = r.get('Date')
+                if d_val and hasattr(d_val, 'strftime'):
+                    d = d_val.strftime('%d/%m/%Y')
+                else:
+                    d = str(d_val) if not pd.isnull(d_val) else ""
                 nature = str(r.get('Nature_Intervention', ''))
                 outil = str(r.get('Outil', '') or r.get('Nom_Produit', '') or r.get('Type_Intervention', ''))
                 obs = str(r.get('Observations', ''))
@@ -346,7 +351,11 @@ class ReportGenerator:
             # 2. Semis
             # Cols: Date, Produit, Dose, Unité, Obs
             def map_semi(r):
-                d = r['Date'].strftime('%d/%m/%Y') if not pd.isnull(r['Date']) else ""
+                d_val = r.get('Date')
+                if d_val and hasattr(d_val, 'strftime'):
+                    d = d_val.strftime('%d/%m/%Y')
+                else:
+                    d = str(d_val) if not pd.isnull(d_val) else ""
                 prod = str(r.get('Nom_Produit', '')) 
                 # User requested Dose/Unité. Prefer Dose_Ha, fallback to Densité if Dose_Ha is empty/0
                 dose_val = r.get('Dose_Ha', '')
@@ -369,7 +378,11 @@ class ReportGenerator:
             # 3. Fertilisation
             # Cols: Date, Engrais, Dose, Unité, N, P, K
             def map_ferti(r):
-                d = r['Date'].strftime('%d/%m/%Y') if not pd.isnull(r['Date']) else ""
+                d_val = r.get('Date')
+                if d_val and hasattr(d_val, 'strftime'):
+                    d = d_val.strftime('%d/%m/%Y')
+                else:
+                    d = str(d_val) if not pd.isnull(d_val) else ""
                 prod = str(r.get('Nom_Produit', ''))
                 dose = f"{r.get('Dose_Ha', '')}"
                 unit = str(r.get('Unité_Dose', ''))
@@ -389,7 +402,11 @@ class ReportGenerator:
             # 4. Traitement (Phyto)
             # Cols: Date, Produit, Dose, Unité, Cible, Obs
             def map_phyto(r):
-                d = r['Date'].strftime('%d/%m/%Y') if not pd.isnull(r['Date']) else ""
+                d_val = r.get('Date')
+                if d_val and hasattr(d_val, 'strftime'):
+                    d = d_val.strftime('%d/%m/%Y')
+                else:
+                    d = str(d_val) if not pd.isnull(d_val) else ""
                 prod = str(r.get('Nom_Produit', ''))
                 dose = f"{r.get('Dose_Ha', '')}"
                 unit = str(r.get('Unité_Dose', ''))
@@ -452,7 +469,11 @@ class ReportGenerator:
             # 5. Récolte
             # Cols: Date, Rendement, Humidité, Obs
             def map_recolte(r):
-                d = r['Date'].strftime('%d/%m/%Y') if not pd.isnull(r['Date']) else ""
+                d_val = r.get('Date')
+                if d_val and hasattr(d_val, 'strftime'):
+                    d = d_val.strftime('%d/%m/%Y')
+                else:
+                    d = str(d_val) if not pd.isnull(d_val) else ""
                 rend = str(r.get('Rendement_Ha', '') or r.get('Quantité_Récoltée_Totale', ''))
                 hum = str(r.get('Humidité_récolte', ''))
                 obs = str(r.get('Observations', ''))
@@ -489,7 +510,10 @@ class ReportGenerator:
         parcelle = intervention_data.get('Parcelle', 'Inconnue')
         surface = float(intervention_data.get('Surface', 0))
         date_prevue = intervention_data.get('Date')
-        date_str = date_prevue.strftime('%d/%m/%Y') if date_prevue else "Non définie"
+        if date_prevue and hasattr(date_prevue, 'strftime'):
+            date_str = date_prevue.strftime('%d/%m/%Y')
+        else:
+            date_str = str(date_prevue) if date_prevue else "Non définie"
         
         self.add_title(f"Fiche de Préparation Phyto - {date_str}")
         
