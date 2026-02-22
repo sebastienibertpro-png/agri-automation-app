@@ -122,7 +122,7 @@ class DataLoader:
             return pd.DataFrame()
 
         # Sort by date for correct diff
-        df_releves['Date_Relevé'] = pd.to_datetime(df_releves['Date_Relevé'], errors='coerce')
+        df_releves['Date_Relevé'] = pd.to_datetime(df_releves['Date_Relevé'], errors='coerce', dayfirst=True)
         df_releves = df_releves.sort_values(by=['ID_Compteur', 'Date_Relevé'])
 
         # Calculate difference (Index - Previous Index) BEFORE filtering
@@ -310,7 +310,7 @@ class DataLoader:
             d_target_str = parts[1] # YYYYMMDD
             
             # Normalize Date in DF
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
             
             # Determine Status Column
             status_col = 'Statut_Intervention'
