@@ -77,7 +77,7 @@ try:
     
     # Years from Irrigation Readings
     if not df_releves.empty:
-        df_releves['Date_Relevé'] = pd.to_datetime(df_releves['Date_Relevé'], errors='coerce')
+        df_releves['Date_Relevé'] = pd.to_datetime(df_releves['Date_Relevé'], errors='coerce', dayfirst=True)
         years.update(df_releves['Date_Relevé'].dt.year.dropna().unique())
         
     available_campaigns = sorted([int(y) for y in years], reverse=True)
