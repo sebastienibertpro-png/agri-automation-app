@@ -6,6 +6,7 @@ from report_gen import ReportGenerator
 import json
 import tempfile
 from datetime import datetime
+from email_utils import send_email_with_attachment
 
 # Page Configuration
 st.set_page_config(
@@ -429,3 +430,95 @@ with col_pdf2:
     handle_pdf_action("PHYTO", "🛡️ Registre Phyto")
 with col_pdf3:
     handle_pdf_action("FERTI", "🧪 Bilan Ferti")
+
+# --- SECTION IRRIGATION ---
+st.divider()
+st.subheader("💧 Gestion de l'Irrigation")
+
+try:
+    with st.spinner("Chargement des données d'irrigation..."):
+        df_conso = loader.get_consumption_data(selected_campaign)
+
+    if df_conso.empty:
+        st.info(f"Aucune donnée d'irrigation trouvée pour la campagne {selected_campaign}.")
+    else:
+        # Display data summary
+        st.markdown(f"#### 📊 Consommation Campagne {selected_campaign}")
+        
+        # Simple aggregated view per network
+        df_agg = df_conso.groupby('Reseau_type')['Conso_Reelle_m3'].sum().reset_index()
+        df_agg.columns = ['Réseau', 'Total m3']
+        st.table(df_agg)
+
+        # Actions par réseau
+        networks = df_conso['Reseau_type'].unique()
+        
+        for net in sorted(networks):
+            with st.expander(f"Action pour le réseau : {net}"):
+                net_data = df_conso[df_conso['Reseau_type'] == net]
+                
+                col_irr1, col_irr2 = st.columns(2)
+                
+                with col_irr1:
+                    if st.button(f"📄 Générer PDF - {net}", key=f"btn_pdf_{net}"):
+                        with tempfile.TemporaryDirectory() as tmpdirname:
+                            fname = f"Rapport_Irrigation_{selected_campaign}_{net}.pdf"
+                            fpath = os.path.join(tmpdirname, fname)
+                            
+                            gen = ReportGenerator(fpath)
+                            gen.generate_irrigation_report(selected_campaign, net, net_data)
+                            
+                            with open(fpath, "rb") as f:
+                                st.download_button(
+                                    label=f"⬇️ Télécharger PDF {net}",
+                                    data=f,
+                                    file_name=fname,
+                                    mime="application/pdf"
+                                )
+                
+                with col_irr2:
+                    # Email only for non-private networks
+                    if net in ["CUMA_Irrigation", "ASA_SaintLoup"]:
+                        recipient = net_data['Mail_Contact-Reseau'].iloc[0] if 'Mail_Contact-Reseau' in net_data.columns else None
+                        
+                        if st.button(f"📧 Envoyer par Email - {net}", key=f"btn_mail_{net}"):
+                            if not recipient:
+                                st.error(f"Aucune adresse email trouvée pour le réseau {net}.")
+                            else:
+                                with st.spinner(f"Envoi au destinataire : {recipient}..."):
+                                    # Use a tmp file that persists for the email duration
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                                        fpath = tmp_file.name
+                                        gen = ReportGenerator(fpath)
+                                        gen.generate_irrigation_report(selected_campaign, net, net_data)
+                                        
+                                        # GMAIL CONFIG FROM SECRETS
+                                        # User provided: pabr ewcm ikrf wkcw
+                                        # We should ideally use st.secrets, but for this step let's mention it.
+                                        sender_email = st.secrets.get("GMAIL_USER")
+                                        app_password = st.secrets.get("GMAIL_PASSWORD")
+                                        
+                                        if not sender_email or not app_password:
+                                            st.error("Identifiants Gmail manquants dans les Secrets Streamlit (GMAIL_USER, GMAIL_PASSWORD).")
+                                        else:
+                                            success = send_email_with_attachment(
+                                                sender_email,
+                                                app_password,
+                                                recipient,
+                                                f"Rapport Irrigation {selected_campaign} - {net}",
+                                                f"Bonjour,\n\nVeuillez trouver ci-joint le rapport de consommation pour le réseau {net} pour la campagne {selected_campaign}.\n\nCordialement.",
+                                                fpath
+                                            )
+                                            if success:
+                                                st.success(f"Email envoyé avec succès à {recipient} !")
+                                            else:
+                                                st.error("Échec de l'envoi de l'email. Vérifiez la configuration (Code à 16 caractères).")
+                                        
+                                        # Cleanup
+                                        if os.path.exists(fpath):
+                                            os.remove(fpath)
+                    else:
+                        st.info("Réseau privé : Envoi par email non requis.")
+
+except Exception as e:
+    st.error(f"Erreur lors du traitement de l'irrigation : {e}")
