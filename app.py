@@ -471,6 +471,28 @@ try:
         # Final filter
         df_filtered = df_net_filtered[df_net_filtered['ID_Compteur'].isin(selected_meters)]
         
+        # Month Selector for Monthly Reports
+        # Map Reading Month to Consumption Month (Reading - 1)
+        french_months = {
+            1: 'Janvier', 2: 'Février', 3: 'Mars', 4: 'Avril', 5: 'Mai', 6: 'Juin',
+            7: 'Juillet', 8: 'Août', 9: 'Septembre', 10: 'Octobre', 11: 'Novembre', 12: 'Décembre'
+        }
+        
+        reading_months = sorted(df_filtered['Date_Relevé'].dt.month.dropna().unique())
+        month_options = []
+        month_map = {} # Display Name -> Consumption Month Index
+        
+        for m in reading_months:
+            conso_m_idx = m - 1 if m > 1 else 12
+            label = f"{french_months[conso_m_idx]} (Relevé de {french_months[m]})"
+            month_options.append(label)
+            month_map[label] = m # We store the Reading Month to filter data
+            
+        with col_f1:
+            selected_month_label = st.selectbox("📅 Mois de Consommation (Bilan Mensuel)", month_options)
+            selected_reading_month = month_map[selected_month_label] if selected_month_label else None
+            conso_month_name = selected_month_label.split(" (")[0] if selected_month_label else ""
+        
         if df_filtered.empty:
             st.warning("Veuillez sélectionner au moins un réseau.")
         else:
@@ -480,6 +502,7 @@ try:
             # Simple aggregated view per network
             df_agg = df_filtered.groupby('Reseau_type')['Conso_Reelle_m3'].sum().reset_index()
             df_agg.columns = ['Réseau', 'Total m3']
+            df_agg['Total m3'] = df_agg['Total m3'].round(1)
             st.table(df_agg)
 
             # Actions par réseau
@@ -488,68 +511,68 @@ try:
                 if net_data.empty: continue
                 
                 with st.expander(f"Action pour le réseau : {net}"):
+                    st.markdown("#### 📜 Bilan Campagne")
                     col_irr1, col_irr2 = st.columns(2)
                 
-                with col_irr1:
-                    if st.button(f"📄 Générer PDF - {net}", key=f"btn_pdf_{net}"):
-                        with tempfile.TemporaryDirectory() as tmpdirname:
-                            fname = f"Rapport_Irrigation_{selected_campaign}_{net}.pdf"
-                            fpath = os.path.join(tmpdirname, fname)
+                    with col_irr1:
+                        if st.button(f"📄 PDF Campagne - {net}", key=f"btn_pdf_camp_{net}"):
+                            with tempfile.TemporaryDirectory() as tmpdirname:
+                                fname = f"Bilan_Campagne_Irrigation_{selected_campaign}_{net}.pdf"
+                                fpath = os.path.join(tmpdirname, fname)
+                                gen = ReportGenerator(fpath)
+                                gen.generate_irrigation_report(selected_campaign, net, net_data)
+                                with open(fpath, "rb") as f:
+                                    st.download_button(label=f"⬇️ Télécharger PDF Campagne", data=f, file_name=fname, mime="application/pdf", key=f"dl_camp_{net}")
+
+                    st.divider()
+                    st.markdown(f"#### 📅 Bilan Mensuel : {conso_month_name}")
+                    col_irr_m1, col_irr_m2 = st.columns(2)
+                    
+                    # Filter for that specific month's data
+                    monthly_data = net_data[net_data['Date_Relevé'].dt.month == selected_reading_month]
+                    
+                    with col_irr_m1:
+                        if st.button(f"📄 PDF Mensuel - {net}", key=f"btn_pdf_month_{net}"):
+                            with tempfile.TemporaryDirectory() as tmpdirname:
+                                fname = f"Bilan_Mensuel_{conso_month_name}_{selected_campaign}_{net}.pdf"
+                                fpath = os.path.join(tmpdirname, fname)
+                                gen = ReportGenerator(fpath)
+                                gen.generate_monthly_network_report(selected_campaign, conso_month_name, net, monthly_data)
+                                with open(fpath, "rb") as f:
+                                    st.download_button(label=f"⬇️ Télécharger PDF Mensuel", data=f, file_name=fname, mime="application/pdf", key=f"dl_month_{net}")
+                                    
+                    with col_irr_m2:
+                        # Email only for non-private networks
+                        if net in ["CUMA_Irrigation", "ASA_SaintLoup"]:
+                            recipient = monthly_data['Mail_Contact-Reseau'].iloc[0] if not monthly_data.empty and 'Mail_Contact-Reseau' in monthly_data.columns else None
                             
-                            gen = ReportGenerator(fpath)
-                            gen.generate_irrigation_report(selected_campaign, net, net_data)
-                            
-                            with open(fpath, "rb") as f:
-                                st.download_button(
-                                    label=f"⬇️ Télécharger PDF {net}",
-                                    data=f,
-                                    file_name=fname,
-                                    mime="application/pdf"
-                                )
-                
-                with col_irr2:
-                    # Email only for non-private networks
-                    if net in ["CUMA_Irrigation", "ASA_SaintLoup"]:
-                        recipient = net_data['Mail_Contact-Reseau'].iloc[0] if 'Mail_Contact-Reseau' in net_data.columns else None
-                        
-                        if st.button(f"📧 Envoyer par Email - {net}", key=f"btn_mail_{net}"):
-                            if not recipient:
-                                st.error(f"Aucune adresse email trouvée pour le réseau {net}.")
-                            else:
-                                with st.spinner(f"Envoi au destinataire : {recipient}..."):
-                                    # Use a tmp file that persists for the email duration
-                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                                        fpath = tmp_file.name
-                                        gen = ReportGenerator(fpath)
-                                        gen.generate_irrigation_report(selected_campaign, net, net_data)
-                                        
-                                        # GMAIL CONFIG FROM SECRETS
-                                        # User provided: pabr ewcm ikrf wkcw
-                                        # We should ideally use st.secrets, but for this step let's mention it.
-                                        sender_email = st.secrets.get("GMAIL_USER")
-                                        app_password = st.secrets.get("GMAIL_PASSWORD")
-                                        
-                                        if not sender_email or not app_password:
-                                            st.error("Identifiants Gmail manquants dans les Secrets Streamlit (GMAIL_USER, GMAIL_PASSWORD).")
-                                        else:
-                                            success = send_email_with_attachment(
-                                                sender_email,
-                                                app_password,
-                                                recipient,
-                                                f"Rapport Irrigation {selected_campaign} - {net}",
-                                                f"Bonjour,\n\nVeuillez trouver ci-joint le rapport de consommation pour le réseau {net} pour la campagne {selected_campaign}.\n\nCordialement.",
-                                                fpath
-                                            )
-                                            if success:
-                                                st.success(f"Email envoyé avec succès à {recipient} !")
+                            if st.button(f"📧 Envoyer Bilan Mensuel - {net}", key=f"btn_mail_month_{net}"):
+                                if not recipient:
+                                    st.error(f"Aucune adresse email trouvée pour le réseau {net}.")
+                                else:
+                                    with st.spinner(f"Envoi du bilan mensuel à : {recipient}..."):
+                                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                                            fpath = tmp_file.name
+                                            gen = ReportGenerator(fpath)
+                                            gen.generate_monthly_network_report(selected_campaign, conso_month_name, net, monthly_data)
+                                            
+                                            sender_email = st.secrets.get("GMAIL_USER")
+                                            app_password = st.secrets.get("GMAIL_PASSWORD")
+                                            
+                                            if not sender_email or not app_password:
+                                                st.error("Identifiants Gmail manquants.")
                                             else:
-                                                st.error("Échec de l'envoi de l'email. Vérifiez la configuration (Code à 16 caractères).")
-                                        
-                                        # Cleanup
-                                        if os.path.exists(fpath):
-                                            os.remove(fpath)
-                    else:
-                        st.info("Réseau privé : Envoi par email non requis.")
+                                                success = send_email_with_attachment(
+                                                    sender_email, app_password, recipient,
+                                                    f"Bilan Irrigation Mensuel ({conso_month_name}) - {net}",
+                                                    f"Bonjour,\n\nVeuillez trouver ci-joint le bilan de consommation mensuel pour le réseau {net} (Mois concerné : {conso_month_name}).\n\nCordialement.",
+                                                    fpath
+                                                )
+                                                if success: st.success(f"Email envoyé à {recipient} !")
+                                                else: st.error("Échec de l'envoi.")
+                                            if os.path.exists(fpath): os.remove(fpath)
+                        else:
+                            st.info("Privé : Email non requis.")
 
 except Exception as e:
     st.error(f"Erreur lors du traitement de l'irrigation : {e}")
