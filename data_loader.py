@@ -136,32 +136,30 @@ class DataLoader:
         if df_releves.empty or df_ref.empty:
             return pd.DataFrame()
 
-        # Filter by Campaign (assuming Date_Relevé contains year or we filter by campaign range)
-        # Assuming campaign is a year like 2024
+        # Sort by date for correct diff
         df_releves['Date_Relevé'] = pd.to_datetime(df_releves['Date_Relevé'], errors='coerce')
-        # Campaigns usually cover summer. Let's filter by year for now or specific month ranges
-        df_releves = df_releves[df_releves['Date_Relevé'].dt.year == int(campaign)]
-
-        if df_releves.empty:
-            return pd.DataFrame()
-
-        # Sort by date
         df_releves = df_releves.sort_values(by=['ID_Compteur', 'Date_Relevé'])
 
-        # Calculate difference (Index - Previous Index)
+        # Calculate difference (Index - Previous Index) BEFORE filtering
+        # This allows getting the consumption for the first reading of a campaign
         df_releves['Diff_m3'] = df_releves.groupby('ID_Compteur')['Index_m3'].diff()
 
+        # Filter by Campaign AFTER diff calculation
+        df_filtered_releves = df_releves[df_releves['Date_Relevé'].dt.year == int(campaign)]
+
+        if df_filtered_releves.empty:
+            return pd.DataFrame()
+
         # Merge with Ref to get Usage% and Reseau_type
-        # ID_cCompteur vs ID_Compteur? User said ID_cCompteur in REF_COMPTEURS, but Releves usually matches.
-        # Let's check columns for ID_cCompteur or ID_Compteur
         id_col_ref = 'ID_cCompteur' if 'ID_cCompteur' in df_ref.columns else 'ID_Compteur'
-        id_col_releves = 'ID_Compteur' # Assuming standard
+        id_col_releves = 'ID_Compteur' 
 
-        df_merged = pd.merge(df_releves, df_ref, left_on=id_col_releves, right_on=id_col_ref, how='left')
+        df_merged = pd.merge(df_filtered_releves, df_ref, left_on=id_col_releves, right_on=id_col_ref, how='left')
 
-        # Apply Usage% (coerce to float if needed)
-        df_merged['Usage%'] = pd.to_numeric(df_merged['Usage%'], errors='coerce').fillna(1.0)
-        df_merged['Conso_Reelle_m3'] = df_merged['Diff_m3'] * df_merged['Usage%']
+        # Apply Usage% (coerce to float and divide by 100)
+        # If the sheet says 30, it means 30% -> 0.3
+        df_merged['Usage_Ratio'] = pd.to_numeric(df_merged['Usage%'], errors='coerce').fillna(100.0) / 100.0
+        df_merged['Conso_Reelle_m3'] = df_merged['Diff_m3'] * df_merged['Usage_Ratio']
 
         return df_merged
 
