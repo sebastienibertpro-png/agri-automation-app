@@ -635,7 +635,7 @@ class ReportGenerator:
         network_type: 'Privé', 'CUMA_Irrigation', or 'ASA_SaintLoup'
         data: DataFrame containing consumption data (merged info).
         """
-        self.doc.pagesize = landscape(A4)
+        self.doc.pagesize = A4 # Portrait
         self.add_title(f"Rapport de Consommation Irrigation - {network_type}")
         self.add_paragraph(f"Campagne {campaign}", style_name='Heading2')
         
@@ -656,8 +656,8 @@ class ReportGenerator:
                 self.elements.append(Spacer(1, 5))
                 
                 # Table: Monthly Consumption
-                # Columns: Date, Relevé Brut (Index), Différence (Brute), Conso Réelle (Usage%)
-                table_data = [['Date Relevé', 'Index Brut (m3)', 'Diff. Brute (m3)', 'Conso Réelle (m3)']]
+                # Columns: Date, Relevé Brut (Index), Conso Brute (m3), Conso Réelle (m3)
+                table_data = [['Date Relevé', 'Index Brut (m3)', 'Conso Brute (m3)', 'Conso Réelle (m3)']]
                 
                 total_brut = 0
                 total_reel = 0
