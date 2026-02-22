@@ -691,13 +691,13 @@ class ReportGenerator:
                     table_data.append([
                         d_str,
                         month_label,
-                        f"{row['Index_m3']:.0f}" if pd.notnull(row['Index_m3']) else "",
-                        f"{diff:.0f}" if pd.notnull(diff) else "",
-                        f"{conso:.0f}" if pd.notnull(conso) else ""
+                        f"{row['Index_m3']:.1f}" if pd.notnull(row['Index_m3']) else "",
+                        f"{diff:.1f}" if pd.notnull(diff) else "",
+                        f"{conso:.1f}" if pd.notnull(conso) else ""
                     ])
                 
                 # Summary Row
-                table_data.append(['TOTAL CAMPAGNE', '', '', f"{total_brut:.0f}", f"{total_reel:.0f}"])
+                table_data.append(['TOTAL CAMPAGNE', '', '', f"{total_brut:.1f}", f"{total_reel:.1f}"])
                 
                 t = Table(table_data, colWidths=[3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
                 t.setStyle(TableStyle([
@@ -720,4 +720,62 @@ class ReportGenerator:
 
         self.doc.build(self.elements)
         print(f"Irrigation PDF Generated: {self.filename}")
+
+    def generate_monthly_network_report(self, campaign, month_name, network_type, data):
+        """
+        Generates a summary report for a specific month and network.
+        Single table with all meters.
+        """
+        self.doc.pagesize = A4
+        self.add_title(f"Bilan Mensuel Irrigation - {network_type}")
+        self.add_paragraph(f"Mois : {month_name} {campaign}", style_name='Heading2')
+        
+        if data.empty:
+            self.add_paragraph("Aucune donnée pour ce mois.")
+        else:
+            table_data = [['ID Compteur', 'Relevé Brut (m3)', 'Conso Brute (m3)', 'Conso Nette (m3)']]
+            
+            total_brut = 0
+            total_nette = 0
+            
+            # Data is already filtered for the network and month
+            # ID_cCompteur or ID_Compteur
+            id_col = 'ID_cCompteur' if 'ID_cCompteur' in data.columns else 'ID_Compteur'
+            
+            for _, row in data.sort_values(by=id_col).iterrows():
+                brut = row.get('Diff_m3', 0)
+                nette = row.get('Conso_Reelle_m3', 0)
+                
+                if pd.notnull(brut): total_brut += brut
+                if pd.notnull(nette): total_nette += nette
+                
+                table_data.append([
+                    str(row[id_col]),
+                    f"{row['Index_m3']:.0f}" if pd.notnull(row['Index_m3']) else "",
+                    f"{brut:.1f}" if pd.notnull(brut) else "",
+                    f"{nette:.1f}" if pd.notnull(nette) else ""
+                ])
+                
+            # Summary Row
+            table_data.append(['TOTAL RÉSEAU', '', f"{total_brut:.1f}", f"{total_nette:.1f}"])
+            
+            t = Table(table_data, colWidths=[4.5*cm, 4.5*cm, 4.5*cm, 4.5*cm])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e8f5e9')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0,-1), (-1,-1), colors.lightgrey),
+            ]))
+            self.elements.append(t)
+            self.elements.append(Spacer(1, 20))
+            
+            if 'Mail_Contact-Reseau' in data.columns and pd.notnull(data['Mail_Contact-Reseau'].iloc[0]):
+                contact = data['Mail_Contact-Reseau'].iloc[0]
+                self.elements.append(Paragraph(f"<i>Destinataire : {contact}</i>", self.styles['Normal']))
+
+        self.doc.build(self.elements)
+        print(f"Monthly Irrigation PDF Generated: {self.filename}")
 
