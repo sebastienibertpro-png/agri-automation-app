@@ -3,6 +3,7 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
+from reportlab.graphics.shapes import Drawing, Rect
 from datetime import datetime
 import os
 import pandas as pd
@@ -330,15 +331,14 @@ class ReportGenerator:
             # 1. Travail du Sol
             # Cols: Date, Nature, Outil, Obs
             def map_sol(r):
-                d_val = r.get('Date')
-                if d_val and hasattr(d_val, 'strftime'):
-                    d = d_val.strftime('%d/%m/%Y')
-                else:
-                    d = str(d_val) if not pd.isnull(d_val) else ""
+                d = r['Date']
+                if d and hasattr(d, 'strftime'): d_str = d.strftime('%d/%m/%Y')
+                else: d_str = str(d) if not pd.isnull(d) else ""
+                
                 nature = str(r.get('Nature_Intervention', ''))
                 outil = str(r.get('Outil', '') or r.get('Nom_Produit', '') or r.get('Type_Intervention', ''))
                 obs = str(r.get('Observations', ''))
-                return [d, nature, outil, obs]
+                return [d_str, nature, outil, obs]
 
             add_section_table(
                 "Travail du Sol",
@@ -351,11 +351,10 @@ class ReportGenerator:
             # 2. Semis
             # Cols: Date, Produit, Dose, Unité, Obs
             def map_semi(r):
-                d_val = r.get('Date')
-                if d_val and hasattr(d_val, 'strftime'):
-                    d = d_val.strftime('%d/%m/%Y')
-                else:
-                    d = str(d_val) if not pd.isnull(d_val) else ""
+                d = r['Date']
+                if d and hasattr(d, 'strftime'): d_str = d.strftime('%d/%m/%Y')
+                else: d_str = str(d) if not pd.isnull(d) else ""
+                
                 prod = str(r.get('Nom_Produit', '')) 
                 # User requested Dose/Unité. Prefer Dose_Ha, fallback to Densité if Dose_Ha is empty/0
                 dose_val = r.get('Dose_Ha', '')
@@ -365,7 +364,7 @@ class ReportGenerator:
                 
                 unit = str(r.get('Unité_Dose', '') or r.get('Unité_Densité', ''))
                 obs = str(r.get('Observations', ''))
-                return [d, prod, dose, unit, obs]
+                return [d_str, prod, dose, unit, obs]
 
             add_section_table(
                 "Semis",
@@ -378,18 +377,17 @@ class ReportGenerator:
             # 3. Fertilisation
             # Cols: Date, Engrais, Dose, Unité, N, P, K
             def map_ferti(r):
-                d_val = r.get('Date')
-                if d_val and hasattr(d_val, 'strftime'):
-                    d = d_val.strftime('%d/%m/%Y')
-                else:
-                    d = str(d_val) if not pd.isnull(d_val) else ""
+                d = r['Date']
+                if d and hasattr(d, 'strftime'): d_str = d.strftime('%d/%m/%Y')
+                else: d_str = str(d) if not pd.isnull(d) else ""
+                
                 prod = str(r.get('Nom_Produit', ''))
                 dose = f"{r.get('Dose_Ha', '')}"
                 unit = str(r.get('Unité_Dose', ''))
                 n = f"{r.get('N/ha', '')}"
                 p = f"{r.get('P/ha', '')}"
                 k = f"{r.get('K/ha', '')}"
-                return [d, prod, dose, unit, n, p, k]
+                return [d_str, prod, dose, unit, n, p, k]
             
             add_section_table(
                 "Fertilisation",
@@ -402,17 +400,16 @@ class ReportGenerator:
             # 4. Traitement (Phyto)
             # Cols: Date, Produit, Dose, Unité, Cible, Obs
             def map_phyto(r):
-                d_val = r.get('Date')
-                if d_val and hasattr(d_val, 'strftime'):
-                    d = d_val.strftime('%d/%m/%Y')
-                else:
-                    d = str(d_val) if not pd.isnull(d_val) else ""
+                d = r['Date']
+                if d and hasattr(d, 'strftime'): d_str = d.strftime('%d/%m/%Y')
+                else: d_str = str(d) if not pd.isnull(d) else ""
+                
                 prod = str(r.get('Nom_Produit', ''))
                 dose = f"{r.get('Dose_Ha', '')}"
                 unit = str(r.get('Unité_Dose', ''))
                 cible = str(r.get('Cible', ''))
                 obs = str(r.get('Observations', ''))
-                return [d, prod, dose, unit, cible, obs]
+                return [d_str, prod, dose, unit, cible, obs]
             
             # Grouping Logic for Phyto
             raw_treatments = content.get('Traitement', [])
@@ -421,18 +418,24 @@ class ReportGenerator:
             
             for t in raw_treatments:
                 d_val = t.get('Date')
+                # Explicit check for NaT/NaN or String
                 if pd.isnull(d_val):
                     key = "Inconnue"
-                else:
+                elif hasattr(d_val, 'strftime'):
                     key = d_val.strftime('%Y-%m-%d')
+                else:
+                    key = str(d_val) # Fallback key
                 
                 if key not in treatments_by_date:
                     treatments_by_date[key] = []
                 treatments_by_date[key].append(t)
             
+            # Helper for combined row checks?
+            # Ideally re-verify dates are unified.
+            
             for key in sorted(treatments_by_date.keys()):
                 group = treatments_by_date[key]
-                first = group[0]
+                first = group[0] # Use first item for base date
                 
                 prods = [str(x.get('Nom_Produit', '')) for x in group]
                 doses = [str(x.get('Dose_Ha', '')) for x in group]
@@ -469,15 +472,14 @@ class ReportGenerator:
             # 5. Récolte
             # Cols: Date, Rendement, Humidité, Obs
             def map_recolte(r):
-                d_val = r.get('Date')
-                if d_val and hasattr(d_val, 'strftime'):
-                    d = d_val.strftime('%d/%m/%Y')
-                else:
-                    d = str(d_val) if not pd.isnull(d_val) else ""
+                d = r['Date']
+                if d and hasattr(d, 'strftime'): d_str = d.strftime('%d/%m/%Y')
+                else: d_str = str(d) if not pd.isnull(d) else ""
+                
                 rend = str(r.get('Rendement_Ha', '') or r.get('Quantité_Récoltée_Totale', ''))
                 hum = str(r.get('Humidité_récolte', ''))
                 obs = str(r.get('Observations', ''))
-                return [d, rend, hum, obs]
+                return [d_str, rend, hum, obs]
 
             add_section_table(
                 "Récolte",
@@ -493,7 +495,7 @@ class ReportGenerator:
         print(f"PDF Generated: {self.filename}")
 
 
-    def generate_prep_sheet(self, campaign, intervention_data):
+    def generate_prep_sheet(self, campaign, intervention_data, base_url="https://share.streamlit.io"):
         """
         Generates the Phyto Preparation Sheet (Fiche de Préparation de Bouillie).
         intervention_data: dict containing:
@@ -503,6 +505,7 @@ class ReportGenerator:
             'Volume_Bouillie_Ha': float (optional, default 150)
             'Products': list of dicts (Nom_Produit, Dose_Ha, Formulation, etc.) sorted by mixing order
             'Intervention_ID': str (unique ID for QR)
+        base_url: str (Base URL of the Streamlit App for QR link)
         """
         self.doc.pagesize = A4 # Portrait
         
@@ -569,8 +572,11 @@ class ReportGenerator:
             dose_str = f"{dose_ha} {unite}"
             qty_str = f"{qty_total:.2f} {unite}"
             
-            # Checkbox placeholder (Empty square)
-            checkbox = "⬜" 
+            # Checkbox placeholder (Empty square for pen check)
+            # Checkbox - Graphic Rectangle
+            d = Drawing(10, 10)
+            d.add(Rect(0, 0, 10, 10, fillColor=colors.white, strokeColor=colors.black))
+            checkbox = d
             
             table_data.append([checkbox, str(idx), p_name, form, dose_str, qty_str])
             
@@ -598,8 +604,12 @@ class ReportGenerator:
         
         intervention_id = intervention_data.get('Intervention_ID', 'test')
         
-        qr_payload = f"https://share.streamlit.io/?validate_phyto={intervention_id}" 
-        # Note: Ideally we want the specific app url. We'll use a generic text for now.
+        # QR Payload with dynamic Base URL
+        # Ensure trailing slash handling
+        if not base_url.endswith('/'):
+            base_url += '/'
+        
+        qr_payload = f"{base_url}?validate_phyto={intervention_id}" 
         
         qr = qrcode.QRCode(box_size=10, border=4)
         qr.add_data(qr_payload)
@@ -618,4 +628,80 @@ class ReportGenerator:
         
         self.doc.build(self.elements)
         print(f"PDF Generated: {self.filename}")
+
+    def generate_irrigation_report(self, campaign, network_type, data):
+        """
+        Generates the Irrigation Consumption Report.
+        network_type: 'Privé', 'CUMA_Irrigation', or 'ASA_SaintLoup'
+        data: DataFrame containing consumption data (merged info).
+        """
+        self.doc.pagesize = landscape(A4)
+        self.add_title(f"Rapport de Consommation Irrigation - {network_type}")
+        self.add_paragraph(f"Campagne {campaign}", style_name='Heading2')
+        
+        if data.empty:
+            self.add_paragraph("Aucune donnée de consommation enregistrée pour ce réseau.")
+        else:
+            # Group by Compteur
+            # ID_cCompteur or ID_Compteur
+            id_col = 'ID_cCompteur' if 'ID_cCompteur' in data.columns else 'ID_Compteur'
+            
+            for meter_id in data[id_col].unique():
+                meter_data = data[data[id_col] == meter_id].sort_values(by='Date_Relevé')
+                sn = meter_data['Numero_Serie_Compteur'].iloc[0] if 'Numero_Serie_Compteur' in meter_data.columns else 'N/A'
+                usage = meter_data['Usage%'].iloc[0] if 'Usage%' in meter_data.columns else 1.0
+                
+                header_text = f"<b>Compteur : {meter_id}</b> (N° Série: {sn}) | Coefficient d'usage : {usage*100:.0f}%"
+                self.elements.append(Paragraph(header_text, self.styles['Heading3']))
+                self.elements.append(Spacer(1, 5))
+                
+                # Table: Monthly Consumption
+                # Columns: Date, Relevé Brut (Index), Différence (Brute), Conso Réelle (Usage%)
+                table_data = [['Date Relevé', 'Index Brut (m3)', 'Diff. Brute (m3)', 'Conso Réelle (m3)']]
+                
+                total_brut = 0
+                total_reel = 0
+                
+                for _, row in meter_data.iterrows():
+                    d_val = row['Date_Relevé']
+                    d_str = d_val.strftime('%d/%m/%Y') if pd.notnull(d_val) else ""
+                    
+                    diff = row.get('Diff_m3', 0)
+                    conso = row.get('Conso_Reelle_m3', 0)
+                    
+                    # Cumulative totals
+                    if pd.notnull(diff): total_brut += diff
+                    if pd.notnull(conso): total_reel += conso
+                    
+                    table_data.append([
+                        d_str,
+                        f"{row['Index_m3']:.0f}" if pd.notnull(row['Index_m3']) else "",
+                        f"{diff:.0f}" if pd.notnull(diff) else "",
+                        f"{conso:.0f}" if pd.notnull(conso) else ""
+                    ])
+                
+                # Summary Row
+                table_data.append(['TOTAL CAMPAGNE', '', f"{total_brut:.0f}", f"{total_reel:.0f}"])
+                
+                t = Table(table_data, colWidths=[4*cm, 4*cm, 4*cm, 4*cm])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e8f5e9')),
+                    ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                    ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+                    ('BACKGROUND', (0,-1), (-1,-1), colors.lightgrey),
+                ]))
+                self.elements.append(t)
+                self.elements.append(Spacer(1, 15))
+
+            # Email Contact Info (Footer)
+            if 'Mail_Contact-Reseau' in data.columns and pd.notnull(data['Mail_Contact-Reseau'].iloc[0]):
+                contact = data['Mail_Contact-Reseau'].iloc[0]
+                self.elements.append(Spacer(1, 10))
+                self.elements.append(Paragraph(f"<i>Destinataire : {contact}</i>", self.styles['Normal']))
+
+        self.doc.build(self.elements)
+        print(f"Irrigation PDF Generated: {self.filename}")
 
