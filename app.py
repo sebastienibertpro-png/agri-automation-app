@@ -21,6 +21,18 @@ with st.sidebar:
     st.write(f"CWD : `{os.getcwd()}`")
     import report_gen
     st.write(f"Module : `{report_gen.__file__}`")
+    
+    # Check GMAIL Secrets
+    gmail_root = "GMAIL_USER" in st.secrets
+    gmail_nested = ("connections" in st.secrets and "gsheets" in st.secrets["connections"] and "GMAIL_USER" in st.secrets["connections"]["gsheets"])
+    
+    if gmail_root or gmail_nested:
+        st.success("✅ Secrets GMAIL trouvés")
+        if gmail_nested: st.warning("Note: Secrets imbriqués dans [connections.gsheets]")
+    else:
+        st.error("❌ Secrets GMAIL INTROUVABLES")
+        st.info("Clés attendues : GMAIL_USER, GMAIL_PASSWORD")
+    
     if hasattr(ReportGenerator, 'generate_monthly_network_report'):
         st.success("✅ Méthode mensuelle PRÉSENTE")
     else:
@@ -567,11 +579,20 @@ try:
                                             gen = ReportGenerator(fpath)
                                             gen.generate_monthly_network_report(selected_campaign, conso_month_name, net, monthly_data)
                                             
+                                            # Robust secrets retrieval
                                             sender_email = st.secrets.get("GMAIL_USER")
                                             app_password = st.secrets.get("GMAIL_PASSWORD")
                                             
+                                            # If not at root, try nested in connections.gsheets
+                                            if not sender_email:
+                                                try:
+                                                    sender_email = st.secrets["connections"]["gsheets"]["GMAIL_USER"]
+                                                    app_password = st.secrets["connections"]["gsheets"]["GMAIL_PASSWORD"]
+                                                except:
+                                                    pass
+                                            
                                             if not sender_email or not app_password:
-                                                st.error("Identifiants Gmail manquants.")
+                                                st.error(f"Identifiants Gmail manquants. (Clés vues : {list(st.secrets.keys())})")
                                             else:
                                                 success = send_email_with_attachment(
                                                     sender_email, app_password, recipient,
