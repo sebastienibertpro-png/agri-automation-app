@@ -648,23 +648,38 @@ class ReportGenerator:
             
             for meter_id in data[id_col].unique():
                 meter_data = data[data[id_col] == meter_id].sort_values(by='Date_Relevé')
+                # Original Usage% from sheet (not the ratio)
+                usage_val = meter_data['Usage%'].iloc[0] if 'Usage%' in meter_data.columns else 100.0
                 sn = meter_data['Numero_Serie_Compteur'].iloc[0] if 'Numero_Serie_Compteur' in meter_data.columns else 'N/A'
-                usage = meter_data['Usage%'].iloc[0] if 'Usage%' in meter_data.columns else 1.0
                 
-                header_text = f"<b>Compteur : {meter_id}</b> (N° Série: {sn}) | Coefficient d'usage : {usage*100:.0f}%"
+                header_text = f"<b>Compteur : {meter_id}</b> (N° Série: {sn}) | Coefficient d'usage : {usage_val:.0f}%"
                 self.elements.append(Paragraph(header_text, self.styles['Heading3']))
                 self.elements.append(Spacer(1, 5))
                 
                 # Table: Monthly Consumption
-                # Columns: Date, Relevé Brut (Index), Conso Brute (m3), Conso Réelle (m3)
-                table_data = [['Date Relevé', 'Index Brut (m3)', 'Conso Brute (m3)', 'Conso Réelle (m3)']]
+                # Columns: Date, Mois, Relevé Brut, Conso Brute, Conso Réelle
+                table_data = [['Date Relevé', 'Mois', 'Index Brut (m3)', 'Conso Brute (m3)', 'Conso Réelle (m3)']]
                 
                 total_brut = 0
                 total_reel = 0
                 
+                # Month names in French
+                french_months = {
+                    1: 'Janvier', 2: 'Février', 3: 'Mars', 4: 'Avril', 5: 'Mai', 6: 'Juin',
+                    7: 'Juillet', 8: 'Août', 9: 'Septembre', 10: 'Octobre', 11: 'Novembre', 12: 'Décembre'
+                }
+                
                 for _, row in meter_data.iterrows():
                     d_val = row['Date_Relevé']
                     d_str = d_val.strftime('%d/%m/%Y') if pd.notnull(d_val) else ""
+                    
+                    # Target month (Month before reading)
+                    month_label = ""
+                    if pd.notnull(d_val):
+                        # Calculate previous month
+                        prev_m_idx = d_val.month - 1
+                        if prev_m_idx == 0: prev_m_idx = 12
+                        month_label = french_months.get(prev_m_idx, "")
                     
                     diff = row.get('Diff_m3', 0)
                     conso = row.get('Conso_Reelle_m3', 0)
@@ -675,15 +690,16 @@ class ReportGenerator:
                     
                     table_data.append([
                         d_str,
+                        month_label,
                         f"{row['Index_m3']:.0f}" if pd.notnull(row['Index_m3']) else "",
                         f"{diff:.0f}" if pd.notnull(diff) else "",
                         f"{conso:.0f}" if pd.notnull(conso) else ""
                     ])
                 
                 # Summary Row
-                table_data.append(['TOTAL CAMPAGNE', '', f"{total_brut:.0f}", f"{total_reel:.0f}"])
+                table_data.append(['TOTAL CAMPAGNE', '', '', f"{total_brut:.0f}", f"{total_reel:.0f}"])
                 
-                t = Table(table_data, colWidths=[4*cm, 4*cm, 4*cm, 4*cm])
+                t = Table(table_data, colWidths=[3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
                 t.setStyle(TableStyle([
                     ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e8f5e9')),
                     ('TEXTCOLOR', (0,0), (-1,0), colors.black),
