@@ -8,9 +8,8 @@ class DataLoader:
         self.file_path = file_path
         self.use_cloud = use_cloud
         self.conn = None
-        # We don't need credentials_dict explicitly passed here if st.secrets is set up correctly
-        # The GSheetsConnection handles it automatically from st.secrets
-        self.xl = None # Keep for local Excel fallback
+        self.xl = None 
+        self._cache = {} # Local session cache
 
     def load_source(self):
         """Loads data source: Google Sheets if available/requested, else local Excel."""
@@ -33,40 +32,34 @@ class DataLoader:
         return False
 
     def _get_data(self, sheet_name):
-        """Internal helper to get dataframe from active source."""
-        # GSheetsConnection reads the whole file or by worksheet
-        # It usually expects a spreadsheet name or URL in the query or secrets
-        # We can pass the spreadsheet name directly to read() if configured, 
-        # or assuming the connection is bound to a specific sheet.
-        # Actually, st-gsheets-connection .read() takes a worksheet parameter.
-        
-        # We need to specify the spreadsheet title here if it's not default
+        """Internal helper to get dataframe from active source with caching."""
+        if sheet_name in self._cache:
+            return self._cache[sheet_name]
+
         SPREADSHEET_NAME = "MASTER_EXPLOITATION"
         
+        df = pd.DataFrame()
         if self.conn:
             try:
-                # read() returns a DataFrame directly
-                return self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME)
+                # Use a small TTL for the connection itself, but our _cache handles the session
+                df = self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME, ttl=300)
             except Exception as e:
                 st.error(f"Erreur lecture onglet '{sheet_name}' : {e}")
-                return pd.DataFrame()
-        elif self.xl: # Check if local Excel is loaded
-            return pd.read_excel(self.file_path, sheet_name=sheet_name)
+        elif self.xl:
+            df = pd.read_excel(self.file_path, sheet_name=sheet_name)
         else:
-            # This case should ideally not be reached if load_source was called correctly
-            # and either conn or xl was initialized.
             raise Exception("Source de données non initialisée.")
+        
+        if not df.empty:
+            self._cache[sheet_name] = df
+        return df
+
+    def clear_cache(self):
+        """Clears the local session cache."""
+        self._cache = {}
 
     def get_interventions(self):
-        try:
-            if self.conn:
-                df = self.conn.read(worksheet="JOURNAL_INTERVENTION", ttl=600, spreadsheet="MASTER_EXPLOITATION")
-            else:
-                df = self.xl.parse("JOURNAL_INTERVENTION")
-            return df
-        except Exception as e:
-            st.error(f"Erreur lecture Interventions: {e}")
-            return pd.DataFrame()
+        return self._get_data("JOURNAL_INTERVENTION")
 
     def get_intrants(self):
         """Loads REF_INTRANTS."""
@@ -77,19 +70,11 @@ class DataLoader:
         return self._get_data("REF_PARCELLES")
     
     def get_assolement(self, campaign=None):
-        try:
-            if self.conn:
-                df = self.conn.read(worksheet="ASSOLEMENT", ttl=600, spreadsheet="MASTER_EXPLOITATION")
-            else:
-                df = self.xl.parse("ASSOLEMENT")
-            
-            if campaign and not df.empty:
-                df['Campagne'] = df['Campagne'].astype(str)
-                df = df[df['Campagne'] == str(campaign)]
-            return df
-        except Exception as e:
-            # Fallback or error
-            return pd.DataFrame()
+        df = self._get_data("ASSOLEMENT")
+        if campaign and not df.empty:
+            df['Campagne'] = df['Campagne'].astype(str)
+            df = df[df['Campagne'] == str(campaign)]
+        return df
 
     def get_products_ref(self):
         try:
