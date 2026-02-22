@@ -15,29 +15,6 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- DEBUG DIAGNOSTICS ---
-with st.sidebar:
-    st.title("🛠️ Diagnostics")
-    st.write(f"CWD : `{os.getcwd()}`")
-    import report_gen
-    st.write(f"Module : `{report_gen.__file__}`")
-    
-    # Check GMAIL Secrets
-    gmail_root = "GMAIL_USER" in st.secrets
-    gmail_nested = ("connections" in st.secrets and "gsheets" in st.secrets["connections"] and "GMAIL_USER" in st.secrets["connections"]["gsheets"])
-    
-    if gmail_root or gmail_nested:
-        st.success("✅ Secrets GMAIL trouvés")
-        if gmail_nested: st.warning("Note: Secrets imbriqués dans [connections.gsheets]")
-    else:
-        st.error("❌ Secrets GMAIL INTROUVABLES")
-        st.info("Clés attendues : GMAIL_USER, GMAIL_PASSWORD")
-    
-    if hasattr(ReportGenerator, 'generate_monthly_network_report'):
-        st.success("✅ Méthode mensuelle PRÉSENTE")
-    else:
-        st.error("❌ Méthode mensuelle MANQUANTE")
-
 # Custom CSS for aesthetics
 st.markdown("""
 <style>
