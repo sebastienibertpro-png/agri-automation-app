@@ -66,13 +66,25 @@ if not active_loader:
 # --- Campaigns ---
 try:
     df_intervention = active_loader.get_interventions()
-    if df_intervention.empty:
-         st.warning("Aucune donnée d'intervention trouvée.")
-         st.stop()
-         
-    # Clean Campaign Column
-    df_intervention['Campagne'] = pd.to_numeric(df_intervention['Campagne'], errors='coerce').fillna(0).astype(int)
-    available_campaigns = sorted(df_intervention[df_intervention['Campagne'] > 0]['Campagne'].unique(), reverse=True)
+    df_releves = active_loader.get_releves_compteurs()
+    
+    years = set()
+    
+    # Years from Interventions
+    if not df_intervention.empty:
+        df_intervention['Campagne'] = pd.to_numeric(df_intervention['Campagne'], errors='coerce').fillna(0).astype(int)
+        years.update(df_intervention[df_intervention['Campagne'] > 0]['Campagne'].unique())
+    
+    # Years from Irrigation Readings
+    if not df_releves.empty:
+        df_releves['Date_Relevé'] = pd.to_datetime(df_releves['Date_Relevé'], errors='coerce')
+        years.update(df_releves['Date_Relevé'].dt.year.dropna().unique())
+        
+    available_campaigns = sorted([int(y) for y in years], reverse=True)
+    
+    if not available_campaigns:
+        st.warning("Aucune donnée (intervention ou relevé) trouvée.")
+        st.stop()
 except Exception as e:
     st.error(f"Erreur lecture campagnes: {e}")
     st.stop()
@@ -442,22 +454,41 @@ try:
     if df_conso.empty:
         st.info(f"Aucune donnée d'irrigation trouvée pour la campagne {selected_campaign}.")
     else:
-        # Display data summary
-        st.markdown(f"#### 📊 Consommation Campagne {selected_campaign}")
+        # Network and Meter Filtering
+        networks = sorted(df_conso['Reseau_type'].unique())
         
-        # Simple aggregated view per network
-        df_agg = df_conso.groupby('Reseau_type')['Conso_Reelle_m3'].sum().reset_index()
-        df_agg.columns = ['Réseau', 'Total m3']
-        st.table(df_agg)
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            selected_nets = st.multiselect("Filtre Réseau", networks, default=networks)
+        
+        # Filter meters based on networks
+        df_net_filtered = df_conso[df_conso['Reseau_type'].isin(selected_nets)]
+        available_meters = sorted(df_net_filtered['ID_Compteur'].unique()) if not df_net_filtered.empty else []
+        
+        with col_f2:
+            selected_meters = st.multiselect("Filtre Compteurs", available_meters, default=available_meters)
+            
+        # Final filter
+        df_filtered = df_net_filtered[df_net_filtered['ID_Compteur'].isin(selected_meters)]
+        
+        if df_filtered.empty:
+            st.warning("Veuillez sélectionner au moins un réseau.")
+        else:
+            # Display data summary
+            st.markdown(f"#### 📊 Consommation Campagne {selected_campaign}")
+            
+            # Simple aggregated view per network
+            df_agg = df_filtered.groupby('Reseau_type')['Conso_Reelle_m3'].sum().reset_index()
+            df_agg.columns = ['Réseau', 'Total m3']
+            st.table(df_agg)
 
-        # Actions par réseau
-        networks = df_conso['Reseau_type'].unique()
-        
-        for net in sorted(networks):
-            with st.expander(f"Action pour le réseau : {net}"):
-                net_data = df_conso[df_conso['Reseau_type'] == net]
+            # Actions par réseau
+            for net in sorted(selected_nets):
+                net_data = df_filtered[df_filtered['Reseau_type'] == net]
+                if net_data.empty: continue
                 
-                col_irr1, col_irr2 = st.columns(2)
+                with st.expander(f"Action pour le réseau : {net}"):
+                    col_irr1, col_irr2 = st.columns(2)
                 
                 with col_irr1:
                     if st.button(f"📄 Générer PDF - {net}", key=f"btn_pdf_{net}"):
