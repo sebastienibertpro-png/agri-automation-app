@@ -109,6 +109,62 @@ class DataLoader:
         except Exception as e:
             return pd.DataFrame()
 
+    def get_ref_compteurs(self):
+        """Loads REF_COMPTEURS (ID_Compteur, Numero_Serie_Compteur, Reseau_type, Mail_Contact-Reseau, Usage%)."""
+        return self._get_data("REF_COMPTEURS")
+
+    def get_ref_secteurs(self):
+        """Loads REF_SECTEURS (ID_Secteur, ID_Compteur, Surface_ha, etc.)."""
+        return self._get_data("REF_SECTEURS")
+
+    def get_releves_compteurs(self):
+        """Loads RELEVES_COMPTEURS (ID_Compteur, Date_Relevé, Index_m3)."""
+        return self._get_data("RELEVES_COMPTEURS")
+
+    def get_journal_irrigation(self):
+        """Loads JOURNAL_IRRIGATION (ID_Secteur, Date_Debut, Date_Fin, Vol_m3, etc.)."""
+        return self._get_data("JOURNAL_IRRIGATION")
+
+    def get_consumption_data(self, campaign):
+        """
+        Calculates consumption per meter for a given campaign.
+        Consommation = (Index_N - Index_N-1) * Usage%
+        """
+        df_releves = self.get_releves_compteurs()
+        df_ref = self.get_ref_compteurs()
+
+        if df_releves.empty or df_ref.empty:
+            return pd.DataFrame()
+
+        # Filter by Campaign (assuming Date_Relevé contains year or we filter by campaign range)
+        # Assuming campaign is a year like 2024
+        df_releves['Date_Relevé'] = pd.to_datetime(df_releves['Date_Relevé'], errors='coerce')
+        # Campaigns usually cover summer. Let's filter by year for now or specific month ranges
+        df_releves = df_releves[df_releves['Date_Relevé'].dt.year == int(campaign)]
+
+        if df_releves.empty:
+            return pd.DataFrame()
+
+        # Sort by date
+        df_releves = df_releves.sort_values(by=['ID_Compteur', 'Date_Relevé'])
+
+        # Calculate difference (Index - Previous Index)
+        df_releves['Diff_m3'] = df_releves.groupby('ID_Compteur')['Index_m3'].diff()
+
+        # Merge with Ref to get Usage% and Reseau_type
+        # ID_cCompteur vs ID_Compteur? User said ID_cCompteur in REF_COMPTEURS, but Releves usually matches.
+        # Let's check columns for ID_cCompteur or ID_Compteur
+        id_col_ref = 'ID_cCompteur' if 'ID_cCompteur' in df_ref.columns else 'ID_Compteur'
+        id_col_releves = 'ID_Compteur' # Assuming standard
+
+        df_merged = pd.merge(df_releves, df_ref, left_on=id_col_releves, right_on=id_col_ref, how='left')
+
+        # Apply Usage% (coerce to float if needed)
+        df_merged['Usage%'] = pd.to_numeric(df_merged['Usage%'], errors='coerce').fillna(1.0)
+        df_merged['Conso_Reelle_m3'] = df_merged['Diff_m3'] * df_merged['Usage%']
+
+        return df_merged
+
     def get_parcel_metadata(self, campaign):
         """
         Returns a dictionary keyed by ID_Parcelle containing: 
