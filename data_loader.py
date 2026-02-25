@@ -355,3 +355,28 @@ class DataLoader:
         except Exception as e:
             st.error(f"Erreur mise à jour: {e}")
             return False
+
+    def bulk_insert_interventions(self, df_to_append):
+        """
+        Appends multiple new intervention rows to the JOURNAL_INTERVENTION sheet.
+        """
+        if not self.conn:
+            st.error("Insertion impossible en local (Lecture seule).")
+            return False
+            
+        try:
+            # 1. Read existing data
+            df_existing = self.conn.read(worksheet="JOURNAL_INTERVENTION", ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            
+            # 2. Append new data
+            # Use pd.concat for pandas >= 1.4.0 instead of append
+            df_updated = pd.concat([df_existing, df_to_append], ignore_index=True)
+            
+            # 3. Write back
+            # Streamlit GSheets update replaces the entire worksheet's data with the dataframe
+            self.conn.update(worksheet="JOURNAL_INTERVENTION", data=df_updated, spreadsheet="MASTER_EXPLOITATION")
+            return True
+            
+        except Exception as e:
+            st.error(f"Erreur lors de l'insertion en masse : {e}")
+            return False
