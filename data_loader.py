@@ -72,8 +72,8 @@ class DataLoader:
     def get_assolement(self, campaign=None):
         df = self._get_data("ASSOLEMENT")
         if campaign and not df.empty:
-            df['Campagne'] = df['Campagne'].astype(str)
-            df = df[df['Campagne'] == str(campaign)]
+            df['Campagne'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+            df = df[df['Campagne'] == int(campaign)]
         return df
 
     def get_products_ref(self):
@@ -158,20 +158,16 @@ class DataLoader:
         df_ref = self.get_parcelles()
         
         # Merge Assolement (Campagne specific) with Ref (Static)
-        # Left join on ID_Parcelle
-        merged = pd.merge(df_asso, df_ref, on='ID_Parcelle', how='left', suffixes=('', '_ref'))
+        # We start from df_ref to ensure we have all reference parcels, then merge assolement info.
+        merged = pd.merge(df_ref, df_asso, on='ID_Parcelle', how='left', suffixes=('', '_asso'))
         
         metadata = {}
         for _, row in merged.iterrows():
             p_id = row['ID_Parcelle']
             
-            # Gestion des suffixes liés au merge DataFrame pandas
-            surf_col = 'Surface_Référence_Ha_ref' if 'Surface_Référence_Ha_ref' in row else 'Surface_Référence_Ha'
-            culture_col = 'Culture'
-            
             metadata[p_id] = {
-                'Culture': row.get(culture_col, 'Inconnue'),
-                'Surface': row.get(surf_col, 0.0),
+                'Culture': row.get('Culture', 'Inconnue'),
+                'Surface': row.get('Surface_Référence_Ha', 0.0),
                 'Ilot_PAC': row.get('îlot PAC', 'N/A'),
                 'Precedent': row.get('Precedent_Cultural', 'N/A'),
                 'Variete': row.get('Variété', '')
