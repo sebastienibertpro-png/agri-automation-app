@@ -306,8 +306,10 @@ class DataLoader:
             parts = intervention_id.rsplit('_', 1) 
             if len(parts) < 2: return False
             
-            p_target = parts[0]
+            p_targets_str = parts[0]
             d_target_str = parts[1] # YYYYMMDD
+            
+            p_targets = p_targets_str.split('|')
             
             # Normalize Date in DF
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
@@ -328,7 +330,7 @@ class DataLoader:
             # Date Matching (Flexible)
             df['Target_Date_Str'] = df['Date'].dt.strftime('%Y%m%d')
             
-            m_p = df['ID_Parcelle'] == p_target
+            m_p = df['ID_Parcelle'].isin(p_targets)
             m_d = df['Target_Date_Str'] == d_target_str
             m_n = df['Nature_Intervention'] == 'Traitement'
             m_s = df[status_col].astype(str).str.lower().str.startswith('prév')
