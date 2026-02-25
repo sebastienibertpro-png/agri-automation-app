@@ -165,7 +165,7 @@ with st.expander("Ouvrir le formulaire de saisie groupée"):
         # Try to get referentiel, fallback to text input if fails
         liste_produits = []
         try:
-             df_intrants = active_loader._load_sheet_with_retry("REF_INTRANTS")
+             df_intrants = active_loader._get_data("REF_INTRANTS")
              if not df_intrants.empty and 'Nom_Produit' in df_intrants.columns:
                  liste_produits = sorted(df_intrants['Nom_Produit'].dropna().unique().tolist())
              else:
