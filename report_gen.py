@@ -11,11 +11,11 @@ import pandas as pd
 class ReportGenerator:
     def __init__(self, filename):
         self.filename = filename
-        self.doc = SimpleDocTemplate(filename, pagesize=A4) # Portrait
+        # Reduce top margin to bring the logo and content higher up
+        self.doc = SimpleDocTemplate(filename, pagesize=A4, topMargin=1*cm, bottomMargin=1.5*cm, leftMargin=1.5*cm, rightMargin=1.5*cm) 
         self.elements = []
         self.styles = getSampleStyleSheet()
         
-        # --- LOGO INTEGRATION ---
         # --- LOGO INTEGRATION ---
         base_dir = os.path.dirname(os.path.abspath(__file__))
         cwd = os.getcwd()
@@ -42,15 +42,15 @@ class ReportGenerator:
         
         if logo_path:
             try:
-                # Add Logo (Width 5cm, conserve aspect ratio)
+                # Add Logo (Make it larger, e.g. Width 7cm instead of 5cm)
                 im = Image(logo_path)
-                desired_width = 5 * cm
+                desired_width = 7 * cm
                 aspect = im.imageHeight / im.imageWidth
                 im.drawWidth = desired_width
                 im.drawHeight = desired_width * aspect
                 im.hAlign = 'LEFT'
                 self.elements.append(im)
-                self.elements.append(Spacer(1, 15))
+                self.elements.append(Spacer(1, 10)) # Reduced space after logo so title isn't pushed too far down
             except Exception as e:
                 print(f"Warning: Could not load logo: {e}")
         
