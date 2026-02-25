@@ -164,12 +164,10 @@ try:
              # Create a list of options: "YYYY-MM-DD - Parcelle (X produits)"
              
              # Grouping
-             # Key: (DateStr, Parcelle)
-             # Value: List of rows
-             mixes = {}
+             # 1. Group by (Date, Parcelle) to get interventions
+             interventions_by_dp = {}
              for _, row in df_planned.iterrows():
                  d_val = row['Date']
-                 # Ensure d_val is datetime
                  d_str = "Date Inconnue"
                  if pd.notnull(d_val):
                      try:
@@ -180,20 +178,55 @@ try:
                         d_str = str(d_val)
                         
                  p_id = row['ID_Parcelle']
-                 key = (d_str, p_id)
+                 key_dp = (d_str, p_id)
+                 if key_dp not in interventions_by_dp: interventions_by_dp[key_dp] = []
+                 interventions_by_dp[key_dp].append(row)
                  
-                 if key not in mixes: mixes[key] = []
-                 mixes[key].append(row)
+             # 2. Group interventions by (Date, Products_Hash)
+             mixes = {}
+             for key_dp, rows in interventions_by_dp.items():
+                 d_str, p_id = key_dp
+                 
+                 prod_signatures = []
+                 for r in rows:
+                     p_name = str(r.get('Nom_Produit', '')).strip().lower()
+                     dose = str(r.get('Dose_Ha', '')).strip()
+                     prod_signatures.append(f"{p_name}_{dose}")
+                 
+                 mix_signature = tuple(sorted(prod_signatures))
+                 mix_key = (d_str, mix_signature)
+                 
+                 if mix_key not in mixes: mixes[mix_key] = []
+                 mixes[mix_key].append({'Parcelle': p_id, 'Rows': rows})
              
              # Create Options
              mix_options = []
              mix_map = {}
-             for k, rows in mixes.items():
-                 date_lbl, p_lbl = k
-                 nb_p = len(rows)
-                 label = f"{date_lbl} - {p_lbl} ({nb_p} produits)"
+             # Keep track of unique labels
+             label_counter = {}
+             for k, intervs in mixes.items():
+                 d_str, mix_sig = k
+                 first_rows = intervs[0]['Rows']
+                 nb_p = len(first_rows)
+                 nb_parcelles = len(intervs)
+                 
+                 p_names = [i['Parcelle'] for i in intervs]
+                 if nb_parcelles <= 2:
+                     p_label = " & ".join(p_names)
+                 else:
+                     p_label = f"{nb_parcelles} Parcelles"
+                 
+                 base_label = f"{d_str} - {p_label} ({nb_p} produits)"
+                 
+                 if base_label in label_counter:
+                     label_counter[base_label] += 1
+                     label = f"{base_label} (Mix {label_counter[base_label]})"
+                 else:
+                     label_counter[base_label] = 1
+                     label = base_label
+                     
                  mix_options.append(label)
-                 mix_map[label] = (k, rows)
+                 mix_map[label] = (k, intervs)
              
              mix_options = sorted(mix_options, reverse=True)
              
@@ -201,64 +234,68 @@ try:
              with col_p1:
                 selected_mix_lbl = st.selectbox("Choisir l'intervention prévue :", mix_options)
              with col_p2:
-                # No manual input, automatic from Journal
                 pass
              
              if st.button("Générer Fiche Préparation"):
                  # Prepare Data
-                 key, rows = mix_map[selected_mix_lbl]
-                 date_str, p_id = key
+                 key, intervs = mix_map[selected_mix_lbl]
+                 date_str, mix_sig = key
                  
-                 # Get Metadata (Surface) and Volume from Journal !
-                 # User Request: Use Surface_Travaillée_Ha and Volume_Bouillie_L_Ha from Journal
-                 # We take from the first row of the mix (assuming consistent for the intervention)
-                 try:
-                     first_row = rows[0]
-                     # Surface
-                     surf_val = first_row.get('Surface_Travaillée_Ha', 0)
-                     surface = float(surf_val) if pd.notnull(surf_val) else 0.0
+                 total_surface = 0.0
+                 vol_ha_input = 0.0
+                 parcelles_info = []
+                 p_ids = []
+                 
+                 first_rows = intervs[0]['Rows']
+                 
+                 for interv in intervs:
+                     p_id = interv['Parcelle']
+                     p_ids.append(p_id)
+                     first_row_interv = interv['Rows'][0]
                      
-                     # Volume Bouillie
-                     vol_val = first_row.get('Volume_Bouillie_L_Ha', 0) # Fallback 0
-                     vol_ha_input = float(vol_val) if pd.notnull(vol_val) else 0.0
-                     
-                     if vol_ha_input == 0:
-                         st.warning("⚠️ Attention : Volume Bouillie / ha non renseigné dans le journal (ou égal à 0).")
+                     try:
+                         surf_val = first_row_interv.get('Surface_Travaillée_Ha', 0)
+                         surface = float(surf_val) if pd.notnull(surf_val) else 0.0
+                     except:
+                         surface = 0.0
                          
-                 except Exception as ex_parse:
-                     surface = 0.0
-                     vol_ha_input = 0.0
-                     st.warning(f"Erreur lecture données (Surface/Volume): {ex_parse}")
+                     total_surface += surface
+                     parcelles_info.append({'name': p_id, 'surface': surface})
+                     
+                     if vol_ha_input == 0.0:
+                         try:
+                             vol_val = first_row_interv.get('Volume_Bouillie_L_Ha', 0)
+                             vol_ha_input = float(vol_val) if pd.notnull(vol_val) else 0.0
+                         except:
+                             pass
+                             
+                 if vol_ha_input == 0:
+                     st.warning("⚠️ Attention : Volume Bouillie / ha non renseigné.")
                  
                  # Prepare Products List
                  prods = []
-                 for r in rows:
+                 for r in first_rows:
                      prods.append(r.to_dict())
                  
                  # Sort
                  sorted_prods = loader.sort_products_by_formulation(prods)
                  
                  # Parse Date
-                 date_obj = rows[0]['Date'] # Take first
-                 # Ensure Date is datetime
+                 date_obj = first_rows[0]['Date']
                  if isinstance(date_obj, str):
-                     try:
-                        date_obj = pd.to_datetime(date_obj)
-                     except:
-                        pass # Fallback
+                     try: date_obj = pd.to_datetime(date_obj)
+                     except: pass
                         
-                 # ID for QR
-                 # "PARCELLE_YYYYMMDD"
                  if hasattr(date_obj, 'strftime'):
                      clean_date = date_obj.strftime('%Y%m%d')
                  else:
                      clean_date = "00000000"
                      
-                 intervention_id = f"{p_id}_{clean_date}"
+                 intervention_id = f"{'|'.join(p_ids)}_{clean_date}"
                  
                  payload = {
-                     'Parcelle': p_id,
-                     'Surface': surface,
+                     'Parcelles': parcelles_info,
+                     'Total_Surface': total_surface,
                      'Date': date_obj,
                      'Volume_Bouillie_Ha': vol_ha_input,
                      'Products': sorted_prods,
