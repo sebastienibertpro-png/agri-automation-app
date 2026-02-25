@@ -143,26 +143,26 @@ with st.expander("Ouvrir le formulaire de saisie groupée", expanded=True):
 
     st.markdown("##### 2. Choix des Parcelles")
     # Ensure we don't start with "Toutes" pre-selected as it's not a real parcel
-        default_p = [] if selected_parcelle == "Toutes" else [selected_parcelle]
-        selected_p_for_entry = st.multiselect("Parcelles concernées", available_parcelles, default=default_p)
-        
-        # Affichage dynamique des surfaces
-        parcelles_data = [] # List of dicts: {'id': ..., 'culture': ..., 'surface': ...}
-        if selected_p_for_entry:
-            st.markdown("*Surfaces travaillées (Ajustables)*")
-            metadata = active_loader.get_parcel_metadata(campagne_saisie)
-            cols = st.columns(len(selected_p_for_entry) if len(selected_p_for_entry) < 4 else 4)
-            for i, p_id in enumerate(selected_p_for_entry):
-                p_meta = metadata.get(p_id, {})
-                culture_ref = p_meta.get('Culture', 'Inconnue')
-                try:
-                    surf_ref = float(str(p_meta.get('Surface', 0.0)).replace(',', '.'))
-                except:
-                    surf_ref = 0.0
-                    
-                with cols[i % 4]:
-                     surf_input = st.number_input(f"{p_id} ({culture_ref})", value=surf_ref, step=0.5, key=f"surf_input_{p_id}")
-                     parcelles_data.append({'id': p_id, 'culture': culture_ref, 'surface': float(surf_input)})
+    default_p = [] if selected_parcelle == "Toutes" else [selected_parcelle]
+    selected_p_for_entry = st.multiselect("Parcelles concernées", available_parcelles, default=default_p)
+    
+    # Affichage dynamique des surfaces
+    parcelles_data = [] # List of dicts: {'id': ..., 'culture': ..., 'surface': ...}
+    if selected_p_for_entry:
+        st.markdown("*Surfaces travaillées (Ajustables)*")
+        metadata = active_loader.get_parcel_metadata(campagne_saisie)
+        cols = st.columns(len(selected_p_for_entry) if len(selected_p_for_entry) < 4 else 4)
+        for i, p_id in enumerate(selected_p_for_entry):
+            p_meta = metadata.get(p_id, {})
+            culture_ref = p_meta.get('Culture', 'Inconnue')
+            try:
+                surf_ref = float(str(p_meta.get('Surface', 0.0)).replace(',', '.'))
+            except:
+                surf_ref = 0.0
+                
+            with cols[i % 4]:
+                 surf_input = st.number_input(f"{p_id} ({culture_ref})", value=surf_ref, step=0.5, key=f"surf_input_{p_id}")
+                 parcelles_data.append({'id': p_id, 'culture': culture_ref, 'surface': float(surf_input)})
 
     st.markdown("##### 3. Choix des Produits")
     # Try to get referentiel, fallback to text input if fails
@@ -197,56 +197,56 @@ with st.expander("Ouvrir le formulaire de saisie groupée", expanded=True):
     submitted = st.button("Enregistrer les interventions 🚀")
     
     if submitted:
-            if not selected_p_for_entry:
-                 st.error("Veuillez sélectionner au moins une parcelle.")
-            elif not produits_data:
-                 st.error("Veuillez ajouter au moins un produit.")
-            else:
-                 # Construire le DataFrame à insérer
-                 rows_to_insert = []
-                 for p in parcelles_data:
-                      for prod in produits_data:
-                           # Calculs auto
-                           qty_totale = prod['dose'] * p['surface']
-                           vol_c_total = volume_bouillie * p['surface']
-                           
-                           # Generate 8 char alphanumeric ID
-                           uid = generate_intervention_id()
-                           
-                           row = {
-                                'ID_Intervention': uid,
-                                'ID_Parcelle': p['id'],
-                                'Campagne': campagne_saisie,
-                                'Date': date_interv.strftime('%d/%m/%Y'),
-                                'Statut_Intervention': statut,
-                                'Nature_Intervention': 'Traitement',
-                                'Type_Intervention': type_interv,
-                                'Culture': p['culture'],
-                                'Surface_Travaillée_Ha': p['surface'],
-                                'Tracteur': tracteur,
-                                'Outil': outil if outil != "- Aucun -" else "",
-                                'Nom_Produit': prod['nom'],
-                                'Num_AMM': '', # Laisser vide pour l'instant
-                                'Dose_Ha': prod['dose'],
-                                'Unité_Dose': prod['unite'],
-                                'Quantité_Totale_Produit': round(qty_totale, 2),
-                                'Unité_Quantité': str(prod['unite']).replace('/ha', '').replace('/Ha', ''),
-                                'Volume_Bouillie_L_Ha': volume_bouillie,
-                                'Volume_Total_Bouillie_L': round(vol_c_total, 2),
-                                'Stade_Culture': stade,
-                                'BBCH': '',
-                                'Observations': observations
-                           }
-                           rows_to_insert.append(row)
-                 
-                 df_new = pd.DataFrame(rows_to_insert)
-                 
-                 with st.spinner(f"Insertion de {len(df_new)} ligne(s) dans le journal..."):
-                      success = active_loader.bulk_insert_interventions(df_new)
-                      if success:
-                           st.success("✅ Interventions enregistrées avec succès ! (Rechargez la page pour la mise à jour des rapports)")
-                      else:
-                           st.error("❌ Échec de l'insertion.")
+        if not selected_p_for_entry:
+             st.error("Veuillez sélectionner au moins une parcelle.")
+        elif not produits_data:
+             st.error("Veuillez ajouter au moins un produit.")
+        else:
+             # Construire le DataFrame à insérer
+             rows_to_insert = []
+             for p in parcelles_data:
+                  for prod in produits_data:
+                       # Calculs auto
+                       qty_totale = prod['dose'] * p['surface']
+                       vol_c_total = volume_bouillie * p['surface']
+                       
+                       # Generate 8 char alphanumeric ID
+                       uid = generate_intervention_id()
+                       
+                       row = {
+                            'ID_Intervention': uid,
+                            'ID_Parcelle': p['id'],
+                            'Campagne': campagne_saisie,
+                            'Date': date_interv.strftime('%d/%m/%Y'),
+                            'Statut_Intervention': statut,
+                            'Nature_Intervention': 'Traitement',
+                            'Type_Intervention': type_interv,
+                            'Culture': p['culture'],
+                            'Surface_Travaillée_Ha': p['surface'],
+                            'Tracteur': tracteur,
+                            'Outil': outil if outil != "- Aucun -" else "",
+                            'Nom_Produit': prod['nom'],
+                            'Num_AMM': '', # Laisser vide pour l'instant
+                            'Dose_Ha': prod['dose'],
+                            'Unité_Dose': prod['unite'],
+                            'Quantité_Totale_Produit': round(qty_totale, 2),
+                            'Unité_Quantité': str(prod['unite']).replace('/ha', '').replace('/Ha', ''),
+                            'Volume_Bouillie_L_Ha': volume_bouillie,
+                            'Volume_Total_Bouillie_L': round(vol_c_total, 2),
+                            'Stade_Culture': stade,
+                            'BBCH': '',
+                            'Observations': observations
+                       }
+                       rows_to_insert.append(row)
+             
+             df_new = pd.DataFrame(rows_to_insert)
+             
+             with st.spinner(f"Insertion de {len(df_new)} ligne(s) dans le journal..."):
+                  success = active_loader.bulk_insert_interventions(df_new)
+                  if success:
+                       st.success("✅ Interventions enregistrées avec succès ! (Rechargez la page pour la mise à jour des rapports)")
+                  else:
+                       st.error("❌ Échec de l'insertion.")
 
 # --- QR Action Logic (Must be at top generally, but works here in stream) ---
 
