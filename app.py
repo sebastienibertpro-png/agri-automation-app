@@ -136,7 +136,7 @@ with st.expander("Ouvrir le formulaire de saisie groupée"):
         with col_m2:
             tracteur = st.selectbox("Tracteur", ["130_CVX", "220_CVX", "Berthoud_Raptor", "Axial_5140"])
         with col_m3:
-            outil = st.selectbox("Outil", ["Agata", "Ependeur_Engrais", "DDI", "Rotative", "Cultivateur_Bonnel", "Bineuse", "Fissurateur", "Rabe"])
+            outil = st.selectbox("Outil", ["- Aucun -", "Agata", "Ependeur_Engrais", "DDI", "Rotative", "Cultivateur_Bonnel", "Bineuse", "Fissurateur", "Rabe"])
             
         stade = st.selectbox("Stade Culture", ["Pré-levée", "Levée", "2F", "4-6F", "8-10F", "12F", "Floraison", "Tallage", "Epis 1cm", "Montaison"])
         volume_bouillie = st.number_input("Volume Bouillie (L/ha)", min_value=0.0, value=100.0, step=10.0)
@@ -163,10 +163,18 @@ with st.expander("Ouvrir le formulaire de saisie groupée"):
 
         st.markdown("##### 3. Choix des Produits")
         # Try to get referentiel, fallback to text input if fails
+        liste_produits = []
         try:
              df_intrants = active_loader._load_sheet_with_retry("REF_INTRANTS")
-             liste_produits = sorted(df_intrants['Nom_Produit'].dropna().unique().tolist()) if not df_intrants.empty else ["Produit_Test"]
-        except:
+             if not df_intrants.empty and 'Nom_Produit' in df_intrants.columns:
+                 liste_produits = sorted(df_intrants['Nom_Produit'].dropna().unique().tolist())
+             else:
+                 st.warning("⚠️ L'onglet 'REF_INTRANTS' est vide ou la colonne 'Nom_Produit' est introuvable.")
+             
+             if not liste_produits:
+                  liste_produits = ["(Saisir manuellement)"]
+        except Exception as e:
+             st.error(f"❌ Impossible de charger 'REF_INTRANTS' : {e}")
              liste_produits = ["(Saisir manuellement)"]
              
         # Streamlit doesn't support dynamic number of inputs inside a form natively very well without session state pre-init.
@@ -213,7 +221,7 @@ with st.expander("Ouvrir le formulaire de saisie groupée"):
                                 'Culture': p['culture'],
                                 'Surface_Travaillée_Ha': p['surface'],
                                 'Tracteur': tracteur,
-                                'Outil': outil,
+                                'Outil': outil if outil != "- Aucun -" else "",
                                 'Nom_Produit': prod['nom'],
                                 'Num_AMM': '', # Laisser vide pour l'instant
                                 'Dose_Ha': prod['dose'],
