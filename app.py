@@ -156,10 +156,14 @@ with st.expander("Ouvrir le formulaire de saisie groupée"):
             for i, p_id in enumerate(selected_p_for_entry):
                 p_meta = metadata.get(p_id, {})
                 culture_ref = p_meta.get('Culture', 'Inconnue')
-                surf_ref = float(p_meta.get('Surface_Reference_Ha', 0.0))
+                try:
+                    surf_ref = float(str(p_meta.get('Surface', 0.0)).replace(',', '.'))
+                except:
+                    surf_ref = 0.0
+                    
                 with cols[i % 4]:
                      surf_input = st.number_input(f"{p_id} ({culture_ref})", value=surf_ref, step=0.5, key=f"surf_input_{p_id}")
-                     parcelles_data.append({'id': p_id, 'culture': culture_ref, 'surface': surf_input})
+                     parcelles_data.append({'id': p_id, 'culture': culture_ref, 'surface': float(surf_input)})
 
         st.markdown("##### 3. Choix des Produits")
         # Try to get referentiel, fallback to text input if fails
