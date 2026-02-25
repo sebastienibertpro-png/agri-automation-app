@@ -593,9 +593,12 @@ class ReportGenerator:
             
             qty_total = dose_ha * surface_totale
             
+            # Clean up unit for total quantity (remove /ha)
+            unite_totale = str(unite).replace('/ha', '').replace('/HA', '').replace('/Ha', '')
+            
             # Format numbers
             dose_str = f"{dose_ha} {unite}"
-            qty_str = f"{qty_total:.2f} {unite}"
+            qty_str = f"{qty_total:.2f} {unite_totale}".strip()
             
             # Checkbox placeholder (Empty square for pen check)
             # Checkbox - Graphic Rectangle
