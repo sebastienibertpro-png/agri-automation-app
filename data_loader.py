@@ -164,10 +164,15 @@ class DataLoader:
         metadata = {}
         for _, row in merged.iterrows():
             p_id = row['ID_Parcelle']
+            
+            # Gestion des suffixes liés au merge DataFrame pandas
+            surf_col = 'Surface_Référence_Ha_ref' if 'Surface_Référence_Ha_ref' in row else 'Surface_Référence_Ha'
+            culture_col = 'Culture'
+            
             metadata[p_id] = {
-                'Culture': row.get('Culture', 'N/A'),
-                'Surface': row.get('Surface_Référence_Ha', 'N/A'),
-                'Ilot_PAC': row.get('îlot PAC', 'N/A'), # From REF_PARCELLES
+                'Culture': row.get(culture_col, 'Inconnue'),
+                'Surface': row.get(surf_col, 0.0),
+                'Ilot_PAC': row.get('îlot PAC', 'N/A'),
                 'Precedent': row.get('Precedent_Cultural', 'N/A'),
                 'Variete': row.get('Variété', '')
             }
