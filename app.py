@@ -118,32 +118,31 @@ def generate_intervention_id():
 
 st.divider()
 st.subheader("✍️ Saisie Rapide : Traitement Phyto (Multi-Parcelles)")
-with st.expander("Ouvrir le formulaire de saisie groupée"):
-    with st.form("form_saisie_groupee"):
-        st.markdown("##### 1. Informations Générales")
-        col_g1, col_g2, col_g3 = st.columns(3)
-        with col_g1:
-            date_interv = st.date_input("Date de l'intervention")
-        with col_g2:
-            statut = st.selectbox("Statut", ["Prévu", "Réalisé"])
-        with col_g3:
-             # Default to selected campaign
-            campagne_saisie = st.number_input("Campagne", value=int(selected_campaign), format="%d")
-            
-        col_m1, col_m2, col_m3 = st.columns(3)
-        with col_m1:
-            type_interv = st.selectbox("Type d'intervention", ["Herbicide", "Fongicide", "Insecticide"])
-        with col_m2:
-            tracteur = st.selectbox("Tracteur", ["130_CVX", "220_CVX", "Berthoud_Raptor", "Axial_5140"])
-        with col_m3:
-            outil = st.selectbox("Outil", ["- Aucun -", "Agata", "Ependeur_Engrais", "DDI", "Rotative", "Cultivateur_Bonnel", "Bineuse", "Fissurateur", "Rabe"])
-            
-        stade = st.selectbox("Stade Culture", ["Pré-levée", "Levée", "2F", "4-6F", "8-10F", "12F", "Floraison", "Tallage", "Epis 1cm", "Montaison"])
-        volume_bouillie = st.number_input("Volume Bouillie (L/ha)", min_value=0.0, value=100.0, step=10.0)
-        observations = st.text_input("Observations")
+with st.expander("Ouvrir le formulaire de saisie groupée", expanded=True):
+    st.markdown("##### 1. Informations Générales")
+    col_g1, col_g2, col_g3 = st.columns(3)
+    with col_g1:
+        date_interv = st.date_input("Date de l'intervention")
+    with col_g2:
+        statut = st.selectbox("Statut", ["Prévu", "Réalisé"])
+    with col_g3:
+         # Default to selected campaign
+        campagne_saisie = st.number_input("Campagne", value=int(selected_campaign), format="%d")
+        
+    col_m1, col_m2, col_m3 = st.columns(3)
+    with col_m1:
+        type_interv = st.selectbox("Type d'intervention", ["Herbicide", "Fongicide", "Insecticide"])
+    with col_m2:
+        tracteur = st.selectbox("Tracteur", ["130_CVX", "220_CVX", "Berthoud_Raptor", "Axial_5140"])
+    with col_m3:
+        outil = st.selectbox("Outil", ["- Aucun -", "Agata", "Ependeur_Engrais", "DDI", "Rotative", "Cultivateur_Bonnel", "Bineuse", "Fissurateur", "Rabe"])
+        
+    stade = st.selectbox("Stade Culture", ["Pré-levée", "Levée", "2F", "4-6F", "8-10F", "12F", "Floraison", "Tallage", "Epis 1cm", "Montaison"])
+    volume_bouillie = st.number_input("Volume Bouillie (L/ha)", min_value=0.0, value=100.0, step=10.0)
+    observations = st.text_input("Observations")
 
-        st.markdown("##### 2. Choix des Parcelles")
-        # Ensure we don't start with "Toutes" pre-selected as it's not a real parcel
+    st.markdown("##### 2. Choix des Parcelles")
+    # Ensure we don't start with "Toutes" pre-selected as it's not a real parcel
         default_p = [] if selected_parcelle == "Toutes" else [selected_parcelle]
         selected_p_for_entry = st.multiselect("Parcelles concernées", available_parcelles, default=default_p)
         
@@ -165,39 +164,39 @@ with st.expander("Ouvrir le formulaire de saisie groupée"):
                      surf_input = st.number_input(f"{p_id} ({culture_ref})", value=surf_ref, step=0.5, key=f"surf_input_{p_id}")
                      parcelles_data.append({'id': p_id, 'culture': culture_ref, 'surface': float(surf_input)})
 
-        st.markdown("##### 3. Choix des Produits")
-        # Try to get referentiel, fallback to text input if fails
-        liste_produits = []
-        try:
-             df_intrants = active_loader._get_data("REF_INTRANTS")
-             if not df_intrants.empty and 'Nom_Produit' in df_intrants.columns:
-                 liste_produits = sorted(df_intrants['Nom_Produit'].dropna().unique().tolist())
-             else:
-                 st.warning("⚠️ L'onglet 'REF_INTRANTS' est vide ou la colonne 'Nom_Produit' est introuvable.")
-             
-             if not liste_produits:
-                  liste_produits = ["(Saisir manuellement)"]
-        except Exception as e:
-             st.error(f"❌ Impossible de charger 'REF_INTRANTS' : {e}")
-             liste_produits = ["(Saisir manuellement)"]
-             
-        # Streamlit doesn't support dynamic number of inputs inside a form natively very well without session state pre-init.
-        # So we hardcode up to 5 products for simplicity.
-        produits_data = []
-        for i in range(1, 6): # Allow up to 5 products at once
-             c1, c2, c3 = st.columns([2, 1, 1])
-             with c1:
-                  prod = st.selectbox(f"Produit {i}", ["- Aucun -"] + liste_produits, key=f"prod_name_{i}")
-             with c2:
-                  dose = st.number_input(f"Dose/ha", min_value=0.0, step=0.1, key=f"prod_dose_{i}")
-             with c3:
-                  unite = st.selectbox("Unité", ["L/ha", "Kg/ha", "g/ha"], key=f"prod_unite_{i}")
-             if prod != "- Aucun -":
-                  produits_data.append({'nom': prod, 'dose': dose, 'unite': unite})
+    st.markdown("##### 3. Choix des Produits")
+    # Try to get referentiel, fallback to text input if fails
+    liste_produits = []
+    try:
+         df_intrants = active_loader._get_data("REF_INTRANTS")
+         if not df_intrants.empty and 'Nom_Produit' in df_intrants.columns:
+             liste_produits = sorted(df_intrants['Nom_Produit'].dropna().unique().tolist())
+         else:
+             st.warning("⚠️ L'onglet 'REF_INTRANTS' est vide ou la colonne 'Nom_Produit' est introuvable.")
+         
+         if not liste_produits:
+              liste_produits = ["(Saisir manuellement)"]
+    except Exception as e:
+         st.error(f"❌ Impossible de charger 'REF_INTRANTS' : {e}")
+         liste_produits = ["(Saisir manuellement)"]
+         
+    # We hardcode up to 5 products for simplicity.
+    produits_data = []
+    for i in range(1, 6): # Allow up to 5 products at once
+         c1, c2, c3 = st.columns([2, 1, 1])
+         with c1:
+              prod = st.selectbox(f"Produit {i}", ["- Aucun -"] + liste_produits, key=f"prod_name_{i}")
+         with c2:
+              dose = st.number_input(f"Dose/ha", min_value=0.0, step=0.1, key=f"prod_dose_{i}")
+         with c3:
+              unite = st.selectbox("Unité", ["L/ha", "Kg/ha", "g/ha"], key=f"prod_unite_{i}")
+         if prod != "- Aucun -":
+              produits_data.append({'nom': prod, 'dose': dose, 'unite': unite})
 
-        submitted = st.form_submit_button("Enregistrer les interventions 🚀")
-        
-        if submitted:
+    st.markdown("<br>", unsafe_allow_html=True)
+    submitted = st.button("Enregistrer les interventions 🚀")
+    
+    if submitted:
             if not selected_p_for_entry:
                  st.error("Veuillez sélectionner au moins une parcelle.")
             elif not produits_data:
