@@ -510,8 +510,13 @@ class ReportGenerator:
         self.doc.pagesize = A4 # Portrait
         
         # --- Header ---
-        parcelle = intervention_data.get('Parcelle', 'Inconnue')
-        surface = float(intervention_data.get('Surface', 0))
+        parcelles_info = intervention_data.get('Parcelles', [])
+        if not parcelles_info:
+             # Fallback au cas où le payload viendrait d'ailleurs (ancienne version)
+             parcelles_info = [{'name': intervention_data.get('Parcelle', 'Inconnue'), 'surface': float(intervention_data.get('Surface', 0))}]
+             
+        surface_totale = float(intervention_data.get('Total_Surface', intervention_data.get('Surface', 0)))
+        
         date_prevue = intervention_data.get('Date')
         if date_prevue and hasattr(date_prevue, 'strftime'):
             date_str = date_prevue.strftime('%d/%m/%Y')
@@ -522,10 +527,14 @@ class ReportGenerator:
         
         # --- Parcelle Info & Volume ---
         vol_ha = float(intervention_data.get('Volume_Bouillie_Ha', 100)) # Default 100L/ha if missing
-        vol_total = surface * vol_ha
+        vol_total = surface_totale * vol_ha
         
+        parcelles_names = " & ".join([str(p['name']) for p in parcelles_info])
+        if len(parcelles_names) > 40:
+             parcelles_names = "MULTI-PARCELLES"
+             
         header_table_data = [
-            [f"PARCELLE : {parcelle}", f"SURFACE : {surface:.2f} ha"],
+            [f"PARCELLE(S) : {parcelles_names}", f"SURFACE TOTALE : {surface_totale:.2f} ha"],
             [f"Volume Bouillie / ha : {vol_ha:.0f} L/ha", f"VOLUME TOTAL CUVE : {vol_total:.0f} Litres"]
         ]
         
@@ -541,7 +550,23 @@ class ReportGenerator:
             ('TOPPADDING', (0,0), (-1,-1), 10),
         ]))
         self.elements.append(t_header)
-        self.elements.append(Spacer(1, 15))
+        self.elements.append(Spacer(1, 10))
+        
+        # --- Détail Parcelles (if > 1) ---
+        if len(parcelles_info) > 1:
+             detail_data = [['Parcelle', 'Surface (ha)']]
+             for p in parcelles_info:
+                  detail_data.append([p['name'], f"{p['surface']:.2f}"])
+             
+             t_detail = Table(detail_data, colWidths=[6*cm, 4*cm])
+             t_detail.setStyle(TableStyle([
+                  ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e0e0e0')),
+                  ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                  ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                  ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+             ]))
+             self.elements.append(t_detail)
+             self.elements.append(Spacer(1, 15))
         
         # --- Sécurité (EPI) ---
         # Text based icons for robustness
@@ -566,7 +591,7 @@ class ReportGenerator:
             dose_ha = float(prod.get('Dose_Ha', 0))
             unite = prod.get('Unité_Dose', '')
             
-            qty_total = dose_ha * surface
+            qty_total = dose_ha * surface_totale
             
             # Format numbers
             dose_str = f"{dose_ha} {unite}"
