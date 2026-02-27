@@ -819,8 +819,35 @@ class ReportGenerator:
         }
         """
         self.doc.pagesize = A4 # Portrait
-        self.add_title(f"Bilan Irrigation Parcelle - Campagne {campaign}")
-
+        
+        # --- Custom Header for Irrigation with specific Logo ---
+        elements_header = []
+        title_para = Paragraph(f"Bilan Irrigation Parcelle - Campagne {campaign}", self.styles['Heading1'])
+        
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_irri_path = os.path.join(base_dir, "LOGO_IRRI.png")
+        
+        logo_element = ""
+        if os.path.exists(logo_irri_path):
+            try:
+                im = Image(logo_irri_path)
+                desired_width = 4 * cm
+                aspect = im.imageHeight / float(im.imageWidth)
+                im.drawWidth = desired_width
+                im.drawHeight = desired_width * aspect
+                im.hAlign = 'RIGHT'
+                logo_element = im
+            except Exception as e:
+                print(f"Warning: Could not load LOGO_IRRI.png: {e}")
+                
+        header_table = Table([[title_para, logo_element]], colWidths=[12 * cm, 5 * cm])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('ALIGN', (1,0), (1,0), 'RIGHT')
+        ]))
+        
+        self.elements.append(header_table)
+        self.elements.append(Spacer(1, 20))
         if not data_grouped:
              self.add_paragraph("Aucune donnée d'irrigation trouvée pour cette sélection.")
 
@@ -872,7 +899,7 @@ class ReportGenerator:
 
             # --- Table: Itinerary ---
             if irrigations:
-                table_data = [['Date', 'Secteur (ID)', 'Matériel', 'Surf. Irriguée (ha)', 'Vol. Apporté (mm)', 'Vol. Total (m3)']]
+                table_data = [['Date', 'Secteur (ID)', 'Matériel', 'S. Irriguée (ha)', 'mm', 'm3']]
                 
                 # Sort by date
                 def get_date(r):
@@ -892,7 +919,7 @@ class ReportGenerator:
                     secteur = str(row.get('ID_Secteur', row.get('ID_Irrigation', '')))
                     materiel = str(row.get('ID_Materiel', row.get('Materiel', '')))
                     
-                    surf_irr = row.get('Surface_Irriguée_Réelle', row.get('Surface_Irriguee_Reelle', ''))
+                    surf_irr = row.get('Surface_Irriguée', row.get('Surface_Irriguee', ''))
                     surf_str = f"{float(surf_irr):.2f}" if surf_irr and not pd.isnull(surf_irr) else ""
                     
                     vol_mm = row.get('Volume_mm', '')
