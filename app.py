@@ -30,17 +30,18 @@ st.markdown("""
     h1 {
         color: #2E7D32;
     }
-</style>
-""", unsafe_allow_html=True)
-
-col_logo, col_title = st.columns([1, 4])
+col_logo, col_title = st.columns([1.5, 3.5])
 with col_logo:
-    logo_path = "LOGO.png"
-    if os.path.exists(logo_path):
-        st.image(logo_path, width=120)
+    logo_app = "LOGO_APP.png"
+    logo_alt = "LOGO_APP.jpg"
+    if os.path.exists(logo_app):
+        st.image(logo_app, width=220)
+    elif os.path.exists(logo_alt):
+         st.image(logo_alt, width=220)
     else:
-        st.markdown("") # Espace vide si pas de logo
+        st.info("Placer LOGO_APP.png ici")
 with col_title:
+    st.markdown("<br>", unsafe_allow_html=True) # Pour aligner verticalement avec le logo
     st.title("🚜 Agri Automation")
 
 # --- CONFIG ---
