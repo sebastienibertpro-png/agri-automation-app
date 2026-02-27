@@ -89,25 +89,13 @@ except Exception as e:
     st.error(f"Erreur lecture campagnes: {e}")
     st.stop()
 
-# Sidebar / Top inputs
-col1, col2 = st.columns(2)
-with col1:
-    selected_campaign = st.selectbox("📅 Choisir la Campagne", available_campaigns)
+# --- SELECTEUR GLOBAL DE CAMPAGNE ---
+# Placé tout en haut car il impacte toute la page
+selected_campaign = st.selectbox("📅 Choisir la Campagne", available_campaigns)
 
-# Filter Parcels for Campaign
+# Backend filtering logic
 df_campaign = df_intervention[df_intervention['Campagne'].astype(str) == str(selected_campaign)]
 available_parcelles = sorted(df_campaign['ID_Parcelle'].unique())
-
-with col2:
-    # Add 'Toutes' option
-    options = ["Toutes"] + list(available_parcelles)
-    selected_parcelle = st.selectbox("🌾 Choisir la Parcelle", options)
-
-target_parcelles = []
-if selected_parcelle == "Toutes":
-    target_parcelles = list(available_parcelles)
-else:
-    target_parcelles = [selected_parcelle]
 
 # --- Saisie Rapide Groupée ---
 import string
@@ -142,9 +130,7 @@ with st.expander("Ouvrir le formulaire de saisie groupée", expanded=True):
     observations = st.text_input("Observations")
 
     st.markdown("##### 2. Choix des Parcelles")
-    # Ensure we don't start with "Toutes" pre-selected as it's not a real parcel
-    default_p = [] if selected_parcelle == "Toutes" else [selected_parcelle]
-    selected_p_for_entry = st.multiselect("Parcelles concernées", available_parcelles, default=default_p)
+    selected_p_for_entry = st.multiselect("Parcelles concernées", available_parcelles)
     
     # Affichage dynamique des surfaces
     parcelles_data = [] # List of dicts: {'id': ..., 'culture': ..., 'surface': ...}
@@ -278,13 +264,8 @@ if intervention_id:
 
     st.divider()
 
-# --- Generation Section ---
-st.divider()
-st.subheader("📄 Génération de Rapports")
-
-
 # --- FICHE PREPARATION PHYTO ---
-st.markdown("#### 🧪 Fiche de Préparation Phyto")
+st.subheader("🧪 Fiche de Préparation Phyto")
 try:
     df_planned = loader.get_planned_treatments(selected_campaign)
     
@@ -462,6 +443,28 @@ except Exception as e:
     st.error(f"Erreur chargement planning: {e}")
 
 st.divider()
+
+# --- Generation Section ---
+st.subheader("📄 Génération de Rapports Globaux : ITK, Ferti et Registre Phyto")
+
+# Move selectors here
+col1, col2 = st.columns(2)
+with col1:
+    # Just show the selected campaign from the top level
+    st.info(f"📅 Campagne active : {selected_campaign}")
+
+with col2:
+    # Add 'Toutes' option
+    options = ["Toutes"] + list(available_parcelles)
+    selected_parcelle = st.selectbox("🌾 Choisir la Parcelle", options)
+
+target_parcelles = []
+if selected_parcelle == "Toutes":
+    target_parcelles = list(available_parcelles)
+else:
+    target_parcelles = [selected_parcelle]
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 # Helper for PDF Generation
 def generate_and_download(report_type):
