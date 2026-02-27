@@ -821,32 +821,27 @@ class ReportGenerator:
         self.doc.pagesize = A4 # Portrait
         
         # --- Custom Header for Irrigation with specific Logo ---
-        elements_header = []
-        title_para = Paragraph(f"Bilan Irrigation Parcelle - Campagne {campaign}", self.styles['Heading1'])
-        
         base_dir = os.path.dirname(os.path.abspath(__file__))
         logo_irri_path = os.path.join(base_dir, "LOGO_IRRI.png")
         
-        logo_element = ""
         if os.path.exists(logo_irri_path):
             try:
                 im = Image(logo_irri_path)
-                desired_width = 4 * cm
+                desired_width = 5 * cm
                 aspect = im.imageHeight / float(im.imageWidth)
                 im.drawWidth = desired_width
                 im.drawHeight = desired_width * aspect
                 im.hAlign = 'RIGHT'
-                logo_element = im
+                
+                # We can insert it at the very top of the document if we want it above the default LOGO
+                # or just append it here. Appending here puts it below the default LOGO but above the Title.
+                # To make it "really high", let's insert it at index 0. 
+                self.elements.insert(0, Spacer(1, 10))
+                self.elements.insert(0, im)
             except Exception as e:
                 print(f"Warning: Could not load LOGO_IRRI.png: {e}")
                 
-        header_table = Table([[title_para, logo_element]], colWidths=[12 * cm, 5 * cm])
-        header_table.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('ALIGN', (1,0), (1,0), 'RIGHT')
-        ]))
-        
-        self.elements.append(header_table)
+        self.add_title(f"Bilan Irrigation Parcelle - Campagne {campaign}")
         self.elements.append(Spacer(1, 20))
         if not data_grouped:
              self.add_paragraph("Aucune donnée d'irrigation trouvée pour cette sélection.")
