@@ -34,7 +34,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🚜 Agri Automation")
-st.markdown("Outil de génération de rapports : **ITK**, **Ferti** et **Registre Phyto**.")
 
 # --- CONFIG ---
 # URL de l'application pour le QR Code
@@ -106,7 +105,7 @@ def generate_intervention_id():
 
 st.divider()
 st.subheader("✍️ Saisie Rapide : Traitement Phyto (Multi-Parcelles)")
-with st.expander("Ouvrir le formulaire de saisie groupée", expanded=True):
+with st.expander("Ouvrir le formulaire de saisie groupée", expanded=False):
     st.markdown("##### 1. Informations Générales")
     col_g1, col_g2, col_g3 = st.columns(3)
     with col_g1:
@@ -270,10 +269,8 @@ try:
     df_planned = loader.get_planned_treatments(selected_campaign)
     
     if not df_planned.empty:
-        # Filter by selected parcelle if not "Toutes"
-        if selected_parcelle != "Toutes":
-            df_planned = df_planned[df_planned['ID_Parcelle'] == selected_parcelle]
-            
+        # The user selects parcelles specifically for reports below.
+        # Here we just show all planned treatments for the campaign.
         if df_planned.empty:
              st.info("Aucune intervention 'Prévue' pour cette sélection.")
         else:
