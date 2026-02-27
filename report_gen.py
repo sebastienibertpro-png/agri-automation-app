@@ -824,21 +824,31 @@ class ReportGenerator:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         logo_irri_path = os.path.join(base_dir, "LOGO_IRRI.png")
         
+        logo_element = ""
         if os.path.exists(logo_irri_path):
             try:
                 im = Image(logo_irri_path)
-                desired_width = 3 * cm  # Plus petit
+                desired_width = 1.8 * cm  # Très petit
                 aspect = im.imageHeight / float(im.imageWidth)
                 im.drawWidth = desired_width
                 im.drawHeight = desired_width * aspect
-                im.hAlign = 'CENTER'  # Centré au-dessus du titre
-                
-                self.elements.append(im)
-                self.elements.append(Spacer(1, 10))
+                im.hAlign = 'RIGHT' # Aligné à droite de sa propre cellule
+                logo_element = im
             except Exception as e:
                 print(f"Warning: Could not load LOGO_IRRI.png: {e}")
                 
-        self.add_title(f"Bilan Irrigation Parcelle - Campagne {campaign}")
+        # Create a title string format
+        title_para = Paragraph(f"Bilan Irrigation Parcelle - Campagne {campaign}", self.styles['Heading1'])
+        
+        # Table to put logo and title on the same line
+        header_table = Table([[logo_element, title_para]], colWidths=[2 * cm, 15 * cm])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('ALIGN', (0,0), (0,0), 'RIGHT'),
+            ('ALIGN', (1,0), (1,0), 'LEFT')
+        ]))
+        
+        self.elements.append(header_table)
         self.elements.append(Spacer(1, 20))
         if not data_grouped:
              self.add_paragraph("Aucune donnée d'irrigation trouvée pour cette sélection.")
