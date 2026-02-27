@@ -555,6 +555,30 @@ def generate_and_download(report_type):
                  grouped_data[p] = cat_data
         return grouped_data, "generate_itk", "Itineraire_Technique"
 
+    # --- IRRIGATION PARCELLE ---
+    elif report_type == "IRRIG_PARCELLE":
+        df_irrig = active_loader.get_journal_irrigation()
+        if not df_irrig.empty:
+            df_irrig['Campagne'] = pd.to_numeric(df_irrig['Campagne'], errors='coerce').fillna(0).astype(int)
+            df_irrig = df_irrig[df_irrig['Campagne'] == int(selected_campaign)]
+            
+            # Filter by targeted parcels
+            if "Toutes" not in options and target_parcelles:
+                df_irrig = df_irrig[df_irrig['ID_Parcelle'].isin(target_parcelles)]
+            elif target_parcelles and target_parcelles[0] != "Toutes":
+                df_irrig = df_irrig[df_irrig['ID_Parcelle'].isin(target_parcelles)]
+
+            grouped_data = {}
+            for p in df_irrig['ID_Parcelle'].unique():
+                subset = df_irrig[df_irrig['ID_Parcelle'] == p]
+                p_meta = metadata_map.get(p, {})
+                grouped_data[p] = {
+                     'Irrigations': subset.to_dict('records'),
+                     'meta': p_meta
+                }
+            return grouped_data, "generate_irrigation_parcel_report", "Bilan_Irrig_Parcelle"
+        return {}, None, None
+
     return None, None, None
 
 # UI for generation
@@ -618,12 +642,16 @@ def handle_pdf_action(report_type, btn_label):
                         )
         st.success("Génération terminée ! Cliquez ci-dessus pour télécharger.")
 
+col_pdf1, col_pdf2, col_pdf3, col_pdf4 = st.columns(4)
+
 with col_pdf1:
     handle_pdf_action("ITK", "📄 Itinéraire Technique")
 with col_pdf2:
     handle_pdf_action("PHYTO", "🛡️ Registre Phyto")
 with col_pdf3:
     handle_pdf_action("FERTI", "🧪 Bilan Ferti")
+with col_pdf4:
+    handle_pdf_action("IRRIG_PARCELLE", "💧 Bilan Irrig Parcelle")
 
 # --- SECTION IRRIGATION ---
 st.divider()
