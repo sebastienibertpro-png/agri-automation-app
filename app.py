@@ -33,7 +33,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🚜 Agri Automation")
+col_logo, col_title = st.columns([1, 4])
+with col_logo:
+    logo_path = "LOGO.png"
+    if os.path.exists(logo_path):
+        st.image(logo_path, width=120)
+    else:
+        st.markdown("") # Espace vide si pas de logo
+with col_title:
+    st.title("🚜 Agri Automation")
 
 # --- CONFIG ---
 # URL de l'application pour le QR Code
