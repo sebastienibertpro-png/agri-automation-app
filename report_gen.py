@@ -827,17 +827,14 @@ class ReportGenerator:
         if os.path.exists(logo_irri_path):
             try:
                 im = Image(logo_irri_path)
-                desired_width = 5 * cm
+                desired_width = 3 * cm  # Plus petit
                 aspect = im.imageHeight / float(im.imageWidth)
                 im.drawWidth = desired_width
                 im.drawHeight = desired_width * aspect
-                im.hAlign = 'RIGHT'
+                im.hAlign = 'CENTER'  # Centré au-dessus du titre
                 
-                # We can insert it at the very top of the document if we want it above the default LOGO
-                # or just append it here. Appending here puts it below the default LOGO but above the Title.
-                # To make it "really high", let's insert it at index 0. 
-                self.elements.insert(0, Spacer(1, 10))
-                self.elements.insert(0, im)
+                self.elements.append(im)
+                self.elements.append(Spacer(1, 10))
             except Exception as e:
                 print(f"Warning: Could not load LOGO_IRRI.png: {e}")
                 
