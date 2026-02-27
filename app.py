@@ -42,7 +42,7 @@ with col_logo:
         elif os.path.exists(logo_alt):
              st.image(logo_alt, width=220)
         else:
-            st.info("Placer LOGO_APP.png ici")
+            st.info(f"Recherche de l'image échouée à : {logo_app}")
     except Exception as e:
         st.warning(f"Erreur d'image: {e}")
 with col_title:
