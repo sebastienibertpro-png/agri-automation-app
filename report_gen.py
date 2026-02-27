@@ -529,9 +529,10 @@ class ReportGenerator:
         vol_ha = float(intervention_data.get('Volume_Bouillie_Ha', 100)) # Default 100L/ha if missing
         vol_total = surface_totale * vol_ha
         
-        parcelles_names = " & ".join([str(p['name']) for p in parcelles_info])
-        if len(parcelles_names) > 40:
-             parcelles_names = "MULTI-PARCELLES"
+        if len(parcelles_info) > 1:
+            parcelles_names = "Multi-Parcelles"
+        else:
+            parcelles_names = " & ".join([str(p['name']) for p in parcelles_info])
              
         header_table_data = [
             [f"PARCELLE(S) : {parcelles_names}", f"SURFACE TOTALE : {surface_totale:.2f} ha"],
@@ -807,3 +808,116 @@ class ReportGenerator:
         self.doc.build(self.elements)
         print(f"Monthly Irrigation PDF Generated: {self.filename}")
 
+    def generate_irrigation_parcel_report(self, campaign, data_grouped):
+        """
+        Generates the Parcel Irrigation Report (mm/ha).
+        data_grouped: dictionary { 
+            'Parcelle_Name': {
+                'Irrigations': [list of dicts from JOURNAL_IRRIGATION],
+                'meta': {dict of parcel metadata}
+            }
+        }
+        """
+        self.doc.pagesize = A4 # Portrait
+        self.add_title(f"Bilan Irrigation Parcelle - Campagne {campaign}")
+
+        if not data_grouped:
+             self.add_paragraph("Aucune donnée d'irrigation trouvée pour cette sélection.")
+
+        for parcelle, data in data_grouped.items():
+            irrigations = data.get('Irrigations', [])
+            meta = data.get('meta', {})
+
+            # --- Header: Parcelle Info ---
+            header_text = f"<b>Parcelle : {parcelle}</b>"
+            if meta.get('Ilot_PAC', 'N/A') != 'N/A':
+                header_text += f" (Ilot: {meta.get('Ilot_PAC')})"
+            
+            # Retrieve Reference Surface
+            try:
+                surface_ref = float(str(meta.get('Surface', 0)).replace(',', '.'))
+            except:
+                surface_ref = 0.0
+
+            sub_header = f"Culture: {meta.get('Culture', 'N/A')} | Surface Référence: {surface_ref} ha"
+            
+            self.elements.append(Paragraph(header_text, self.styles['Heading2']))
+            self.elements.append(Paragraph(sub_header, self.styles['Normal']))
+            self.elements.append(Spacer(1, 10))
+
+            # --- Calculate Totals ---
+            total_m3 = 0.0
+            
+            for row in irrigations:
+                # Fallback between Vol_m3 and Volume_m3
+                vol_val = row.get('Volume_m3', row.get('Vol_m3', 0))
+                try:
+                    total_m3 += float(vol_val)
+                except:
+                    pass
+            
+            # Calculate Total mm/ha
+            total_mm_ha = 0.0
+            if surface_ref > 0:
+                # 1 mm = 10 m3 / ha
+                total_mm_ha = (total_m3 / surface_ref) / 10.0
+            
+            # --- Summary Box ---
+            summary_text = f"<b>Bilan Global de l'Irrigation :</b><br/>" \
+                           f"Volume Total Apporté : {total_m3:.1f} m³<br/>" \
+                           f"Surface de Référence : {surface_ref:.2f} ha<br/>" \
+                           f"<b>Total Apporté : {total_mm_ha:.1f} mm/ha</b>"
+            self.elements.append(Paragraph(summary_text, self.styles['Normal']))
+            self.elements.append(Spacer(1, 15))
+
+            # --- Table: Itinerary ---
+            if irrigations:
+                table_data = [['Date', 'Secteur (ID)', 'Matériel', 'Surf. Irriguée (ha)', 'Vol. Apporté (mm)', 'Vol. Total (m3)']]
+                
+                # Sort by date
+                def get_date(r):
+                    d = r.get('Date', r.get('Date_Debut'))
+                    if hasattr(d, 'timestamp'): return d.timestamp()
+                    return 0
+                irrigations_sorted = sorted(irrigations, key=get_date)
+
+                for row in irrigations_sorted:
+                    # Date formatting
+                    d_val = row.get('Date', row.get('Date_Debut'))
+                    if d_val and hasattr(d_val, 'strftime'):
+                        date_str = d_val.strftime('%d/%m/%Y')
+                    else:
+                        date_str = str(d_val) if not pd.isnull(d_val) else ""
+                    
+                    secteur = str(row.get('ID_Secteur', row.get('ID_Irrigation', '')))
+                    materiel = str(row.get('ID_Materiel', row.get('Materiel', '')))
+                    
+                    surf_irr = row.get('Surface_Irriguée_Réelle', row.get('Surface_Irriguee_Reelle', ''))
+                    surf_str = f"{float(surf_irr):.2f}" if surf_irr and not pd.isnull(surf_irr) else ""
+                    
+                    vol_mm = row.get('Volume_mm', '')
+                    mm_str = f"{float(vol_mm):.1f}" if vol_mm and not pd.isnull(vol_mm) else ""
+                    
+                    vol_m3 = row.get('Volume_m3', row.get('Vol_m3', ''))
+                    m3_str = f"{float(vol_m3):.1f}" if vol_m3 and not pd.isnull(vol_m3) else ""
+
+                    table_data.append([date_str, secteur, materiel, surf_str, mm_str, m3_str])
+                
+                # Table style
+                t = Table(table_data, colWidths=[2.5*cm, 3.5*cm, 4*cm, 3*cm, 2.5*cm, 2.5*cm])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e3f2fd')), # Light blue
+                    ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0,0), (-1,0), 9),
+                    ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                ]))
+                self.elements.append(t)
+            else:
+                 self.elements.append(Paragraph("<i>Aucun arrosage enregistré pour cette parcelle.</i>", self.styles['Normal']))
+            
+            self.elements.append(Spacer(1, 20))
+
+        self.doc.build(self.elements)
+        print(f"Parcel Irrigation PDF Generated: {self.filename}")
