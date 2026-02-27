@@ -27,9 +27,9 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #45a049;
     }
-    h1 {
-        color: #2E7D32;
-    }
+</style>
+""", unsafe_allow_html=True)
+
 col_logo, col_title = st.columns([1.5, 3.5])
 with col_logo:
     logo_app = "LOGO_APP.png"
