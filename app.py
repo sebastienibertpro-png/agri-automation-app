@@ -32,14 +32,19 @@ st.markdown("""
 
 col_logo, col_title = st.columns([1.5, 3.5])
 with col_logo:
-    logo_app = "LOGO_APP.png"
-    logo_alt = "LOGO_APP.jpg"
-    if os.path.exists(logo_app):
-        st.image(logo_app, width=220)
-    elif os.path.exists(logo_alt):
-         st.image(logo_alt, width=220)
-    else:
-        st.info("Placer LOGO_APP.png ici")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_app = os.path.join(base_dir, "LOGO_APP.png")
+    logo_alt = os.path.join(base_dir, "LOGO_APP.jpg")
+    
+    try:
+        if os.path.exists(logo_app):
+            st.image(logo_app, width=220)
+        elif os.path.exists(logo_alt):
+             st.image(logo_alt, width=220)
+        else:
+            st.info("Placer LOGO_APP.png ici")
+    except Exception as e:
+        st.warning(f"Erreur d'image: {e}")
 with col_title:
     st.markdown("<br>", unsafe_allow_html=True) # Pour aligner verticalement avec le logo
     st.title("🚜 Agri Automation")
