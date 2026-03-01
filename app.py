@@ -918,12 +918,12 @@ try:
                                                 body_text = f"Bonjour,\n\nVeuillez trouver ci-joint le bilan de fin de campagne d'irrigation pour l'année {selected_campaign} concernant le réseau {net}.\n\nCordialement,\nAgri Automation"
                                                 
                                                 success = send_email_with_attachment(
-                                                    sender_email=sender_email,
-                                                    sender_app_password=sender_app_password,
-                                                    recipient_email=recipient,
-                                                    subject=subject,
-                                                    body_text=body_text,
-                                                    attachment_path=fpath
+                                                    sender_email,
+                                                    sender_app_password,
+                                                    recipient,
+                                                    subject,
+                                                    body_text,
+                                                    fpath
                                                 )
                                                 
                                                 if success:
