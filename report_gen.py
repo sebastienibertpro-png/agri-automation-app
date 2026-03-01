@@ -746,6 +746,7 @@ class ReportGenerator:
                 last_index = meter_data['Index_m3'].iloc[-1] if not meter_data.empty and pd.notnull(meter_data['Index_m3'].iloc[-1]) else 0
                 summary_data_list.append([
                     str(meter_id),
+                    str(sn),
                     f"{last_index:.0f}",
                     f"{total_reel:.0f}",
                     total_reel # Keep raw value for summing
@@ -755,17 +756,17 @@ class ReportGenerator:
             self.elements.append(Spacer(1, 10))
             self.add_paragraph("Synthèse Réseau - Fin de campagne", style_name='Heading2')
             
-            final_table_data = [['ID Compteur', 'Dernier Index (m3)', 'Consommation Totale (m3)']]
+            final_table_data = [['ID Compteur', 'N° Série', 'Dernier Index (m3)', 'Consommation Totale (m3)']]
             
             total_network_conso = 0
             for row in summary_data_list:
-                 final_table_data.append([row[0], row[1], row[2]])
-                 total_network_conso += row[3]
+                 final_table_data.append([row[0], row[1], row[2], row[3]])
+                 total_network_conso += row[4]
                  
             # Add Total Row
-            final_table_data.append(['TOTAL RÉSEAU', '', f"{total_network_conso:.0f}"])
+            final_table_data.append(['TOTAL RÉSEAU', '', '', f"{total_network_conso:.0f}"])
             
-            t_final = Table(final_table_data, colWidths=[6*cm, 5.5*cm, 6*cm])
+            t_final = Table(final_table_data, colWidths=[4.5*cm, 4*cm, 4.5*cm, 4.5*cm])
             t_final.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1f4e79')),
                 ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
