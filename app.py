@@ -901,15 +901,18 @@ try:
                                             gen.generate_irrigation_report(selected_campaign, net, net_data)
                                             
                                             # Robust secrets retrieval
-                                            try:
-                                                sender_email = st.secrets["EMAIL_SENDER"]
-                                                sender_app_password = st.secrets["EMAIL_PASSWORD"]
-                                            except Exception:
-                                                sender_email = None
-                                                sender_app_password = None
+                                            sender_email = st.secrets.get("GMAIL_USER")
+                                            sender_app_password = st.secrets.get("GMAIL_PASSWORD")
+                                            
+                                            if not sender_email:
+                                                try:
+                                                    sender_email = st.secrets["connections"]["gsheets"]["GMAIL_USER"]
+                                                    sender_app_password = st.secrets["connections"]["gsheets"]["GMAIL_PASSWORD"]
+                                                except Exception:
+                                                    pass
                                                 
                                             if not sender_email or not sender_app_password:
-                                                st.error("Identifiants d'envoi d'email introuvables dans les secrets (EMAIL_SENDER, EMAIL_PASSWORD).")
+                                                st.error("Identifiants d'envoi d'email introuvables (GMAIL_USER, GMAIL_PASSWORD).")
                                             else:
                                                 subject = f"Bilan Fin de Campagne Irrigation - {net} - {selected_campaign}"
                                                 body_text = f"Bonjour,\n\nVeuillez trouver ci-joint le bilan de fin de campagne d'irrigation pour l'année {selected_campaign} concernant le réseau {net}.\n\nCordialement,\nAgri Automation"
