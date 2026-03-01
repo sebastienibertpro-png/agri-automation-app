@@ -102,6 +102,29 @@ class DataLoader:
         """Loads REF_SECTEURS (ID_Secteur, ID_Compteur, Surface_ha, etc.)."""
         return self._get_data("REF_SECTEURS")
 
+    def get_materiels(self):
+        """Loads REF_MATERIELS (ID_Materiel, Marque, Modele, etc.)."""
+        return self._get_data("REF_MATERIELS")
+
+    def get_maintenance_history(self, id_materiel=None):
+        """Loads JOURNAL_MAINTENANCE. Optionally filters by ID_Materiel."""
+        df = self._get_data("JOURNAL_MAINTENANCE")
+        if df.empty:
+            return pd.DataFrame()
+            
+        # Ensure proper column is parsed
+        if 'ID_Materiel' in df.columns and id_materiel:
+             # Ensure string match
+             df['ID_Materiel'] = df['ID_Materiel'].astype(str)
+             df = df[df['ID_Materiel'] == str(id_materiel)]
+             
+        if 'Date_Intervention' in df.columns:
+            # Enforce datetime formatting
+            df['Date_Intervention'] = pd.to_datetime(df['Date_Intervention'], errors='coerce', dayfirst=True)
+            df = df.sort_values(by='Date_Intervention', ascending=False)
+            
+        return df
+
     def get_releves_compteurs(self):
         """Loads RELEVES_COMPTEURS (ID_Compteur, Date_Relevé, Index_m3)."""
         return self._get_data("RELEVES_COMPTEURS")
