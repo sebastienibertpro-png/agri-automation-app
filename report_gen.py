@@ -829,11 +829,20 @@ class ReportGenerator:
             val = row.get(col_key, '-')
             return str(val) if pd.notnull(val) else '-'
 
+        def get_val_int(row, col_key):
+            val = row.get(col_key, '-')
+            if not pd.notnull(val): return '-'
+            try:
+                # Try to cast to float then int to remove .0
+                return str(int(float(val)))
+            except (ValueError, TypeError):
+                return str(val)
+
         info_data = [
             ["INFORMATIONS MATÉRIEL", ""],
             ["Marque", get_val(materiel_info, 'Marque')],
             ["Modèle", get_val(materiel_info, 'Modele')],
-            ["Année", get_val(materiel_info, 'Année_model')],
+            ["Année", get_val_int(materiel_info, 'Année_model')],
             ["ID Parc", get_val(materiel_info, 'ID_Materiel')]
         ]
 
@@ -868,12 +877,19 @@ class ReportGenerator:
             
             def safe_str(val):
                 return str(val) if pd.notnull(val) else ''
+                
+            def safe_int_str(val):
+                if not pd.notnull(val): return ''
+                try:
+                    return str(int(float(val)))
+                except (ValueError, TypeError):
+                    return str(val)
             
             data_table.append([
                 date_str,
                 Paragraph(safe_str(row.get('Type_Intervention')), self.styles['Normal']),
                 Paragraph(safe_str(row.get('Description')), self.styles['Normal']),
-                safe_str(row.get('Heures_Moteur')),
+                safe_int_str(row.get('Heures_Moteur')),
                 safe_str(row.get('Intervenant')),
             ])
 
