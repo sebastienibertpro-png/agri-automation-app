@@ -860,7 +860,7 @@ class ReportGenerator:
         data_table = [headers]
 
         for _, row in history.iterrows():
-            d_val = row.get('Date_Intervention')
+            d_val = row.get('Date')
             if d_val and hasattr(d_val, 'strftime'):
                 date_str = d_val.strftime('%d/%m/%Y')
             else:
@@ -873,7 +873,7 @@ class ReportGenerator:
                 date_str,
                 Paragraph(safe_str(row.get('Type_Intervention')), self.styles['Normal']),
                 Paragraph(safe_str(row.get('Description')), self.styles['Normal']),
-                safe_str(row.get('Heures_Compteur')),
+                safe_str(row.get('Heures_Moteur')),
                 safe_str(row.get('Intervenant')),
             ])
 
