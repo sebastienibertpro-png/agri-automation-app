@@ -671,6 +671,7 @@ class ReportGenerator:
         if data.empty:
             self.add_paragraph("Aucune donnée de consommation enregistrée pour ce réseau.")
         else:
+            summary_data_list = []
             # Group by Compteur
             # ID_cCompteur or ID_Compteur
             id_col = 'ID_cCompteur' if 'ID_cCompteur' in data.columns else 'ID_Compteur'
@@ -720,13 +721,13 @@ class ReportGenerator:
                     table_data.append([
                         d_str,
                         month_label,
-                        f"{row['Index_m3']:.1f}" if pd.notnull(row['Index_m3']) else "",
-                        f"{diff:.1f}" if pd.notnull(diff) else "",
-                        f"{conso:.1f}" if pd.notnull(conso) else ""
+                        f"{row['Index_m3']:.0f}" if pd.notnull(row['Index_m3']) else "",
+                        f"{diff:.0f}" if pd.notnull(diff) else "",
+                        f"{conso:.0f}" if pd.notnull(conso) else ""
                     ])
                 
                 # Summary Row
-                table_data.append(['TOTAL CAMPAGNE', '', '', f"{total_brut:.1f}", f"{total_reel:.1f}"])
+                table_data.append(['TOTAL CAMPAGNE', '', '', f"{total_brut:.0f}", f"{total_reel:.0f}"])
                 
                 t = Table(table_data, colWidths=[3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
                 t.setStyle(TableStyle([
@@ -740,6 +741,42 @@ class ReportGenerator:
                 ]))
                 self.elements.append(t)
                 self.elements.append(Spacer(1, 15))
+                
+                # Store total for final summary
+                last_index = meter_data['Index_m3'].iloc[-1] if not meter_data.empty and pd.notnull(meter_data['Index_m3'].iloc[-1]) else 0
+                summary_data_list.append([
+                    str(meter_id),
+                    f"{last_index:.0f}",
+                    f"{total_reel:.0f}",
+                    total_reel # Keep raw value for summing
+                ])
+
+            # --- Final Network Summary Table ---
+            self.elements.append(Spacer(1, 10))
+            self.add_paragraph("Synthèse Réseau - Fin de campagne", style_name='Heading2')
+            
+            final_table_data = [['ID Compteur', 'Dernier Index (m3)', 'Consommation Totale (m3)']]
+            
+            total_network_conso = 0
+            for row in summary_data_list:
+                 final_table_data.append([row[0], row[1], row[2]])
+                 total_network_conso += row[3]
+                 
+            # Add Total Row
+            final_table_data.append(['TOTAL RÉSEAU', '', f"{total_network_conso:.0f}"])
+            
+            t_final = Table(final_table_data, colWidths=[6*cm, 5.5*cm, 6*cm])
+            t_final.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1f4e79')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#e8f5e9')),
+            ]))
+            self.elements.append(t_final)
+            self.elements.append(Spacer(1, 20))
 
             # Email Contact Info (Footer)
             if 'Mail_Contact-Reseau' in data.columns and pd.notnull(data['Mail_Contact-Reseau'].iloc[0]):
