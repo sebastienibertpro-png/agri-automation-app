@@ -799,6 +799,107 @@ class ReportGenerator:
                 ('BACKGROUND', (0,-1), (-1,-1), colors.lightgrey),
             ]))
             self.elements.append(t)
+            self.elements.append(Spacer(1, 15))
+
+        self.doc.build(self.elements)
+        print(f"Monthly Irrigation PDF Generated: {self.filename}")
+
+    def generate_maintenance_log(self, materiel_info, history):
+        """
+        Generates the Maintenance Log for a specific equipment.
+        materiel_info: pandas Series or dict containing material info
+        history: DataFrame containing maintenance history
+        """
+        self.doc.pagesize = A4 # Portrait
+        id_materiel = materiel_info.get('ID_Materiel', 'Inconnu')
+        
+        # --- Header ---
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=self.styles['Heading1'],
+            fontSize=16,
+            spaceAfter=12,
+            alignment=1 # Center
+        )
+        self.elements.append(Paragraph(f"CARNET D'ENTRETIEN : {id_materiel}", title_style))
+        self.elements.append(Spacer(1, 0.5*cm))
+
+        # --- Material Info Table ---
+        def get_val(row, col_key):
+            val = row.get(col_key, '-')
+            return str(val) if pd.notnull(val) else '-'
+
+        info_data = [
+            ["INFORMATIONS MATÉRIEL", ""],
+            ["Marque", get_val(materiel_info, 'Marque')],
+            ["Modèle", get_val(materiel_info, 'Modele')],
+            ["Année", get_val(materiel_info, 'Annee')],
+            ["ID Parc", get_val(materiel_info, 'ID_Materiel')]
+        ]
+
+        t_info = Table(info_data, colWidths=[5*cm, 10*cm])
+        t_info.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (1,0), colors.grey),
+            ('TEXTCOLOR', (0,0), (1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('FONTNAME', (0,0), (1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (1,0), 10),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ('TOPPADDING', (0,0), (-1,-1), 6),
+            ('BACKGROUND', (0,1), (-1,-1), colors.beige),
+            ('GRID', (0,0), (-1,-1), 1, colors.black)
+        ]))
+        self.elements.append(t_info)
+        self.elements.append(Spacer(1, 1*cm))
+
+        # --- Maintenance History Table ---
+        self.elements.append(Paragraph("HISTORIQUE DES INTERVENTIONS", self.styles['Heading2']))
+        self.elements.append(Spacer(1, 0.5*cm))
+
+        headers = ["Date", "Type", "Description", "Heures", "Intervenant"]
+        data_table = [headers]
+
+        for _, row in history.iterrows():
+            d_val = row.get('Date_Intervention')
+            if d_val and hasattr(d_val, 'strftime'):
+                date_str = d_val.strftime('%d/%m/%Y')
+            else:
+                 date_str = str(d_val) if pd.notnull(d_val) else ""
+            
+            def safe_str(val):
+                return str(val) if pd.notnull(val) else ''
+            
+            data_table.append([
+                date_str,
+                Paragraph(safe_str(row.get('Type_Intervention')), self.styles['Normal']),
+                Paragraph(safe_str(row.get('Description')), self.styles['Normal']),
+                safe_str(row.get('Heures_Compteur')),
+                safe_str(row.get('Intervenant')),
+            ])
+
+        if len(data_table) > 1:
+            t_hist = Table(data_table, colWidths=[2.5*cm, 3.5*cm, 8*cm, 2*cm, 2.5*cm])
+            t_hist.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.darkblue),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                ('ALIGN', (0,0), (0,-1), 'CENTER'),
+                ('ALIGN', (3,0), (3,-1), 'CENTER'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,-1), 9),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                ('TOPPADDING', (0,0), (-1,-1), 4),
+                ('BACKGROUND', (0,1), (-1,-1), colors.aliceblue),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ]))
+            self.elements.append(t_hist)
+        else:
+            self.elements.append(Paragraph("Aucune intervention enregistrée.", self.styles['Normal']))
+
+        self.doc.build(self.elements)
+        print(f"Maintenance Log PDF Generated: {self.filename}")
+            self.elements.append(t)
             self.elements.append(Spacer(1, 20))
             
             if 'Mail_Contact-Reseau' in data.columns and pd.notnull(data['Mail_Contact-Reseau'].iloc[0]):
