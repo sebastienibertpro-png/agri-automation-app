@@ -804,6 +804,84 @@ class ReportGenerator:
         self.doc.build(self.elements)
         print(f"Monthly Irrigation PDF Generated: {self.filename}")
 
+    def generate_global_irrigation_summary(self, campaign_summaries):
+        """
+        Generates a summary report containing tables for multiple campaigns.
+        campaign_summaries: dict of { campaign_year: df_agg }
+        """
+        self.doc.pagesize = A4
+        self.add_title("Synthèse Globale - Consommation d'Irrigation", font_size=20)
+        self.elements.append(Spacer(1, 10))
+
+        # Sort campaigns descending (newest first)
+        for camp in sorted(campaign_summaries.keys(), reverse=True):
+            df_agg = campaign_summaries[camp]
+            if df_agg.empty: continue
+            
+            self.add_paragraph(f"Bilan Campagne {camp}", style_name='Heading2')
+            
+            # Prepare table data
+            table_data = [['Réseau', 'Total m3', 'Volume (mm/ha)']]
+            
+            for _, row in df_agg.iterrows():
+                # Format to 1 decimal point strictly
+                try:
+                    vol_m3 = float(row['Total m3'])
+                    m3_str = f"{vol_m3:.1f}"
+                except:
+                    m3_str = str(row['Total m3'])
+                    
+                try:
+                    vol_mm = float(row['Volume (mm/ha)'])
+                    mm_str = f"{vol_mm:.1f}"
+                except:
+                    mm_str = str(row['Volume (mm/ha)'])
+                
+                # Check if it's the TOTAL row
+                is_total = (row['Réseau'] == 'TOTAL')
+                
+                if is_total:
+                    table_data.append([
+                         Paragraph(f"<b>{row['Réseau']}</b>", self.styles['Normal']),
+                         Paragraph(f"<b>{m3_str}</b>", self.styles['Normal']),
+                         Paragraph(f"<b>{mm_str}</b>", self.styles['Normal'])
+                    ])
+                else:
+                    table_data.append([row['Réseau'], m3_str, mm_str])
+                
+            # Create Table
+            t = Table(table_data, colWidths=[6*cm, 4*cm, 4*cm])
+            
+            # Styling
+            style_cmds = [
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1f4e79')), # Dark blue header
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,0), 12),
+                ('BOTTOMPADDING', (0,0), (-1,0), 8),
+                ('TOPPADDING', (0,0), (-1,0), 8),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ]
+            
+            # Add bolder styling for the TOTAL row if it exists
+            # The total row is typically the last row
+            if len(table_data) > 1 and df_agg.iloc[-1]['Réseau'] == 'TOTAL':
+                last_row_idx = len(table_data) - 1
+                style_cmds.extend([
+                    ('BACKGROUND', (0, last_row_idx), (-1, last_row_idx), colors.HexColor('#e8f5e9')),
+                    ('FONTNAME', (0, last_row_idx), (-1, last_row_idx), 'Helvetica-Bold'),
+                    ('TOPPADDING', (0, last_row_idx), (-1, last_row_idx), 6),
+                    ('BOTTOMPADDING', (0, last_row_idx), (-1, last_row_idx), 6),
+                ])
+                
+            t.setStyle(TableStyle(style_cmds))
+            self.elements.append(t)
+            self.elements.append(Spacer(1, 20))
+            
+        self.doc.build(self.elements)
+        print(f"Global Irrigation Summary PDF Generated: {self.filename}")
+
     def generate_maintenance_log(self, materiel_info, history):
         """
         Generates the Maintenance Log for a specific equipment.
