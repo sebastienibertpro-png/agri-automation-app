@@ -810,7 +810,7 @@ class ReportGenerator:
         campaign_summaries: dict of { campaign_year: df_agg }
         """
         self.doc.pagesize = A4
-        self.add_title("Synthèse Globale - Consommation d'Irrigation", font_size=20)
+        self.add_title("Synthèse Globale - Consommation d'Irrigation")
         self.elements.append(Spacer(1, 10))
 
         # Sort campaigns descending (newest first)
