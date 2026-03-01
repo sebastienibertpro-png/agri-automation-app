@@ -899,15 +899,6 @@ class ReportGenerator:
 
         self.doc.build(self.elements)
         print(f"Maintenance Log PDF Generated: {self.filename}")
-            self.elements.append(t)
-            self.elements.append(Spacer(1, 20))
-            
-            if 'Mail_Contact-Reseau' in data.columns and pd.notnull(data['Mail_Contact-Reseau'].iloc[0]):
-                contact = data['Mail_Contact-Reseau'].iloc[0]
-                self.elements.append(Paragraph(f"<i>Destinataire : {contact}</i>", self.styles['Normal']))
-
-        self.doc.build(self.elements)
-        print(f"Monthly Irrigation PDF Generated: {self.filename}")
 
     def generate_irrigation_parcel_report(self, campaign, data_grouped):
         """
