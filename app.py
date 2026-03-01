@@ -716,6 +716,55 @@ except Exception as e:
     st.error(f"Erreur lors du traitement du carnet d'entretien : {e}")
 
 
+def calculate_summary_table(df_filtered, selected_nets):
+    aggs = []
+    total_m3_global = 0
+    total_ha_global = 0
+    
+    for net in sorted(selected_nets):
+        net_data = df_filtered[df_filtered['Reseau_type'] == net]
+        if net_data.empty: continue
+        
+        # 1. Total m3 for network
+        total_m3 = net_data['Conso_Reelle_m3'].sum()
+        total_m3_global += total_m3
+        
+        # 2. Total Irrigated Ha
+        unique_meters = net_data.drop_duplicates(subset=['ID_cCompteur' if 'ID_cCompteur' in net_data.columns else 'ID_Compteur'])
+        
+        total_ha = 0
+        if 'Ha_irrigués_compteur' in unique_meters.columns:
+            total_ha = pd.to_numeric(unique_meters['Ha_irrigués_compteur'], errors='coerce').fillna(0).sum()
+        
+        total_ha_global += total_ha
+        
+        # 3. Calculate mm/ha : (m3 / 10) / ha
+        mm_ha = 0
+        if total_ha > 0:
+             mm_ha = (total_m3 / 10) / total_ha
+             
+        aggs.append({
+            'Réseau': net,
+            'Total m3': total_m3,
+            'Volume (mm/ha)': mm_ha
+        })
+        
+    df_agg = pd.DataFrame(aggs)
+    
+    if not df_agg.empty:
+        mm_ha_global = 0
+        if total_ha_global > 0:
+             mm_ha_global = (total_m3_global / 10) / total_ha_global
+        
+        total_row = pd.DataFrame([{
+            'Réseau': 'TOTAL',
+            'Total m3': total_m3_global,
+            'Volume (mm/ha)': mm_ha_global
+        }])
+        df_agg = pd.concat([df_agg, total_row], ignore_index=True)
+        
+    return df_agg
+
 # --- SECTION IRRIGATION ---
 st.divider()
 st.subheader("💧 Gestion de l'Irrigation")
@@ -772,64 +821,51 @@ try:
             # Display data summary
             st.markdown(f"#### 📊 Consommation Campagne {selected_campaign}")
             
-            # Simple aggregated view per network
             # Complex aggregated view per network (including mm/ha and TOTAL)
-            aggs = []
-            total_m3_global = 0
-            total_ha_global = 0
+            df_agg = calculate_summary_table(df_filtered, selected_nets)
             
-            for net in sorted(selected_nets):
-                net_data = df_filtered[df_filtered['Reseau_type'] == net]
-                if net_data.empty: continue
+            # Formatting (Force 1 decimal place string for display)
+            if not df_agg.empty:
+                df_display = df_agg.copy()
+                df_display['Total m3'] = df_display['Total m3'].apply(lambda x: f"{x:.1f}")
+                df_display['Volume (mm/ha)'] = df_display['Volume (mm/ha)'].apply(lambda x: f"{x:.1f}")
                 
-                # 1. Total m3 for network
-                total_m3 = net_data['Conso_Reelle_m3'].sum()
-                total_m3_global += total_m3
-                
-                # 2. Total Irrigated Ha (sum of unique meters' Ha_irrigués_compteur)
-                # Need to drop duplicates by meter ID to sum area correctly
-                unique_meters = net_data.drop_duplicates(subset=['ID_cCompteur' if 'ID_cCompteur' in net_data.columns else 'ID_Compteur'])
-                
-                total_ha = 0
-                if 'Ha_irrigués_compteur' in unique_meters.columns:
-                    # Convert to float to be safe
-                    total_ha = pd.to_numeric(unique_meters['Ha_irrigués_compteur'], errors='coerce').fillna(0).sum()
-                
-                total_ha_global += total_ha
-                
-                # 3. Calculate mm/ha : (m3 / 10) / ha
-                mm_ha = 0
-                if total_ha > 0:
-                     mm_ha = (total_m3 / 10) / total_ha
-                     
-                aggs.append({
-                    'Réseau': net,
-                    'Total m3': total_m3,
-                    'Volume (mm/ha)': mm_ha
-                })
-                
-            df_agg = pd.DataFrame(aggs)
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
             
-            # Add TOTAL row if we have data
-            if not df_agg.empty:
-                mm_ha_global = 0
-                if total_ha_global > 0:
-                     mm_ha_global = (total_m3_global / 10) / total_ha_global
-                
-                total_row = pd.DataFrame([{
-                    'Réseau': 'TOTAL',
-                    'Total m3': total_m3_global,
-                    'Volume (mm/ha)': mm_ha_global
-                }])
-                df_agg = pd.concat([df_agg, total_row], ignore_index=True)
-                
-            # Formatting (Force 1 decimal place string)
-            if not df_agg.empty:
-                df_agg['Total m3'] = df_agg['Total m3'].apply(lambda x: f"{x:.1f}")
-                df_agg['Volume (mm/ha)'] = df_agg['Volume (mm/ha)'].apply(lambda x: f"{x:.1f}")
-                
-            st.dataframe(df_agg, use_container_width=True, hide_index=True)
-
+            # --- Global Export Button ---
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("📄 Exporter Synthèse Multiannuelle PDF", key="btn_global_irr_export"):
+                with st.spinner("Génération de la synthèse globale en cours..."):
+                    campaign_summaries = {}
+                    for camp in available_campaigns:
+                        df_camp_conso = loader.get_consumption_data(camp)
+                        if not df_camp_conso.empty:
+                            df_camp_net_filtered = df_camp_conso[df_camp_conso['Reseau_type'].isin(selected_nets)]
+                            df_camp_filtered = df_camp_net_filtered[df_camp_net_filtered['ID_Compteur'].isin(selected_meters)]
+                            if not df_camp_filtered.empty:
+                                df_camp_agg = calculate_summary_table(df_camp_filtered, selected_nets)
+                                if not df_camp_agg.empty:
+                                    campaign_summaries[camp] = df_camp_agg
+                    
+                    if campaign_summaries:
+                        with tempfile.TemporaryDirectory() as tmpdirname:
+                            global_fname = "Synthese_Globale_Irrigation.pdf"
+                            global_fpath = os.path.join(tmpdirname, global_fname)
+                            gen = ReportGenerator(global_fpath)
+                            gen.generate_global_irrigation_summary(campaign_summaries)
+                            
+                            with open(global_fpath, "rb") as f:
+                                st.download_button(
+                                    label="⬇️ Télécharger Synthèse Multiannuelle",
+                                    data=f,
+                                    file_name=global_fname,
+                                    mime="application/pdf",
+                                    key="dl_global_irr"
+                                )
+                    else:
+                        st.warning("Aucune donnée d'irrigation à exporter pour les filtres actuels.")
+            st.markdown("<br>", unsafe_allow_html=True)
+            
             # Actions par réseau
             for net in sorted(selected_nets):
                 net_data = df_filtered[df_filtered['Reseau_type'] == net]
