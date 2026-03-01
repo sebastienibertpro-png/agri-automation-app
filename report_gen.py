@@ -833,7 +833,7 @@ class ReportGenerator:
             ["INFORMATIONS MATÉRIEL", ""],
             ["Marque", get_val(materiel_info, 'Marque')],
             ["Modèle", get_val(materiel_info, 'Modele')],
-            ["Année", get_val(materiel_info, 'Annee')],
+            ["Année", get_val(materiel_info, 'Année_model')],
             ["ID Parc", get_val(materiel_info, 'ID_Materiel')]
         ]
 
