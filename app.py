@@ -902,9 +902,9 @@ try:
                                             
                                             # Robust secrets retrieval
                                             try:
-                                                sender_email = st.secrets.get("EMAIL_SENDER")
-                                                sender_app_password = st.secrets.get("EMAIL_PASSWORD")
-                                            except AttributeError:
+                                                sender_email = st.secrets["EMAIL_SENDER"]
+                                                sender_app_password = st.secrets["EMAIL_PASSWORD"]
+                                            except Exception:
                                                 sender_email = None
                                                 sender_app_password = None
                                                 
