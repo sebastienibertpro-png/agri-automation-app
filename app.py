@@ -885,6 +885,49 @@ try:
                                 with open(fpath, "rb") as f:
                                     st.download_button(label=f"⬇️ Télécharger PDF Campagne", data=f, file_name=fname, mime="application/pdf", key=f"dl_camp_{net}")
 
+                    with col_irr2:
+                        # Email only for non-private networks
+                        if net in ["CUMA_Irrigation", "ASA_SaintLoup"]:
+                            recipient = net_data['Mail_Contact-Reseau'].iloc[0] if not net_data.empty and 'Mail_Contact-Reseau' in net_data.columns else None
+                            
+                            if st.button(f"📧 Envoyer Bilan Campagne - {net}", key=f"btn_mail_camp_{net}"):
+                                if not recipient:
+                                    st.error(f"Aucune adresse email trouvée pour le réseau {net}.")
+                                else:
+                                    with st.spinner(f"Envoi du bilan campagne à : {recipient}..."):
+                                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                                            fpath = tmp_file.name
+                                            gen = ReportGenerator(fpath)
+                                            gen.generate_irrigation_report(selected_campaign, net, net_data)
+                                            
+                                            # Robust secrets retrieval
+                                            try:
+                                                sender_email = st.secrets.get("EMAIL_SENDER")
+                                                sender_app_password = st.secrets.get("EMAIL_PASSWORD")
+                                            except AttributeError:
+                                                sender_email = None
+                                                sender_app_password = None
+                                                
+                                            if not sender_email or not sender_app_password:
+                                                st.error("Identifiants d'envoi d'email introuvables dans les secrets (EMAIL_SENDER, EMAIL_PASSWORD).")
+                                            else:
+                                                subject = f"Bilan Fin de Campagne Irrigation - {net} - {selected_campaign}"
+                                                body_text = f"Bonjour,\n\nVeuillez trouver ci-joint le bilan de fin de campagne d'irrigation pour l'année {selected_campaign} concernant le réseau {net}.\n\nCordialement,\nAgri Automation"
+                                                
+                                                success = send_email_with_attachment(
+                                                    sender_email=sender_email,
+                                                    sender_app_password=sender_app_password,
+                                                    recipient_email=recipient,
+                                                    subject=subject,
+                                                    body_text=body_text,
+                                                    attachment_path=fpath
+                                                )
+                                                
+                                                if success:
+                                                    st.success("Email envoyé avec succès !")
+                                                else:
+                                                    st.error("L'envoi a échoué. Consultez les logs locaux.")
+
                     st.divider()
                     st.markdown(f"#### 📅 Bilan Mensuel : {conso_month_name}")
                     col_irr_m1, col_irr_m2 = st.columns(2)
