@@ -773,10 +773,62 @@ try:
             st.markdown(f"#### 📊 Consommation Campagne {selected_campaign}")
             
             # Simple aggregated view per network
-            df_agg = df_filtered.groupby('Reseau_type')['Conso_Reelle_m3'].sum().reset_index()
-            df_agg.columns = ['Réseau', 'Total m3']
-            df_agg['Total m3'] = df_agg['Total m3'].round(1)
-            st.table(df_agg)
+            # Complex aggregated view per network (including mm/ha and TOTAL)
+            aggs = []
+            total_m3_global = 0
+            total_ha_global = 0
+            
+            for net in sorted(selected_nets):
+                net_data = df_filtered[df_filtered['Reseau_type'] == net]
+                if net_data.empty: continue
+                
+                # 1. Total m3 for network
+                total_m3 = net_data['Conso_Reelle_m3'].sum()
+                total_m3_global += total_m3
+                
+                # 2. Total Irrigated Ha (sum of unique meters' Ha_irrigués_compteur)
+                # Need to drop duplicates by meter ID to sum area correctly
+                unique_meters = net_data.drop_duplicates(subset=['ID_cCompteur' if 'ID_cCompteur' in net_data.columns else 'ID_Compteur'])
+                
+                total_ha = 0
+                if 'Ha_irrigués_compteur' in unique_meters.columns:
+                    # Convert to float to be safe
+                    total_ha = pd.to_numeric(unique_meters['Ha_irrigués_compteur'], errors='coerce').fillna(0).sum()
+                
+                total_ha_global += total_ha
+                
+                # 3. Calculate mm/ha : (m3 / 10) / ha
+                mm_ha = 0
+                if total_ha > 0:
+                     mm_ha = (total_m3 / 10) / total_ha
+                     
+                aggs.append({
+                    'Réseau': net,
+                    'Total m3': total_m3,
+                    'Volume (mm/ha)': mm_ha
+                })
+                
+            df_agg = pd.DataFrame(aggs)
+            
+            # Add TOTAL row if we have data
+            if not df_agg.empty:
+                mm_ha_global = 0
+                if total_ha_global > 0:
+                     mm_ha_global = (total_m3_global / 10) / total_ha_global
+                
+                total_row = pd.DataFrame([{
+                    'Réseau': 'TOTAL',
+                    'Total m3': total_m3_global,
+                    'Volume (mm/ha)': mm_ha_global
+                }])
+                df_agg = pd.concat([df_agg, total_row], ignore_index=True)
+                
+            # Formatting (Force 1 decimal place string)
+            if not df_agg.empty:
+                df_agg['Total m3'] = df_agg['Total m3'].apply(lambda x: f"{x:.1f}")
+                df_agg['Volume (mm/ha)'] = df_agg['Volume (mm/ha)'].apply(lambda x: f"{x:.1f}")
+                
+            st.dataframe(df_agg, use_container_width=True, hide_index=True)
 
             # Actions par réseau
             for net in sorted(selected_nets):
