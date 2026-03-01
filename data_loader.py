@@ -118,10 +118,10 @@ class DataLoader:
              df['ID_Materiel'] = df['ID_Materiel'].astype(str)
              df = df[df['ID_Materiel'] == str(id_materiel)]
              
-        if 'Date_Intervention' in df.columns:
+        if 'Date' in df.columns:
             # Enforce datetime formatting
-            df['Date_Intervention'] = pd.to_datetime(df['Date_Intervention'], errors='coerce', dayfirst=True)
-            df = df.sort_values(by='Date_Intervention', ascending=False)
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
+            df = df.sort_values(by='Date', ascending=False)
             
         return df
 
