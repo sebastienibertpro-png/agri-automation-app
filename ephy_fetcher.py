@@ -127,6 +127,10 @@ class EphyFetcher:
                 "produits_usages.csv",
                 "usages_des_produits_autorises.csv",
             ])
+            emploi_file = self._find_file_exact(names, [
+                "produits_condition_emploi_utf8.csv",
+                "produits_condition_emploi.csv"
+            ])
             danger_file = self._find_file_exact(names, [
                 "produits_classe_et_mention_danger_utf8.csv",
                 "classe_et_mention_danger_utf8.csv",
@@ -135,13 +139,15 @@ class EphyFetcher:
 
             logger.info(f"CSV produits: {produits_file}")
             logger.info(f"CSV usages: {conditions_file}")
+            logger.info(f"CSV emploi: {emploi_file}")
             logger.info(f"CSV danger: {danger_file}")
 
             df_prod  = self._read_csv_from_zip(zf, produits_file)   if produits_file   else pd.DataFrame()
             df_cond  = self._read_csv_from_zip(zf, conditions_file) if conditions_file else pd.DataFrame()
+            df_empl  = self._read_csv_from_zip(zf, emploi_file)     if emploi_file     else pd.DataFrame()
             df_dang  = self._read_csv_from_zip(zf, danger_file)     if danger_file     else pd.DataFrame()
 
-        self._df_produits, self._df_usages = self._build_tables(df_prod, df_cond, df_dang)
+        self._df_produits, self._df_usages = self._build_tables(df_prod, df_cond, df_empl, df_dang)
 
     def _find_file(self, names: list, keywords: list, exclude: list = None) -> str | None:
         for name in names:
@@ -198,7 +204,7 @@ class EphyFetcher:
                     return orig
         return None
 
-    def _build_tables(self, df_prod, df_cond, df_dang):
+    def _build_tables(self, df_prod, df_cond, df_empl, df_dang):
         """
         À partir des CSV bruts E-Phy, construit deux DataFrames normalisés :
         - df_intrants  : une ligne par produit (→ REF_INTRANTS)
@@ -211,6 +217,21 @@ class EphyFetcher:
         # Log des vraies colonnes pour debug
         logger.info(f"Colonnes CSV produits ({len(df_prod)}L): {list(df_prod.columns)[:15]}")
         logger.info(f"Colonnes CSV usages ({len(df_cond)}L): {list(df_cond.columns)[:10] if not df_cond.empty else 'vide'}")
+
+        # Extraction globale des DVP depuis les conditions d'emploi textuelles
+        dvp_map = {}
+        if df_empl is not None and not df_empl.empty:
+            c_amm_e = self._get_col(df_empl, "numero amm", "amm")
+            c_lib_e = self._get_col(df_empl, "condition d’emploi libelle", "libelle", "condition")
+            if c_amm_e and c_lib_e:
+                for amm, grp in df_empl.groupby(c_amm_e):
+                    dvps = []
+                    for txt in grp[c_lib_e].dropna():
+                        m = re.search(r"dispositif\s+v[é|e]g[é|e]tali?s?[é|e]?\s+permanent[^\d]*?(\d+)\s*m", txt, re.IGNORECASE)
+                        if m:
+                            dvps.append(int(m.group(1)))
+                    if dvps:
+                        dvp_map[str(amm)] = str(max(dvps))
 
         # --- Colonnes du CSV produits E-Phy (nouveau format 2026) ---
         c_nom   = self._get_col(df_prod, "nom produit", "nom commercial", "libelle", "denomination")
@@ -292,7 +313,7 @@ class EphyFetcher:
                     "Unite_Dose":          self._val(row, c_unit_d),
                     "Nb_Applications_Max": self._val(row, c_napp),
                     "DAR":                 self._val(row, c_dar_c),
-                    "DVP":                 self._val(row, c_dvp_c),
+                    "DVP":                 self._val(row, c_dvp_c) or dvp_map.get(str(amm_u), None),
                     "ZNT_Aqua":            self._val(row, c_znt_c),
                     "Etat_Usage":          self._val(row, c_etat_c),
                 })
