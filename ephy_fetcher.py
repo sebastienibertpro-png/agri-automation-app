@@ -214,6 +214,7 @@ class EphyFetcher:
 
         # --- Colonnes du CSV produits E-Phy (nouveau format 2026) ---
         c_nom   = self._get_col(df_prod, "nom produit", "nom commercial", "libelle", "denomination")
+        c_sec   = self._get_col(df_prod, "seconds noms commerciaux", "second nom", "noms secondaires")
         c_amm   = self._get_col(df_prod, "numero amm", "numéro amm", "numero_amm", "amm", "num amm")
         c_type  = self._get_col(df_prod, "type produit", "type de produit", "categorie", "type")
         c_form  = self._get_col(df_prod, "formulation", "forme")
@@ -235,6 +236,7 @@ class EphyFetcher:
 
             records_prod.append({
                 "Nom_Produit":     nom,
+                "Noms_Secondaires": self._val(row, c_sec),
                 "N_AMM":           amm,
                 "Type":            self._val(row, c_type),
                 "Formulation":     self._val(row, c_form),
@@ -244,7 +246,7 @@ class EphyFetcher:
                 "Etat_AMM":        self._val(row, c_etat),
                 "Date_Fin_AMM":    self._parse_date(self._val(row, c_dfin)),
                 "Classement_CMR":  None,  # Rempli ensuite
-                "Lien_Ephy":       self._build_ephy_link(amm),
+                "Lien_Ephy":       self._build_ephy_link(nom),
                 "Date_MAJ_Ephy":   datetime.now().strftime("%d/%m/%Y"),
             })
 
@@ -417,7 +419,23 @@ class EphyFetcher:
         if self._df_produits.empty:
             return []
 
-        noms = self._df_produits["Nom_Produit"].dropna().tolist()
+        noms = []
+        nom_to_idx = {}
+        for idx, row in self._df_produits.iterrows():
+            main_nom = str(row.get("Nom_Produit", ""))
+            if main_nom and main_nom.lower() not in ("nan", "none", ""):
+                noms.append(main_nom)
+                nom_to_idx[main_nom] = idx
+            
+            sec_noms = str(row.get("Noms_Secondaires", ""))
+            if sec_noms and sec_noms.lower() not in ("nan", "none", ""):
+                for sec in sec_noms.split("|"):
+                    sec = sec.strip()
+                    if sec:
+                        noms.append(sec)
+                        if sec not in nom_to_idx:
+                            nom_to_idx[sec] = idx
+
         if not noms:
             return []
 
@@ -425,17 +443,33 @@ class EphyFetcher:
             nom_commercial.upper(),
             [n.upper() for n in noms],
             scorer=fuzz.WRatio,
-            limit=top_n
+            limit=top_n * 2
         )
 
         results = []
-        for match_str, score, idx in matches:
+        seen_amm = set()
+        for match_str, score, list_idx in matches:
             if score < 40:
                 continue
+            
+            orig_str = noms[list_idx]
+            idx = nom_to_idx[orig_str]
             row = self._df_produits.iloc[idx]
             amm = str(row.get("N_AMM", ""))
 
+            if amm in seen_amm:
+                continue
+            seen_amm.add(amm)
+
             intrant = row.to_dict()
+            intrant.pop("Noms_Secondaires", None)  # Ne pas écrire ça dans REF_INTRANTS
+            
+            # Si le nom trouvé est un nom secondaire (ex: SPECTRUM au lieu de ISARD),
+            # on remplace le Nom_Produit pour qu'il s'affiche et s'enregistre sous ce nom.
+            main_nom = str(row.get("Nom_Produit", ""))
+            if orig_str.upper() != main_nom.upper():
+                intrant["Nom_Produit"] = f"{orig_str} (Réf: {main_nom})"
+
             # Nettoyer les NaN
             intrant = {k: ("" if (v != v or v is None) else v) for k, v in intrant.items()}
 
@@ -451,6 +485,8 @@ class EphyFetcher:
                 "usages":  usages,
                 "score":   score,
             })
+            if len(results) >= top_n:
+                break
 
         return results
 
@@ -502,10 +538,11 @@ class EphyFetcher:
         return str(val).strip()
 
     @staticmethod
-    def _build_ephy_link(amm: str) -> str | None:
-        if not amm:
+    def _build_ephy_link(nom: str) -> str | None:
+        if not nom:
             return None
-        amm_clean = re.sub(r"[^0-9]", "", str(amm))
-        if amm_clean:
-            return f"https://ephy.anses.fr/ephy/phytoproduct/{amm_clean}"
+        nom_clean = re.sub(r"[^a-zA-Z0-9]", "-", str(nom).lower())
+        nom_clean = re.sub(r"-+", "-", nom_clean).strip("-")
+        if nom_clean:
+            return f"https://ephy.anses.fr/ppp/{nom_clean}"
         return None
