@@ -1260,7 +1260,13 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
                 cols_prio = ["Nom_Produit", "Type", "N_AMM", "Etat_AMM", "Date_Fin_AMM",
                              "Matieres_Actives", "Formulation", "DAR", "ZNT_Aqua", "DVP",
                              "Classement_CMR", "Date_MAJ_Ephy"]
-                cols_show = [c for c in cols_prio if c in df_phyto_only.columns]
+                
+                # Forcer la création de ces colonnes si elles n'existent pas encore dans le Sheet
+                for c in cols_prio:
+                    if c not in df_phyto_only.columns:
+                        df_phyto_only[c] = ""
+                
+                cols_show = cols_prio
                 st.dataframe(df_phyto_only[cols_show], use_container_width=True, hide_index=True)
                 st.caption(f"{len(df_phyto_only)} produit(s) phytosanitaire(s) dans REF_INTRANTS")
             else:
