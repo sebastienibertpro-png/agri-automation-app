@@ -1185,7 +1185,8 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
                         "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
                     }
                     with st.spinner("Enregistrement dans REF_INTRANTS..."):
-                        ok = active_loader.update_intrant(intrant_to_write)
+                        orig_search = st.session_state.get("search_phyto", "")
+                        ok = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
                     if ok:
                         st.success(f"✅ '{intrant_to_write['Nom_Produit']}' enregistré dans REF_INTRANTS !")
                     # else: erreur affichée dans update_intrant
@@ -1227,7 +1228,8 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
                     "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
                 }
                 with st.spinner("Enregistrement en cours..."):
-                    ok1 = active_loader.update_intrant(intrant_to_write)
+                    orig_search = st.session_state.get("search_phyto", "")
+                    ok1 = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
                     n_amm = intrant.get("N_AMM", "")
                     ok2 = active_loader.update_usages_phyto(n_amm, usages) if usages else True
                 if ok1 and ok2:
