@@ -497,8 +497,10 @@ class EphyFetcher:
             usages = []
             if not self._df_usages.empty and amm:
                 sub = self._df_usages[self._df_usages["N_AMM"].astype(str) == amm]
-                usages = [{k: ("" if (v != v or v is None) else v) for k, v in r.items()}
-                          for r in sub.to_dict("records")]
+                for r in sub.to_dict("records"):
+                    u = {k: ("" if (v != v or v is None) else v) for k, v in r.items()}
+                    u["Nom_Produit"] = intrant.get("Nom_Produit", u.get("Nom_Produit"))
+                    usages.append(u)
 
             results.append({
                 "intrant": intrant,
