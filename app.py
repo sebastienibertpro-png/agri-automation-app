@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from data_loader import DataLoader
 from report_gen import ReportGenerator
+from ephy_fetcher import EphyFetcher
 import json
 import tempfile
 from datetime import datetime
@@ -172,19 +173,69 @@ with st.expander("Ouvrir le formulaire de saisie groupée", expanded=False):
     except Exception as e:
          st.error(f"❌ Impossible de charger 'REF_INTRANTS' : {e}")
          liste_produits = ["(Saisir manuellement)"]
+
+    # Charger les usages E-Phy pour auto-fill dose / cible
+    try:
+        df_usages_ref = active_loader.get_usages_phyto()
+    except Exception:
+        df_usages_ref = pd.DataFrame()
+
+    def get_cibles_for_product(nom_produit):
+        """Retourne la liste des cibles autorisées pour un produit depuis REF_USAGES_PHYTO."""
+        if df_usages_ref.empty or 'Nom_Produit' not in df_usages_ref.columns:
+            return []
+        sub = df_usages_ref[df_usages_ref['Nom_Produit'].astype(str).str.upper() == str(nom_produit).upper()]
+        if sub.empty:
+            return []
+        cibles = sub['Cible'].dropna().unique().tolist()
+        return sorted([str(c) for c in cibles if str(c).strip()])
+
+    def get_dose_for_cible(nom_produit, cible):
+        """Retourne la dose max + unité pour un couple produit/cible."""
+        if df_usages_ref.empty:
+            return None, None
+        sub = df_usages_ref[
+            (df_usages_ref['Nom_Produit'].astype(str).str.upper() == str(nom_produit).upper()) &
+            (df_usages_ref['Cible'].astype(str) == str(cible))
+        ]
+        if sub.empty:
+            return None, None
+        dose = pd.to_numeric(sub['Dose_Max'].iloc[0], errors='coerce')
+        unite = sub['Unite_Dose'].iloc[0] if 'Unite_Dose' in sub.columns else None
+        return (float(dose) if not pd.isna(dose) else None), unite
          
     # We hardcode up to 5 products for simplicity.
     produits_data = []
     for i in range(1, 6): # Allow up to 5 products at once
-         c1, c2, c3 = st.columns([2, 1, 1])
-         with c1:
-              prod = st.selectbox(f"Produit {i}", ["- Aucun -"] + liste_produits, key=f"prod_name_{i}")
-         with c2:
-              dose = st.number_input(f"Dose/ha", min_value=0.0, step=0.1, key=f"prod_dose_{i}")
-         with c3:
-              unite = st.selectbox("Unité", ["L/ha", "Kg/ha", "g/ha"], key=f"prod_unite_{i}")
-         if prod != "- Aucun -":
-              produits_data.append({'nom': prod, 'dose': dose, 'unite': unite})
+        c1, c2, c3, c4 = st.columns([2, 1.5, 1, 1])
+        with c1:
+            prod = st.selectbox(f"Produit {i}", ["- Aucun -"] + liste_produits, key=f"prod_name_{i}")
+        
+        # Dropdown cible (depuis REF_USAGES_PHYTO) si produit sélectionné
+        cible_val = ""
+        if prod != "- Aucun -":
+            cibles_dispo = get_cibles_for_product(prod)
+            with c2:
+                if cibles_dispo:
+                    cible_val = st.selectbox(f"Cible {i}", [""] + cibles_dispo, key=f"prod_cible_{i}")
+                else:
+                    cible_val = st.text_input(f"Cible {i}", key=f"prod_cible_txt_{i}", placeholder="Saisir la cible")
+            # Auto-fill dose depuis REF_USAGES_PHYTO
+            auto_dose, auto_unite = get_dose_for_cible(prod, cible_val) if cible_val else (None, None)
+        else:
+            with c2:
+                st.text_input(f"Cible {i}", key=f"prod_cible_empty_{i}", disabled=True)
+            auto_dose, auto_unite = None, None
+
+        with c3:
+            dose_default = float(auto_dose) if auto_dose else 0.0
+            dose = st.number_input(f"Dose/ha", min_value=0.0, step=0.1, value=dose_default, key=f"prod_dose_{i}")
+        with c4:
+            unite_options = ["L/ha", "Kg/ha", "g/ha"]
+            unite_idx = unite_options.index(auto_unite) if auto_unite in unite_options else 0
+            unite = st.selectbox("Unité", unite_options, index=unite_idx, key=f"prod_unite_{i}")
+        if prod != "- Aucun -":
+            produits_data.append({'nom': prod, 'cible': cible_val, 'dose': dose, 'unite': unite})
 
     st.markdown("<br>", unsafe_allow_html=True)
     submitted = st.button("Enregistrer les interventions 🚀")
@@ -219,7 +270,8 @@ with st.expander("Ouvrir le formulaire de saisie groupée", expanded=False):
                             'Tracteur': tracteur,
                             'Outil': outil if outil != "- Aucun -" else "",
                             'Nom_Produit': prod['nom'],
-                            'Num_AMM': '', # Laisser vide pour l'instant
+                            'Cible': prod.get('cible', ''),   # 🆕 Cible depuis REF_USAGES_PHYTO
+                            'Num_AMM': '', # Auto-rempli si N_AMM dans REF_INTRANTS
                             'Dose_Ha': prod['dose'],
                             'Unité_Dose': prod['unite'],
                             'Quantité_Totale_Produit': round(qty_totale, 2),
@@ -992,3 +1044,226 @@ try:
 
 except Exception as e:
     st.error(f"Erreur lors du traitement de l'irrigation : {e}")
+
+# ===========================================================================
+# 🌿 RÉFÉRENTIEL PHYTO — Recherche E-Phy + Auto-remplissage REF_INTRANTS
+# ===========================================================================
+st.divider()
+st.subheader("🌿 Référentiel Phytosanitaire (E-Phy)")
+
+with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGES_PHYTO", expanded=False):
+
+    # --- Init EphyFetcher dans la session Streamlit ---
+    if "ephy_fetcher" not in st.session_state:
+        with st.spinner("🔄 Chargement du référentiel E-Phy (première fois : ~30s)..."):
+            try:
+                st.session_state["ephy_fetcher"] = EphyFetcher(auto_refresh=True)
+            except Exception as e_init:
+                st.error(f"❌ Erreur initialisation E-Phy : {e_init}")
+                st.session_state["ephy_fetcher"] = None
+
+    fetcher: EphyFetcher | None = st.session_state.get("ephy_fetcher")
+
+    # --- Barre d'état du cache ---
+    col_info1, col_info2, col_info3 = st.columns(3)
+    with col_info1:
+        st.metric("📂 Produits E-Phy indexés", fetcher.nb_produits if fetcher else 0)
+    with col_info2:
+        st.metric("📅 Dernière MAJ", fetcher.last_update if fetcher else "N/A")
+    with col_info3:
+        if st.button("🔄 Forcer mise à jour E-Phy", key="btn_refresh_ephy"):
+            with st.spinner("Téléchargement du référentiel E-Phy en cours..."):
+                ok = fetcher.refresh(force=True) if fetcher else False
+            if ok:
+                st.success("✅ Référentiel E-Phy mis à jour !")
+                st.rerun()
+            else:
+                st.error("❌ Échec de la mise à jour.")
+
+    st.markdown("---")
+
+    # --- Zone de recherche ---
+    st.markdown("#### 🔍 Recherche par nom commercial")
+    search_query = st.text_input(
+        "Nom commercial du produit",
+        placeholder="Ex: TOPSIN M 70 WG, ROUNDUP FLEX, COMET PRO...",
+        key="ephy_search_query"
+    )
+
+    if search_query and fetcher:
+        with st.spinner(f"Recherche de '{search_query}' dans E-Phy..."):
+            results = fetcher.search(search_query, top_n=8)
+
+        if not results:
+            st.warning("⚠️ Aucun produit trouvé. Vérifiez l'orthographe ou essayez un nom partiel.")
+        else:
+            # Préparer les options de sélection
+            options_labels = []
+            for r in results:
+                nom = r['intrant'].get('Nom_Produit', '?')
+                amm = r['intrant'].get('N_AMM', '')
+                score = r['score']
+                etat = r['intrant'].get('Etat_AMM', '')
+                badge = "✅" if "autoris" in str(etat).lower() else ("🔴" if "retir" in str(etat).lower() else "🟡")
+                label = f"{badge} {nom} | AMM: {amm} | Score: {score}%"
+                options_labels.append(label)
+
+            selected_label = st.radio(
+                "Sélectionnez le produit correspondant :",
+                options_labels,
+                key="ephy_select_result"
+            )
+            selected_idx = options_labels.index(selected_label)
+            selected_result = results[selected_idx]
+            intrant = selected_result['intrant']
+            usages  = selected_result['usages']
+
+            # --- Fiche produit ---
+            st.markdown("#### 📄 Fiche réglementaire E-Phy")
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                st.markdown(f"**Nom** : {intrant.get('Nom_Produit', '')}")
+                st.markdown(f"**N° AMM** : `{intrant.get('N_AMM', '')}`")
+                st.markdown(f"**Type** : {intrant.get('Type', '')}")
+                st.markdown(f"**Formulation** : {intrant.get('Formulation', '')}")
+                st.markdown(f"**Titulaire** : {intrant.get('Titulaire_AMM', '')}")
+                st.markdown(f"**État AMM** : {intrant.get('Etat_AMM', '')}")
+                st.markdown(f"**Date fin AMM** : {intrant.get('Date_Fin_AMM', '')}")
+            with col_f2:
+                st.markdown(f"**Matières actives** : {intrant.get('Matieres_Actives', '')}")
+                st.markdown(f"**Concentration** : {intrant.get('Concentration', '')}")
+                st.markdown(f"**Classement CMR** : {intrant.get('Classement_CMR', '')}")
+                st.markdown(f"**Mentions danger** : {intrant.get('Mentions_Danger', '')}")
+                st.markdown(f"**ZNT Aquatique** : {intrant.get('ZNT_Aqua', '')} m")
+                st.markdown(f"**ZNT Riverains** : {intrant.get('ZNT_Riverains', '')} m")
+                st.markdown(f"**DVP** : {intrant.get('DVP', '')}")
+                if intrant.get('Lien_Ephy'):
+                    st.markdown(f"[🔗 Fiche officielle E-Phy]({intrant['Lien_Ephy']})")
+
+            # --- Tableau des usages ---
+            if usages:
+                st.markdown(f"#### 🌱 Usages homologués ({len(usages)} usage(s))")
+                df_usages_display = pd.DataFrame(usages)
+                cols_display = [c for c in ["Culture", "Cible", "Type_Cible", "Dose_Max", "Unite_Dose",
+                                             "Nb_Applications_Max", "DAR", "DVP", "ZNT_Aqua", "Etat_Usage"]
+                                if c in df_usages_display.columns]
+                st.dataframe(df_usages_display[cols_display], use_container_width=True, hide_index=True)
+            else:
+                st.info("ℹ️ Aucun usage détaillé disponible pour ce N°AMM dans E-Phy.")
+
+            st.markdown("---")
+
+            # --- Boutons d'écriture ---
+            st.markdown("#### ✍️ Enregistrer dans MASTER_EXPLOITATION")
+            st.caption("⚠️ Les colonnes `Element_N/P/K`, `Espèce_Semence`, `Unite_Achat`, `Prix_Unitaire_Moyen`, `STOCK_ACTUEL`, `Valeur_Stock` ne sont pas modifiées si le produit existe déjà.")
+
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("➕ Ajouter/MAJ dans REF_INTRANTS", key="btn_add_intrant", type="primary"):
+                    # Construire le dict à écrire (uniquement champs auto E-Phy)
+                    intrant_to_write = {
+                        "Nom_Produit":       intrant.get("Nom_Produit", ""),
+                        "Type":              intrant.get("Type", ""),
+                        "N_AMM":             intrant.get("N_AMM", ""),
+                        "Matieres_Actives":  intrant.get("Matieres_Actives", ""),
+                        "Concentration":     intrant.get("Concentration", ""),
+                        "Culture":           intrant.get("Culture", ""),
+                        "Nb_Applications_Max_An": intrant.get("Nb_Applications_Max_An", ""),
+                        "ZNT_Aqua":          intrant.get("ZNT_Aqua", ""),
+                        "ZNT_Riverains":     intrant.get("ZNT_Riverains", ""),
+                        "DVP":               intrant.get("DVP", ""),
+                        "DAR":               intrant.get("DAR", ""),
+                        "Dose_Max_Homologuee": intrant.get("Dose_Max_Homologuee", ""),
+                        "Mentions_Danger":   intrant.get("Mentions_Danger", ""),
+                        "Unité_utilisation": intrant.get("Unité_utilisation", ""),
+                        "Formulation":       intrant.get("Formulation", ""),
+                        "Etat_AMM":          intrant.get("Etat_AMM", ""),
+                        "Date_Fin_AMM":      intrant.get("Date_Fin_AMM", ""),
+                        "Classement_CMR":    intrant.get("Classement_CMR", ""),
+                        "Titulaire_AMM":     intrant.get("Titulaire_AMM", ""),
+                        "Lien_Ephy":         intrant.get("Lien_Ephy", ""),
+                        "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
+                    }
+                    with st.spinner("Enregistrement dans REF_INTRANTS..."):
+                        ok = active_loader.update_intrant(intrant_to_write)
+                    if ok:
+                        st.success(f"✅ '{intrant_to_write['Nom_Produit']}' enregistré dans REF_INTRANTS !")
+                    # else: erreur affichée dans update_intrant
+
+            with col_btn2:
+                if usages and st.button("🌱 Enregistrer usages dans REF_USAGES_PHYTO", key="btn_add_usages"):
+                    n_amm = intrant.get("N_AMM", "")
+                    with st.spinner(f"Enregistrement de {len(usages)} usage(s) dans REF_USAGES_PHYTO..."):
+                        ok = active_loader.update_usages_phyto(n_amm, usages)
+                    if ok:
+                        st.success(f"✅ {len(usages)} usages enregistrés dans REF_USAGES_PHYTO !")
+
+            # Bouton tout-en-un
+            st.markdown(" ")
+            if st.button("🚀 Tout enregistrer (REF_INTRANTS + REF_USAGES_PHYTO)",
+                         key="btn_add_all", type="primary",
+                         help="Écrit dans les deux onglets en une seule opération"):
+                intrant_to_write = {
+                    "Nom_Produit":       intrant.get("Nom_Produit", ""),
+                    "Type":              intrant.get("Type", ""),
+                    "N_AMM":             intrant.get("N_AMM", ""),
+                    "Matieres_Actives":  intrant.get("Matieres_Actives", ""),
+                    "Concentration":     intrant.get("Concentration", ""),
+                    "Culture":           intrant.get("Culture", ""),
+                    "Nb_Applications_Max_An": intrant.get("Nb_Applications_Max_An", ""),
+                    "ZNT_Aqua":          intrant.get("ZNT_Aqua", ""),
+                    "ZNT_Riverains":     intrant.get("ZNT_Riverains", ""),
+                    "DVP":               intrant.get("DVP", ""),
+                    "DAR":               intrant.get("DAR", ""),
+                    "Dose_Max_Homologuee": intrant.get("Dose_Max_Homologuee", ""),
+                    "Mentions_Danger":   intrant.get("Mentions_Danger", ""),
+                    "Unité_utilisation": intrant.get("Unité_utilisation", ""),
+                    "Formulation":       intrant.get("Formulation", ""),
+                    "Etat_AMM":          intrant.get("Etat_AMM", ""),
+                    "Date_Fin_AMM":      intrant.get("Date_Fin_AMM", ""),
+                    "Classement_CMR":    intrant.get("Classement_CMR", ""),
+                    "Titulaire_AMM":     intrant.get("Titulaire_AMM", ""),
+                    "Lien_Ephy":         intrant.get("Lien_Ephy", ""),
+                    "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
+                }
+                with st.spinner("Enregistrement en cours..."):
+                    ok1 = active_loader.update_intrant(intrant_to_write)
+                    n_amm = intrant.get("N_AMM", "")
+                    ok2 = active_loader.update_usages_phyto(n_amm, usages) if usages else True
+                if ok1 and ok2:
+                    st.success("✅ Produit enregistré dans REF_INTRANTS et REF_USAGES_PHYTO !")
+                    st.balloons()
+
+    elif not fetcher:
+        st.error("❌ Le module E-Phy n'a pas pu être initialisé. Vérifiez la connexion internet.")
+
+    # --- Vue REF_INTRANTS actuel ---
+    st.markdown("---")
+    st.markdown("#### 📊 REF_INTRANTS actuel (produits phytosanitaires)")
+    try:
+        df_ref_current = active_loader.get_intrants()
+        if not df_ref_current.empty:
+            # Filtrer sur les produits phyto (excluant engrais/semences)
+            phyto_types = ["Herbicide", "Fongicide", "Insecticide", "Molluscicide",
+                           "Régulateur de croissance", "Nématicide", "Acaricide"]
+            if "Type" in df_ref_current.columns:
+                df_phyto_only = df_ref_current[
+                    df_ref_current["Type"].astype(str).str.strip().isin(phyto_types)
+                ]
+            else:
+                df_phyto_only = df_ref_current
+
+            if not df_phyto_only.empty:
+                # Colonnes à afficher en priorité
+                cols_prio = ["Nom_Produit", "Type", "N_AMM", "Etat_AMM", "Date_Fin_AMM",
+                             "Matieres_Actives", "Formulation", "DAR", "ZNT_Aqua", "DVP",
+                             "Classement_CMR", "Date_MAJ_Ephy"]
+                cols_show = [c for c in cols_prio if c in df_phyto_only.columns]
+                st.dataframe(df_phyto_only[cols_show], use_container_width=True, hide_index=True)
+                st.caption(f"{len(df_phyto_only)} produit(s) phytosanitaire(s) dans REF_INTRANTS")
+            else:
+                st.info("ℹ️ Aucun produit phytosanitaire trouvé dans REF_INTRANTS (Type non reconnu).")
+        else:
+            st.info("ℹ️ REF_INTRANTS est vide.")
+    except Exception as e:
+        st.error(f"Erreur chargement REF_INTRANTS : {e}")
