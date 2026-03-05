@@ -1,7 +1,9 @@
-streamlit
 pandas
-reportlab
-st-gsheets-connection
 openpyxl
-qrcode
-Pillow
+reportlab
+gspread
+oauth2client
+google-api-python-client
+rapidfuzz
+pyarrow
+requests
