@@ -409,10 +409,10 @@ class DataLoader:
     # RÉFÉRENTIEL PHYTO — Écriture REF_INTRANTS + REF_USAGES_PHYTO
     # -----------------------------------------------------------------------
 
-    def update_intrant(self, intrant_dict: dict) -> bool:
+    def update_intrant(self, intrant_dict: dict, original_name: str = None) -> bool:
         """
         Ajoute ou met à jour un produit dans REF_INTRANTS (upsert par Nom_Produit).
-        Si le produit existe déjà (même Nom_Produit), sa ligne est remplacée.
+        Si le produit existe déjà (même Nom_Produit ou original_name), sa ligne est écrasée avec les nouvelles données.
         Sinon, la ligne est ajoutée en bas.
         Fonctionne uniquement en mode Cloud.
         """
@@ -428,21 +428,27 @@ class DataLoader:
                 if col not in df.columns:
                     df[col] = ""
 
-            # Chercher une ligne existante
+            # Chercher une ligne existante par le nouveau nom ou l'ancien nom recherché
             mask = df["Nom_Produit"].astype(str).str.strip().str.upper() == nom
+            if original_name:
+                orig_nom = str(original_name).strip().upper()
+                if orig_nom:
+                    mask = mask | (df["Nom_Produit"].astype(str).str.strip().str.upper() == orig_nom)
+
             new_row = pd.DataFrame([intrant_dict])
 
             if mask.any():
-                # Remplacer la ligne existante
+                # Remplacer les cellules de la ligne existante pour écraser les vieilles données
                 idx = df[mask].index[0]
-                for col, val in intrant_dict.items():
-                    df.at[idx, col] = val
+                for col in intrant_dict:
+                    df.at[idx, col] = intrant_dict[col]
             else:
                 # Ajouter une nouvelle ligne
                 df = pd.concat([df, new_row], ignore_index=True)
 
             self.conn.update(worksheet="REF_INTRANTS", data=df, spreadsheet="MASTER_EXPLOITATION")
             self._cache.pop("REF_INTRANTS", None)  # Invalider le cache local
+            st.cache_data.clear() # Force Streamlit GSheetsConnection to drop its TTL cache
             return True
         except Exception as e:
             st.error(f"Erreur écriture REF_INTRANTS : {e}")
@@ -477,6 +483,7 @@ class DataLoader:
             df = pd.concat([df, new_df], ignore_index=True)
             self.conn.update(worksheet="REF_USAGES_PHYTO", data=df, spreadsheet="MASTER_EXPLOITATION")
             self._cache.pop("REF_USAGES_PHYTO", None)
+            st.cache_data.clear() # Force Streamlit GSheetsConnection to drop its TTL cache
             return True
         except Exception as e:
             st.error(f"Erreur écriture REF_USAGES_PHYTO : {e}")
