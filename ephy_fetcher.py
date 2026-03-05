@@ -28,7 +28,7 @@ CACHE_DIR = os.path.join(os.path.dirname(__file__), "_ephy_cache")
 CACHE_PRODUITS = os.path.join(CACHE_DIR, "produits.parquet")
 CACHE_USAGES   = os.path.join(CACHE_DIR, "usages.parquet")
 CACHE_DATE_FILE = os.path.join(CACHE_DIR, "last_update.txt")
-REFRESH_DAYS = 7  # Rafraîchissement hebdomadaire
+REFRESH_DAYS = 60  # Rafraîchissement tous les 2 mois
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +128,7 @@ class EphyFetcher:
                 "usages_des_produits_autorises.csv",
             ])
             danger_file = self._find_file_exact(names, [
+                "produits_classe_et_mention_danger_utf8.csv",
                 "classe_et_mention_danger_utf8.csv",
                 "classe_et_mention_danger.csv",
             ])
@@ -187,6 +188,16 @@ class EphyFetcher:
     # 2. CONSTRUCTION DES TABLES INDEXÉES
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _get_col(df: pd.DataFrame, *candidates: str) -> str | None:
+        """Trouve la colonne dont le nom contient l'un des candidats (insensible à la casse)."""
+        col_map = {str(c).lower().strip(): c for c in df.columns}
+        for cand in candidates:
+            for lc, orig in col_map.items():
+                if cand.lower() in lc:
+                    return orig
+        return None
+
     def _build_tables(self, df_prod, df_cond, df_dang):
         """
         À partir des CSV bruts E-Phy, construit deux DataFrames normalisés :
@@ -201,30 +212,15 @@ class EphyFetcher:
         logger.info(f"Colonnes CSV produits ({len(df_prod)}L): {list(df_prod.columns)[:15]}")
         logger.info(f"Colonnes CSV usages ({len(df_cond)}L): {list(df_cond.columns)[:10] if not df_cond.empty else 'vide'}")
 
-        def get_col(df, *candidates):
-            """Trouve la colonne dont le nom contient l'un des candidats (insensible à la casse)."""
-            col_map = {c.lower().strip(): c for c in df.columns}
-            for cand in candidates:
-                for lc, orig in col_map.items():
-                    if cand.lower() in lc:
-                        return orig
-            return None
-
-        # --- Colonnes du CSV produits.CSV E-Phy (noms réels vérifiés 2026) ---
-        # Colonnes réelles: 'numero AMM', 'nom produit', 'type produit',
-        # 'formulation', 'titulaire', 'etat', 'mentions autorisees', ...
-        c_nom   = get_col(df_prod, "nom produit", "nom commercial", "libelle", "denomination")
-        c_amm   = get_col(df_prod, "numero amm", "numéro amm", "numero_amm", "amm", "num amm")
-        c_type  = get_col(df_prod, "type produit", "type de produit", "categorie", "type")
-        c_form  = get_col(df_prod, "formulation", "forme")
-        c_titu  = get_col(df_prod, "titulaire", "firme", "societe", "company", "detenteur")
-        c_sa    = get_col(df_prod, "substance active", "matiere active")
-        c_tsa   = get_col(df_prod, "teneur", "concentration", "taux")
-        c_etat  = get_col(df_prod, "etat", "statut", "situation")
-        c_dfin  = get_col(df_prod, "fin de validite", "date fin", "date_fin", "echeance", "retrait")
-        c_cmr   = get_col(df_prod, "cmr", "classement danger", "mention danger")
-
-        logger.info(f"Mapping colonnes: nom={c_nom}, amm={c_amm}, type={c_type}, form={c_form}, titu={c_titu}, etat={c_etat}")
+        # --- Colonnes du CSV produits E-Phy (nouveau format 2026) ---
+        c_nom   = self._get_col(df_prod, "nom produit", "nom commercial", "libelle", "denomination")
+        c_amm   = self._get_col(df_prod, "numero amm", "numéro amm", "numero_amm", "amm", "num amm")
+        c_type  = self._get_col(df_prod, "type produit", "type de produit", "categorie", "type")
+        c_form  = self._get_col(df_prod, "formulation", "forme")
+        c_titu  = self._get_col(df_prod, "titulaire", "firme", "societe", "company", "detenteur")
+        c_sa    = self._get_col(df_prod, "substances actives", "substance active", "matiere active")
+        c_etat  = self._get_col(df_prod, "etat d’autorisation", "etat d'autorisation", "etat", "statut", "situation")
+        c_dfin  = self._get_col(df_prod, "date de retrait", "fin de validite", "date fin", "date_fin", "echeance", "retrait")
 
         # --- Table produits (REF_INTRANTS) ---
         records_prod = []
@@ -234,9 +230,8 @@ class EphyFetcher:
             if not nom and not amm:
                 continue
 
-            # Substances actives + concentration
+            # La SA concentre tout : "diméthoate (Dimethoate) 400.0 g/L | ..."
             sa     = self._val(row, c_sa)
-            conc   = self._val(row, c_tsa)
 
             records_prod.append({
                 "Nom_Produit":     nom,
@@ -245,10 +240,10 @@ class EphyFetcher:
                 "Formulation":     self._val(row, c_form),
                 "Titulaire_AMM":   self._val(row, c_titu),
                 "Matieres_Actives": sa,
-                "Concentration":   conc,
+                "Concentration":   None,  # Intégré dans Matieres_Actives
                 "Etat_AMM":        self._val(row, c_etat),
                 "Date_Fin_AMM":    self._parse_date(self._val(row, c_dfin)),
-                "Classement_CMR":  self._val(row, c_cmr),
+                "Classement_CMR":  None,  # Rempli ensuite
                 "Lien_Ephy":       self._build_ephy_link(amm),
                 "Date_MAJ_Ephy":   datetime.now().strftime("%d/%m/%Y"),
             })
@@ -259,36 +254,38 @@ class EphyFetcher:
         df_usages = pd.DataFrame()
         if not df_cond.empty:
             logger.info(f"Colonnes CSV usages: {list(df_cond.columns)[:15]}")
-            # Colonnes réelles produits_usages.CSV E-Phy:
-            # 'numero AMM', 'nom produit', 'culture', 'usage', 'organisme nuisible',
-            # 'dose max', 'unite dose', 'nombre max applic', 'DAR', 'DVP', 'ZNT eau'
-            c_amm_c   = get_col(df_cond, "numero amm", "numéro amm", "num amm", "amm")
-            c_nom_c   = get_col(df_cond, "nom produit", "nom commercial", "libelle")
-            c_cult    = get_col(df_cond, "culture")
-            c_cible   = get_col(df_cond, "organisme nuisible", "organisme", "nuisible",
-                                "cible", "bioagresseur", "ravageur", "maladie", "adventice")
-            c_type_c  = get_col(df_cond, "type usage", "usage", "categorie")
-            c_dose    = get_col(df_cond, "dose max", "dose")
-            c_unit_d  = get_col(df_cond, "unite dose", "unité dose", "unit")
-            c_napp    = get_col(df_cond, "nombre max applic", "nombre maxi", "nb appli", "maxi")
-            c_dar_c   = get_col(df_cond, "dar", "delai avant recolte")
-            c_dvp_c   = get_col(df_cond, "dvp", "dispositif vegetal", "haie")
-            c_znt_c   = get_col(df_cond, "znt eau", "znt", "zone non")
-            c_etat_c  = get_col(df_cond, "etat", "statut")
-
-            logger.info(f"Usages map: amm={c_amm_c}, cult={c_cult}, cible={c_cible}, dose={c_dose}, dar={c_dar_c}, dvp={c_dvp_c}")
+            # Nouveau format 2026: 'identifiant usage' = 'Artichaut*Trt Part.Aer.*Pucerons'
+            # 'dose retenue', 'dose retenue unite', 'delai avant recolte jour', 'nombre max d'application', 'ZNT aquatique (en m)'
+            c_amm_c   = self._get_col(df_cond, "numero amm", "numéro amm", "num amm", "amm")
+            c_nom_c   = self._get_col(df_cond, "nom produit", "nom commercial", "libelle")
+            c_ident   = self._get_col(df_cond, "identifiant usage", "usage")
+            c_dose    = self._get_col(df_cond, "dose retenue", "dose max", "dose")
+            c_unit_d  = self._get_col(df_cond, "dose retenue unite", "unite dose", "unité")
+            c_napp    = self._get_col(df_cond, "nombre max d'application", "nombre max applic", "nombre maxi", "nb appli", "maxi")
+            c_dar_c   = self._get_col(df_cond, "delai avant recolte jour", "dar", "delai avant recolte")
+            c_dvp_c   = self._get_col(df_cond, "dvp", "dispositif vegetal", "haie")
+            c_znt_c   = self._get_col(df_cond, "znt aquatique", "znt eau", "znt", "zone non")
+            c_etat_c  = self._get_col(df_cond, "etat usage", "etat")
 
             records_usages = []
             for _, row in df_cond.iterrows():
                 amm_u = self._val(row, c_amm_c)
                 if not amm_u:
                     continue
+                
+                usage_str = self._val(row, c_ident)
+                culture, cible = None, None
+                if usage_str:
+                    parts = usage_str.split('*')
+                    culture = parts[0].strip() if len(parts) > 0 else None
+                    cible = parts[-1].strip() if len(parts) > 1 else None
+
                 records_usages.append({
                     "N_AMM":               amm_u,
                     "Nom_Produit":         self._val(row, c_nom_c),
-                    "Culture":             self._val(row, c_cult),
-                    "Cible":               self._val(row, c_cible),
-                    "Type_Cible":          self._val(row, c_type_c),
+                    "Culture":             culture,
+                    "Cible":               cible,
+                    "Type_Cible":          usage_str,
                     "Dose_Max":            self._val(row, c_dose),
                     "Unite_Dose":          self._val(row, c_unit_d),
                     "Nb_Applications_Max": self._val(row, c_napp),
@@ -344,21 +341,13 @@ class EphyFetcher:
         return df_intrants.apply(enrich_row, axis=1)
 
     def _enrich_danger(self, df_intrants: pd.DataFrame, df_dang: pd.DataFrame) -> pd.DataFrame:
-        """Ajoute Mentions_Danger et ZNT_Riverains depuis le CSV de classement."""
+        """Ajoute Mentions_Danger et CMR depuis le CSV de classement."""
         if df_dang.empty or df_intrants.empty:
             return df_intrants
 
-        c_amm_d  = None
-        c_ment   = None
-        c_zntriv = None
-        for col in df_dang.columns:
-            lc = col.lower()
-            if not c_amm_d and ("amm" in lc or "autorisation" in lc):
-                c_amm_d = col
-            if not c_ment and ("mention" in lc or "danger" in lc or "phrase" in lc):
-                c_ment = col
-            if not c_zntriv and ("riverain" in lc or "rive" in lc):
-                c_zntriv = col
+        c_amm_d = self._get_col(df_dang, "numero amm", "amm")
+        c_court = self._get_col(df_dang, "libellé court", "libelle court", "court", "phrase")
+        c_zntriv = self._get_col(df_dang, "riverain", "rive")
 
         if not c_amm_d:
             return df_intrants
@@ -366,11 +355,19 @@ class EphyFetcher:
         dang_map = {}
         for amm, grp in df_dang.groupby(c_amm_d):
             entry = {}
-            if c_ment:
-                entry["Mentions_Danger"] = ", ".join(sorted(grp[c_ment].dropna().unique().tolist()))
+            if c_court:
+                mots = sorted(grp[c_court].dropna().unique().tolist())
+                entry["Mentions_Danger"] = ", ".join(mots)
+                # Détection CMR si présence de 'C', 'M', 'R' seuls (CMR 1, 2 etc) 
+                # ou H350/H351 etc
+                cmrs = [m for m in mots if m in ('C1A', 'C1B', 'C2', 'M1A', 'M1B', 'M2', 'R1A', 'R1B', 'R2')]
+                if cmrs:
+                    entry["Classement_CMR"] = ", ".join(cmrs)
+            
             if c_zntriv:
                 vals = pd.to_numeric(grp[c_zntriv], errors="coerce")
                 entry["ZNT_Riverains"] = vals.max() if not vals.isna().all() else None
+            
             dang_map[str(amm)] = entry
 
         def add_danger(row):
