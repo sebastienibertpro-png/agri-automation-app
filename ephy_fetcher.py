@@ -136,18 +136,24 @@ class EphyFetcher:
                 "classe_et_mention_danger_utf8.csv",
                 "classe_et_mention_danger.csv",
             ])
+            pcp_file = self._find_file_exact(names, [
+                "permis_de_commerce_parallele_utf8.csv",
+                "permis_de_commerce_parallele.csv"
+            ])
 
             logger.info(f"CSV produits: {produits_file}")
             logger.info(f"CSV usages: {conditions_file}")
             logger.info(f"CSV emploi: {emploi_file}")
             logger.info(f"CSV danger: {danger_file}")
+            logger.info(f"CSV PCP: {pcp_file}")
 
             df_prod  = self._read_csv_from_zip(zf, produits_file)   if produits_file   else pd.DataFrame()
             df_cond  = self._read_csv_from_zip(zf, conditions_file) if conditions_file else pd.DataFrame()
             df_empl  = self._read_csv_from_zip(zf, emploi_file)     if emploi_file     else pd.DataFrame()
             df_dang  = self._read_csv_from_zip(zf, danger_file)     if danger_file     else pd.DataFrame()
+            df_pcp   = self._read_csv_from_zip(zf, pcp_file)        if pcp_file        else pd.DataFrame()
 
-        self._df_produits, self._df_usages = self._build_tables(df_prod, df_cond, df_empl, df_dang)
+        self._df_produits, self._df_usages = self._build_tables(df_prod, df_cond, df_empl, df_dang, df_pcp)
 
     def _find_file(self, names: list, keywords: list, exclude: list = None) -> str | None:
         for name in names:
@@ -204,7 +210,7 @@ class EphyFetcher:
                     return orig
         return None
 
-    def _build_tables(self, df_prod, df_cond, df_empl, df_dang):
+    def _build_tables(self, df_prod, df_cond, df_empl, df_dang, df_pcp):
         """
         À partir des CSV bruts E-Phy, construit deux DataFrames normalisés :
         - df_intrants  : une ligne par produit (→ REF_INTRANTS)
@@ -217,6 +223,8 @@ class EphyFetcher:
         # Log des vraies colonnes pour debug
         logger.info(f"Colonnes CSV produits ({len(df_prod)}L): {list(df_prod.columns)[:15]}")
         logger.info(f"Colonnes CSV usages ({len(df_cond)}L): {list(df_cond.columns)[:10] if not df_cond.empty else 'vide'}")
+        if not df_pcp.empty:
+            logger.info(f"Colonnes CSV PCP ({len(df_pcp)}L): {list(df_pcp.columns)[:10]}")
 
         # Extraction globale des DVP depuis les conditions d'emploi textuelles
         dvp_map = {}
@@ -327,6 +335,56 @@ class EphyFetcher:
         # Enrichir mentions de danger depuis df_dang
         if not df_dang.empty:
             df_intrants = self._enrich_danger(df_intrants, df_dang)
+
+        # --- GESTION DES PERMIS DE COMMERCE PARALLÈLE (PCP - ex: SONAR) ---
+        if not df_pcp.empty:
+            c_nom_pcp = self._get_col(df_pcp, "nom du produit", "nom produit", "libelle")
+            c_amm_pcp = self._get_col(df_pcp, "n° permis", "numero permis", "amm")
+            c_etat_pcp = self._get_col(df_pcp, "etat d’autorisation", "etat")
+            c_ref_pcp = self._get_col(df_pcp, "n° amm du produit de référence", "amm produit de reference", "produit de reference")
+
+            if all([c_nom_pcp, c_amm_pcp, c_ref_pcp]):
+                # Convertir df_intrants en liste d'objets si possible ou travailler par AMM
+                # On va indexer les produits par AMM
+                dict_intrants = df_intrants.to_dict("records")
+                intrant_by_amm = {str(item["N_AMM"]): item for item in dict_intrants}
+                dict_usages = df_usages.to_dict("records")
+                
+                new_intrants = []
+                new_usages = []
+                pcp_count = 0
+                
+                for _, row in df_pcp.iterrows():
+                    nom = self._val(row, c_nom_pcp)
+                    amm = str(self._val(row, c_amm_pcp))
+                    ref_amm = str(self._val(row, c_ref_pcp))
+                    etat = self._val(row, c_etat_pcp)
+
+                    if ref_amm in intrant_by_amm:
+                        # Clone le produit de référence
+                        base = intrant_by_amm[ref_amm]
+                        pcp_item = base.copy()
+                        pcp_item["Nom_Produit"] = f"{nom} (Ref: {base['Nom_Produit']})"
+                        pcp_item["N_AMM"] = amm
+                        pcp_item["Etat_AMM"] = etat or base.get("Etat_AMM", "AUTORISE")
+                        new_intrants.append(pcp_item)
+                        
+                        # Clone les usages
+                        ref_u_list = [u for u in dict_usages if str(u["N_AMM"]) == ref_amm]
+                        for u in ref_u_list:
+                            u_pcp = u.copy()
+                            u_pcp["Nom_Produit"] = pcp_item["Nom_Produit"]
+                            u_pcp["N_AMM"] = amm
+                            new_usages.append(u_pcp)
+                        
+                        pcp_count += 1
+                
+                if new_intrants:
+                    df_intrants = pd.concat([df_intrants, pd.DataFrame(new_intrants)], ignore_index=True)
+                if new_usages:
+                    df_usages = pd.concat([df_usages, pd.DataFrame(new_usages)], ignore_index=True)
+                
+                logger.info(f"Ajouté {pcp_count} Permis de Commerce Parallèle (PCP) à l'index.")
 
         return df_intrants, df_usages
 
@@ -466,9 +524,19 @@ class EphyFetcher:
             limit=top_n * 2
         )
 
+        # Tri secondaire : AUTORISÉ > RETIRÉ à score égal
+        def sort_key(m):
+            _, score, list_idx = m
+            row = self._df_produits.iloc[idx_mapping[list_idx]]
+            etat = str(row.get("Etat_AMM", "")).upper()
+            etat_rank = 0 if "AUTOR" in etat else 1  # 0 = autorisé (rank first)
+            return (-score, etat_rank)
+        
+        matches_sorted = sorted(matches, key=sort_key)
+
         results = []
         seen_amm = set()
-        for match_str, score, list_idx in matches:
+        for match_str, score, list_idx in matches_sorted:
             if score < 40:
                 continue
             
