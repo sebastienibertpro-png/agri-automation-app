@@ -404,3 +404,90 @@ class DataLoader:
         except Exception as e:
             st.error(f"Erreur lors de l'insertion en masse : {e}")
             return False
+
+    # -----------------------------------------------------------------------
+    # RÉFÉRENTIEL PHYTO — Écriture REF_INTRANTS + REF_USAGES_PHYTO
+    # -----------------------------------------------------------------------
+
+    def update_intrant(self, intrant_dict: dict) -> bool:
+        """
+        Ajoute ou met à jour un produit dans REF_INTRANTS (upsert par Nom_Produit).
+        Si le produit existe déjà (même Nom_Produit), sa ligne est remplacée.
+        Sinon, la ligne est ajoutée en bas.
+        Fonctionne uniquement en mode Cloud.
+        """
+        if not self.conn:
+            st.error("Écriture impossible en local (Lecture seule).")
+            return False
+        try:
+            df = self.conn.read(worksheet="REF_INTRANTS", ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            nom = str(intrant_dict.get("Nom_Produit", "")).strip().upper()
+
+            # S'assurer que toutes les colonnes du dict existent dans le df
+            for col in intrant_dict:
+                if col not in df.columns:
+                    df[col] = ""
+
+            # Chercher une ligne existante
+            mask = df["Nom_Produit"].astype(str).str.strip().str.upper() == nom
+            new_row = pd.DataFrame([intrant_dict])
+
+            if mask.any():
+                # Remplacer la ligne existante
+                idx = df[mask].index[0]
+                for col, val in intrant_dict.items():
+                    df.at[idx, col] = val
+            else:
+                # Ajouter une nouvelle ligne
+                df = pd.concat([df, new_row], ignore_index=True)
+
+            self.conn.update(worksheet="REF_INTRANTS", data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop("REF_INTRANTS", None)  # Invalider le cache local
+            return True
+        except Exception as e:
+            st.error(f"Erreur écriture REF_INTRANTS : {e}")
+            return False
+
+    def update_usages_phyto(self, n_amm: str, usages: list[dict]) -> bool:
+        """
+        Remplace tous les usages existants (même N_AMM) dans REF_USAGES_PHYTO
+        par la nouvelle liste fournie.
+        Crée l'onglet s'il n'existe pas encore.
+        """
+        if not self.conn:
+            st.error("Écriture impossible en local (Lecture seule).")
+            return False
+        try:
+            try:
+                df = self.conn.read(worksheet="REF_USAGES_PHYTO", ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            except Exception:
+                # Onglet inexistant : on part d'un DataFrame vide
+                df = pd.DataFrame()
+
+            # Supprimer les anciens usages pour ce N_AMM
+            if not df.empty and "N_AMM" in df.columns:
+                df = df[df["N_AMM"].astype(str).str.strip() != str(n_amm).strip()]
+
+            # S'assurer des colonnes
+            new_df = pd.DataFrame(usages)
+            for col in new_df.columns:
+                if col not in df.columns:
+                    df[col] = ""
+
+            df = pd.concat([df, new_df], ignore_index=True)
+            self.conn.update(worksheet="REF_USAGES_PHYTO", data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop("REF_USAGES_PHYTO", None)
+            return True
+        except Exception as e:
+            st.error(f"Erreur écriture REF_USAGES_PHYTO : {e}")
+            return False
+
+    def get_usages_phyto(self, n_amm: str = None) -> pd.DataFrame:
+        """
+        Charge REF_USAGES_PHYTO (depuis GSheet ou cache).
+        Filtre sur n_amm si fourni.
+        """
+        df = self._get_data("REF_USAGES_PHYTO")
+        if not df.empty and n_amm and "N_AMM" in df.columns:
+            df = df[df["N_AMM"].astype(str).str.strip() == str(n_amm).strip()]
+        return df
