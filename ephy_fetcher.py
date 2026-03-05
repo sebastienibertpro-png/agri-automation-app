@@ -420,12 +420,12 @@ class EphyFetcher:
             return []
 
         noms = []
-        nom_to_idx = {}
+        idx_mapping = []
         for idx, row in self._df_produits.iterrows():
             main_nom = str(row.get("Nom_Produit", ""))
             if main_nom and main_nom.lower() not in ("nan", "none", ""):
                 noms.append(main_nom)
-                nom_to_idx[main_nom] = idx
+                idx_mapping.append(idx)
             
             sec_noms = str(row.get("Noms_Secondaires", ""))
             if sec_noms and sec_noms.lower() not in ("nan", "none", ""):
@@ -433,8 +433,7 @@ class EphyFetcher:
                     sec = sec.strip()
                     if sec:
                         noms.append(sec)
-                        if sec not in nom_to_idx:
-                            nom_to_idx[sec] = idx
+                        idx_mapping.append(idx)
 
         if not noms:
             return []
@@ -453,7 +452,7 @@ class EphyFetcher:
                 continue
             
             orig_str = noms[list_idx]
-            idx = nom_to_idx[orig_str]
+            idx = idx_mapping[list_idx]
             row = self._df_produits.iloc[idx]
             amm = str(row.get("N_AMM", ""))
 
