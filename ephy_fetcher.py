@@ -339,9 +339,10 @@ class EphyFetcher:
         # --- GESTION DES PERMIS DE COMMERCE PARALLÈLE (PCP - ex: SONAR) ---
         if not df_pcp.empty:
             c_nom_pcp = self._get_col(df_pcp, "nom du produit", "nom produit", "libelle")
-            c_amm_pcp = self._get_col(df_pcp, "n° permis", "numero permis", "amm")
-            c_etat_pcp = self._get_col(df_pcp, "etat d’autorisation", "etat")
-            c_ref_pcp = self._get_col(df_pcp, "n° amm du produit de référence", "amm produit de reference", "produit de reference")
+            c_amm_pcp  = self._get_col(df_pcp, "n° permis", "permis")
+            c_etat_pcp = self._get_col(df_pcp, "etat d’autorisation", "etat d'autorisation", "etat")
+            # Colonne reelle: N° AMM de référence français
+            c_ref_pcp  = self._get_col(df_pcp, "amm de référence", "amm de reference", "référence fran")
 
             if all([c_nom_pcp, c_amm_pcp, c_ref_pcp]):
                 # Convertir df_intrants en liste d'objets si possible ou travailler par AMM
