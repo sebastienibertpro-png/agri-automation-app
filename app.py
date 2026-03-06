@@ -1188,8 +1188,9 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
                         orig_search = st.session_state.get("search_phyto", "")
                         ok = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
                     if ok:
+                        active_loader.clear_cache()  # Invalider le cache pour forcer un rechargement
                         st.success(f"✅ '{intrant_to_write['Nom_Produit']}' enregistré dans REF_INTRANTS !")
-                    # else: erreur affichée dans update_intrant
+                        st.rerun()  # Refraîchir la page pour afficher la nouvelle ligne dans le tableau
 
             with col_btn2:
                 if usages and st.button("🌱 Enregistrer usages dans REF_USAGES_PHYTO", key="btn_add_usages"):
@@ -1233,8 +1234,10 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
                     n_amm = intrant.get("N_AMM", "")
                     ok2 = active_loader.update_usages_phyto(n_amm, usages) if usages else True
                 if ok1 and ok2:
+                    active_loader.clear_cache()  # Invalider le cache pour forcer un rechargement
                     st.success("✅ Produit enregistré dans REF_INTRANTS et REF_USAGES_PHYTO !")
                     st.balloons()
+                    st.rerun()  # Rafraîchir le tableau REF_INTRANTS
 
     elif not fetcher:
         st.error("❌ Le module E-Phy n'a pas pu être initialisé. Vérifiez la connexion internet.")
