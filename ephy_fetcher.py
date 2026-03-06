@@ -245,7 +245,7 @@ class EphyFetcher:
         c_nom   = self._get_col(df_prod, "nom produit", "nom commercial", "libelle", "denomination")
         c_sec   = self._get_col(df_prod, "seconds noms commerciaux", "second nom", "noms secondaires")
         c_amm   = self._get_col(df_prod, "numero amm", "numéro amm", "numero_amm", "amm", "num amm")
-        c_type  = self._get_col(df_prod, "type produit", "type de produit", "categorie", "type")
+        c_fonc  = self._get_col(df_prod, "fonctions", "fonction", "type produit")
         c_form  = self._get_col(df_prod, "formulation", "forme")
         c_titu  = self._get_col(df_prod, "titulaire", "firme", "societe", "company", "detenteur")
         c_sa    = self._get_col(df_prod, "substances actives", "substance active", "matiere active")
@@ -267,7 +267,7 @@ class EphyFetcher:
                 "Nom_Produit":     nom,
                 "Noms_Secondaires": self._val(row, c_sec),
                 "N_AMM":           amm,
-                "Type":            self._val(row, c_type),
+                "Type":              self._val(row, c_fonc),
                 "Formulation":     self._val(row, c_form),
                 "Titulaire_AMM":   self._val(row, c_titu),
                 "Matieres_Actives": sa,
@@ -291,8 +291,8 @@ class EphyFetcher:
             c_nom_c   = self._get_col(df_cond, "nom produit", "nom commercial", "libelle")
             c_ident   = self._get_col(df_cond, "identifiant usage", "usage")
             c_dose    = self._get_col(df_cond, "dose retenue", "dose max", "dose")
-            c_unit_d  = self._get_col(df_cond, "dose retenue unite", "unite dose", "unité")
-            c_napp    = self._get_col(df_cond, "nombre max d'application", "nombre max applic", "nombre maxi", "nb appli", "maxi")
+            c_unit_d  = self._get_col(df_cond, "dose retenue unite", "unite", "unité")
+            c_napp    = self._get_col(df_cond, "nombre max", "nb applic", "nbre max", "maxi")
             c_dar_c   = self._get_col(df_cond, "delai avant recolte jour", "dar", "delai avant recolte")
             c_dvp_c   = self._get_col(df_cond, "dvp", "dispositif vegetal", "haie")
             c_znt_c   = self._get_col(df_cond, "znt aquatique", "znt eau", "znt", "zone non")
