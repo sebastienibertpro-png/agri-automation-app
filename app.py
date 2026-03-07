@@ -1145,7 +1145,7 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
                 st.markdown(f"#### 🌱 Usages homologués ({len(usages)} usage(s))")
                 df_usages_display = pd.DataFrame(usages)
                 cols_display = [c for c in ["Culture", "Cible", "Type_Cible", "Dose_Max", "Unite_Dose",
-                                             "Nb_Applications_Max", "DAR", "DVP", "ZNT_Aqua", "Etat_Usage"]
+                                             "Nb_Applications_Max", "Stades_Application", "Condition_Emploi", "DAR", "DVP", "ZNT_Aqua", "Etat_Usage"]
                                 if c in df_usages_display.columns]
                 st.dataframe(df_usages_display[cols_display], use_container_width=True, hide_index=True)
             else:
