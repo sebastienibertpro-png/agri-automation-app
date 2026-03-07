@@ -136,6 +136,11 @@ class EphyFetcher:
                 "classe_et_mention_danger_utf8.csv",
                 "classe_et_mention_danger.csv",
             ])
+            phrase_file = self._find_file_exact(names, [
+                "produits_phrases_de_risque_utf8.csv",
+                "phrases_de_risque_utf8.csv",
+                "phrases_de_risque.csv",
+            ])
             pcp_file = self._find_file_exact(names, [
                 "permis_de_commerce_parallele_utf8.csv",
                 "permis_de_commerce_parallele.csv"
@@ -145,15 +150,17 @@ class EphyFetcher:
             logger.info(f"CSV usages: {conditions_file}")
             logger.info(f"CSV emploi: {emploi_file}")
             logger.info(f"CSV danger: {danger_file}")
+            logger.info(f"CSV phrases de risque: {phrase_file}")
             logger.info(f"CSV PCP: {pcp_file}")
 
             df_prod  = self._read_csv_from_zip(zf, produits_file)   if produits_file   else pd.DataFrame()
             df_cond  = self._read_csv_from_zip(zf, conditions_file) if conditions_file else pd.DataFrame()
             df_empl  = self._read_csv_from_zip(zf, emploi_file)     if emploi_file     else pd.DataFrame()
             df_dang  = self._read_csv_from_zip(zf, danger_file)     if danger_file     else pd.DataFrame()
+            df_phrase = self._read_csv_from_zip(zf, phrase_file)    if phrase_file     else pd.DataFrame()
             df_pcp   = self._read_csv_from_zip(zf, pcp_file)        if pcp_file        else pd.DataFrame()
 
-        self._df_produits, self._df_usages = self._build_tables(df_prod, df_cond, df_empl, df_dang, df_pcp)
+        self._df_produits, self._df_usages = self._build_tables(df_prod, df_cond, df_empl, df_dang, df_phrase, df_pcp)
 
     def _find_file(self, names: list, keywords: list, exclude: list = None) -> str | None:
         for name in names:
@@ -210,7 +217,7 @@ class EphyFetcher:
                     return orig
         return None
 
-    def _build_tables(self, df_prod, df_cond, df_empl, df_dang, df_pcp):
+    def _build_tables(self, df_prod, df_cond, df_empl, df_dang, df_phrase, df_pcp):
         """
         À partir des CSV bruts E-Phy, construit deux DataFrames normalisés :
         - df_intrants  : une ligne par produit (→ REF_INTRANTS)
@@ -298,6 +305,10 @@ class EphyFetcher:
             c_znt_c   = self._get_col(df_cond, "znt aquatique", "znt eau", "znt", "zone non")
             c_etat_c  = self._get_col(df_cond, "etat usage", "etat")
 
+            c_stade_min = self._get_col(df_cond, "stade cultural min", "stade min")
+            c_stade_max = self._get_col(df_cond, "tade cultural max", "stade cultural max", "stade max")
+            c_cond_empl = self._get_col(df_cond, "condition emploi", "conditions emploi")
+
             records_usages = []
             for _, row in df_cond.iterrows():
                 amm_u = self._val(row, c_amm_c)
@@ -311,6 +322,16 @@ class EphyFetcher:
                     culture = parts[0].strip() if len(parts) > 0 else None
                     cible = parts[-1].strip() if len(parts) > 1 else None
 
+                stade_min = self._val(row, c_stade_min)
+                stade_max = self._val(row, c_stade_max)
+                stades = ""
+                if stade_min and stade_max:
+                    stades = f"BBCH {stade_min}-{stade_max}"
+                elif stade_min:
+                    stades = f"BBCH {stade_min}"
+                elif stade_max:
+                    stades = f"BBCH jusqu'à {stade_max}"
+
                 records_usages.append({
                     "N_AMM":               amm_u,
                     "Nom_Produit":         self._val(row, c_nom_c),
@@ -320,6 +341,8 @@ class EphyFetcher:
                     "Dose_Max":            self._val(row, c_dose),
                     "Unite_Dose":          self._val(row, c_unit_d),
                     "Nb_Applications_Max": self._val(row, c_napp),
+                    "Stades_Application":  stades,
+                    "Condition_Emploi":    self._val(row, c_cond_empl),
                     "DAR":                 self._val(row, c_dar_c),
                     "DVP":                 self._val(row, c_dvp_c) or dvp_map.get(str(amm_u), None),
                     "ZNT_Aqua":            self._val(row, c_znt_c),
@@ -332,9 +355,8 @@ class EphyFetcher:
             if not df_usages.empty:
                 df_intrants = self._enrich_intrants(df_intrants, df_usages)
 
-        # Enrichir mentions de danger depuis df_dang
-        if not df_dang.empty:
-            df_intrants = self._enrich_danger(df_intrants, df_dang)
+        # Enrichir mentions de danger depuis df_dang et df_phrase
+        df_intrants = self._enrich_danger(df_intrants, df_dang, df_phrase)
 
         # --- GESTION DES PERMIS DE COMMERCE PARALLÈLE (PCP - ex: SONAR) ---
         if not df_pcp.empty:
@@ -422,35 +444,55 @@ class EphyFetcher:
 
         return df_intrants.apply(enrich_row, axis=1)
 
-    def _enrich_danger(self, df_intrants: pd.DataFrame, df_dang: pd.DataFrame) -> pd.DataFrame:
-        """Ajoute Mentions_Danger et CMR depuis le CSV de classement."""
-        if df_dang.empty or df_intrants.empty:
-            return df_intrants
-
-        c_amm_d = self._get_col(df_dang, "numero amm", "amm")
-        c_court = self._get_col(df_dang, "libellé court", "libelle court", "court", "phrase")
-        c_zntriv = self._get_col(df_dang, "riverain", "rive")
-
-        if not c_amm_d:
+    def _enrich_danger(self, df_intrants: pd.DataFrame, df_dang: pd.DataFrame, df_phrase: pd.DataFrame) -> pd.DataFrame:
+        """Ajoute Mentions_Danger et CMR depuis le CSV de classement et les phrases de risque."""
+        if df_intrants.empty:
             return df_intrants
 
         dang_map = {}
-        for amm, grp in df_dang.groupby(c_amm_d):
-            entry = {}
-            if c_court:
-                mots = sorted(grp[c_court].dropna().unique().tolist())
-                entry["Mentions_Danger"] = ", ".join(mots)
-                # Détection CMR si présence de 'C', 'M', 'R' seuls (CMR 1, 2 etc) 
-                # ou H350/H351 etc
-                cmrs = [m for m in mots if m in ('C1A', 'C1B', 'C2', 'M1A', 'M1B', 'M2', 'R1A', 'R1B', 'R2')]
-                if cmrs:
-                    entry["Classement_CMR"] = ", ".join(cmrs)
+        
+        # 1. Extraire les phrases de risque (H400, H410, etc.)
+        if not df_phrase.empty:
+            c_amm_p = self._get_col(df_phrase, "numero amm", "amm")
+            c_phrase = self._get_col(df_phrase, "libellé court", "libelle court", "phrase")
+            if c_amm_p and c_phrase:
+                for amm, grp in df_phrase.groupby(c_amm_p):
+                    phrases = sorted(grp[c_phrase].dropna().unique().tolist())
+                    if phrases:
+                        dang_map[str(amm)] = {"Mentions_Danger": ", ".join(phrases)}
+
+        # 2. Mentions d'avertissement et CMR depuis df_dang
+        if not df_dang.empty:
+            c_amm_d = self._get_col(df_dang, "numero amm", "amm")
+            c_court = self._get_col(df_dang, "libellé court", "libelle court", "court", "phrase")
+            c_zntriv = self._get_col(df_dang, "riverain", "rive")
+
+            if c_amm_d:
+                for amm, grp in df_dang.groupby(c_amm_d):
+                    amm_str = str(amm)
+                    if amm_str not in dang_map:
+                        dang_map[amm_str] = {}
+                    entry = dang_map[amm_str]
+
+                    if c_court:
+                        mots = sorted(grp[c_court].dropna().unique().tolist())
+                        
+                        existing = entry.get("Mentions_Danger", "")
+                        if existing:
+                            entry["Mentions_Danger"] = f"{', '.join(mots)}, {existing}"
+                        else:
+                            entry["Mentions_Danger"] = ", ".join(mots)
+
+                        # Détection CMR si présence de 'C', 'M', 'R' seuls (CMR 1, 2 etc) 
+                        # ou H350/H351 etc
+                        cmrs = [m for m in mots if m in ('C1A', 'C1B', 'C2', 'M1A', 'M1B', 'M2', 'R1A', 'R1B', 'R2')]
+                        if cmrs:
+                            entry["Classement_CMR"] = ", ".join(cmrs)
             
-            if c_zntriv:
-                vals = pd.to_numeric(grp[c_zntriv], errors="coerce")
-                entry["ZNT_Riverains"] = vals.max() if not vals.isna().all() else None
-            
-            dang_map[str(amm)] = entry
+                    if c_zntriv:
+                        vals = pd.to_numeric(grp[c_zntriv], errors="coerce")
+                        if not vals.isna().all():
+                            entry["ZNT_Riverains"] = vals.max()
 
         def add_danger(row):
             data = dang_map.get(str(row["N_AMM"]), {})
