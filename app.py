@@ -200,7 +200,8 @@ with st.expander("Ouvrir le formulaire de saisie groupée", expanded=False):
         ]
         if sub.empty:
             return None, None
-        dose = pd.to_numeric(sub['Dose_Max'].iloc[0], errors='coerce')
+        dose_raw = str(sub['Dose_Max'].iloc[0]).replace(',', '.')
+        dose = pd.to_numeric(dose_raw, errors='coerce')
         unite = sub['Unite_Dose'].iloc[0] if 'Unite_Dose' in sub.columns else None
         return (float(dose) if not pd.isna(dose) else None), unite
          
@@ -227,13 +228,28 @@ with st.expander("Ouvrir le formulaire de saisie groupée", expanded=False):
                 st.text_input(f"Cible {i}", key=f"prod_cible_empty_{i}", disabled=True)
             auto_dose, auto_unite = None, None
 
+        # Logic to auto-fill the dose when product or target changes
+        col_key_prod = f"last_prod_{i}"
+        col_key_cible = f"last_cible_{i}"
+        
+        if col_key_prod not in st.session_state:
+            st.session_state[col_key_prod] = "- Aucun -"
+        if col_key_cible not in st.session_state:
+            st.session_state[col_key_cible] = ""
+            
+        unite_options = ["L/ha", "Kg/ha", "g/ha"]
+
+        if st.session_state[col_key_prod] != prod or st.session_state[col_key_cible] != cible_val:
+            st.session_state[col_key_prod] = prod
+            st.session_state[col_key_cible] = cible_val
+            
+            st.session_state[f"prod_dose_{i}"] = float(auto_dose) if auto_dose is not None else 0.0
+            st.session_state[f"prod_unite_{i}"] = auto_unite if auto_unite in unite_options else "L/ha"
+
         with c3:
-            dose_default = float(auto_dose) if auto_dose else 0.0
-            dose = st.number_input(f"Dose/ha", min_value=0.0, step=0.1, value=dose_default, key=f"prod_dose_{i}")
+            dose = st.number_input(f"Dose/ha", min_value=0.0, step=0.1, key=f"prod_dose_{i}")
         with c4:
-            unite_options = ["L/ha", "Kg/ha", "g/ha"]
-            unite_idx = unite_options.index(auto_unite) if auto_unite in unite_options else 0
-            unite = st.selectbox("Unité", unite_options, index=unite_idx, key=f"prod_unite_{i}")
+            unite = st.selectbox("Unité", unite_options, key=f"prod_unite_{i}")
         if prod != "- Aucun -":
             produits_data.append({'nom': prod, 'cible': cible_val, 'dose': dose, 'unite': unite})
 
