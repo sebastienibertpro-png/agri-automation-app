@@ -731,7 +731,6 @@ try:
     else:
         st.info("Pas d'interventions planifiées trouvées pour cette campagne.")
 except Exception as e:
-except Exception as e:
     st.error(f"Erreur chargement planning: {e}")
 
 st.divider()
