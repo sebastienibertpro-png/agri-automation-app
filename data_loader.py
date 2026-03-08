@@ -133,6 +133,14 @@ class DataLoader:
         """Loads JOURNAL_IRRIGATION (ID_Secteur, Date_Debut, Date_Fin, Vol_m3, etc.)."""
         return self._get_data("JOURNAL_IRRIGATION")
 
+    def get_ppf(self, campaign):
+        """Loads PPF and filters by campaign."""
+        df = self._get_data("PPF")
+        if not df.empty and 'Campagne' in df.columns:
+            df['Campagne'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+            df = df[df['Campagne'] == int(campaign)]
+        return df
+
     def get_consumption_data(self, campaign):
         """
         Calculates consumption per meter for a given campaign.
