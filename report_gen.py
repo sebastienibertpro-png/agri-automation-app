@@ -356,19 +356,61 @@ class ReportGenerator:
                 else: d_str = str(d) if not pd.isnull(d) else ""
                 
                 prod = str(r.get('Nom_Produit', '')) 
-                # User requested Dose/Unité. Prefer Dose_Ha, fallback to Densité if Dose_Ha is empty/0
-                dose_val = r.get('Dose_Ha', '')
-                if not dose_val and dose_val != 0:
-                     dose_val = r.get('Densité_Semis', '')
-                dose = f"{dose_val}"
-                
-                unit = str(r.get('Unité_Dose', '') or r.get('Unité_Densité', ''))
+                dose_val = str(r.get('Dose_Ha', ''))
+                unit = str(r.get('Unité_Dose', ''))
                 obs = str(r.get('Observations', ''))
-                return [d_str, prod, dose, unit, obs]
+                return [d_str, prod, dose_val, unit, obs]
+
+            # Grouping Logic for Semis
+            raw_semis = content.get('Semis', [])
+            grouped_semis = []
+            semis_by_date = {}
+            
+            for s in raw_semis:
+                d_val = s.get('Date')
+                if pd.isnull(d_val):
+                    key = "Inconnue"
+                elif hasattr(d_val, 'strftime'):
+                    key = d_val.strftime('%Y-%m-%d')
+                else:
+                    key = str(d_val)
+                
+                if key not in semis_by_date:
+                    semis_by_date[key] = []
+                semis_by_date[key].append(s)
+                
+            for key in sorted(semis_by_date.keys()):
+                group = semis_by_date[key]
+                first = group[0]
+                
+                prods = [str(x.get('Nom_Produit', '')) for x in group]
+                
+                doses = []
+                units = []
+                for x in group:
+                    dose_val = x.get('Dose_Ha', '')
+                    if not dose_val and dose_val != 0:
+                        dose_val = x.get('Densité_Semis', '')
+                    doses.append(str(dose_val))
+                    units.append(str(x.get('Unité_Dose', '') or x.get('Unité_Densité', '')))
+                
+                obs = []
+                for x in group:
+                    o = str(x.get('Observations', '')).strip()
+                    if o and o not in obs: obs.append(o)
+                
+                combined = {
+                    'Date': first['Date'],
+                    'Nom_Produit': '\n'.join(prods),
+                    'Dose_Ha': '\n'.join(doses),
+                    'Unité_Dose': '\n'.join(units),
+                    'Observations': '\n'.join(obs)
+                }
+                grouped_semis.append(combined)
 
             add_section_table(
                 "Semis",
-                content.get('Semis', []),
+                grouped_semis,
                 ['Date', 'Produit', 'Dose', 'Unité', 'Observations'],
                 [2.5*cm, 5*cm, 1.5*cm, 1.5*cm, 7.5*cm],
                 map_semi
