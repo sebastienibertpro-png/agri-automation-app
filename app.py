@@ -304,14 +304,17 @@ with st.expander("Ouvrir le formulaire de saisie groupée", expanded=False):
                  pct_p = get_safely('Element_P')
                  pct_k = get_safely('Element_K')
         
+        def get_npk_ratio(val):
+            return val if abs(val) <= 1.0 and val != 0 else val / 100.0
+
         # Calculate Ha values
         # If unit is T/ha, multiply dose by 1000 before applying percentage? Assuming standard agriculture:
         # Pct is usually in %, so Kg of N per 100Kg of fertilizer.
-        # If Kg/ha or L/ha (density 1 assumed), it's Dose * Pct / 100
+        # If Kg/ha or L/ha (density 1 assumed), it's Dose * Pct
         mult = 1000.0 if unite_ferti == "T/ha" else 1.0
-        n_ha = round((dose_ferti * mult) * (pct_n / 100.0), 1)
-        p_ha = round((dose_ferti * mult) * (pct_p / 100.0), 1)
-        k_ha = round((dose_ferti * mult) * (pct_k / 100.0), 1)
+        n_ha = round((dose_ferti * mult) * get_npk_ratio(pct_n), 1)
+        p_ha = round((dose_ferti * mult) * get_npk_ratio(pct_p), 1)
+        k_ha = round((dose_ferti * mult) * get_npk_ratio(pct_k), 1)
         
         st.markdown(f"**Apports Calculés:** N: `{n_ha}` | P: `{p_ha}` | K: `{k_ha}`")
         if engrais_prod != "- Aucun -":
@@ -366,9 +369,13 @@ with st.expander("Ouvrir le formulaire de saisie groupée", expanded=False):
                          pct_n = get_safely_p('Element_N')
                          pct_p = get_safely_p('Element_P')
                          pct_k = get_safely_p('Element_K')
-                n_ha = round(p_dose * (pct_n / 100.0), 1)
-                p_ha = round(p_dose * (pct_p / 100.0), 1)
-                k_ha = round(p_dose * (pct_k / 100.0), 1)
+                
+                def get_npk_ratio(val):
+                    return val if abs(val) <= 1.0 and val != 0 else val / 100.0
+
+                n_ha = round(p_dose * get_npk_ratio(pct_n), 1)
+                p_ha = round(p_dose * get_npk_ratio(pct_p), 1)
+                k_ha = round(p_dose * get_npk_ratio(pct_k), 1)
                 
                 semis_assoc_prods.append({
                     'nom': p_nom, 'dose': p_dose, 'unite': p_unite,
@@ -724,12 +731,84 @@ try:
     else:
         st.info("Pas d'interventions planifiées trouvées pour cette campagne.")
 except Exception as e:
+except Exception as e:
     st.error(f"Erreur chargement planning: {e}")
 
 st.divider()
 
+# --- Bilan Azoté (Suivi PPF) ---
+st.subheader("🌾 Bilan Azoté (Suivi PPF)")
+with st.expander("Voir le reste à apporter (N) par parcelle", expanded=False):
+    try:
+        df_ppf = active_loader.get_ppf(selected_campaign)
+        if df_ppf.empty:
+            st.info(f"Aucune donnée dans l'onglet PPF pour la campagne {selected_campaign}.")
+        else:
+            # Get Realized Fertilization for the campaign
+            # Re-read or use df_campaign
+            df_ferti_realized = df_campaign[df_campaign['Nature_Intervention'] == "Fertilisation"].copy()
+            
+            # Group realized N/ha by Parcelle
+            realized_n_by_parcel = {}
+            if not df_ferti_realized.empty:
+                # Ensure N/ha is float
+                df_ferti_realized['N/ha'] = pd.to_numeric(df_ferti_realized['N/ha'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+                sum_n = df_ferti_realized.groupby('ID_Parcelle')['N/ha'].sum()
+                realized_n_by_parcel = sum_n.to_dict()
+                
+            # Build Display DataFrame
+            ppf_display_data = []
+            
+            for _, row in df_ppf.iterrows():
+                p_id = str(row.get('ID_Parcelle', 'N/A')).strip()
+                if p_id == 'N/A' or not p_id: continue
+                
+                # 'Dose_X' is the target column
+                dose_x_raw = str(row.get('Dose_X', '0')).replace(',', '.')
+                try: dose_x = float(dose_x_raw)
+                except: dose_x = 0.0
+                
+                n_apport = realized_n_by_parcel.get(p_id, 0.0)
+                reste = dose_x - n_apport
+                
+                culture = str(row.get('Culture', ''))
+                
+                ppf_display_data.append({
+                    'Parcelle': p_id,
+                    'Culture': culture,
+                    'Dose X Prévue (U)': round(dose_x, 1),
+                    'N Apporté (U)': round(n_apport, 1),
+                    'Reste à Apporter (U)': round(reste, 1)
+                })
+                
+            if ppf_display_data:
+                df_ppf_vis = pd.DataFrame(ppf_display_data)
+                
+                # Determine color for the 'Reste à Apporter'
+                def color_reste(val):
+                    if val > 0:
+                        return 'color: #d17a22' # Orange/Yellowish for remaining
+                    elif val < 0:
+                        return 'color: #d32f2f' # Red for over-fertilization
+                    else:
+                        return 'color: #388e3c' # Green for exactly completed
+                        
+                # Display dataframe with styled column
+                st.dataframe(
+                    df_ppf_vis.style.map(color_reste, subset=['Reste à Apporter (U)']),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("Impossible de lier les parcelles du PPF.")
+                
+    except Exception as e:
+        st.error(f"Erreur lors du chargement du Bilan Azoté : {e}")
+
+st.divider()
+
 # --- Generation Section ---
-st.subheader("📄 Génération de Rapports Globaux : ITK, Ferti et Registre Phyto")
+st.subheader("📄 Edition de documents")
 
 # Move selectors here
 col1, col2 = st.columns(2)
