@@ -11,3 +11,6 @@ streamlit
 st-gsheets-connection
 qrcode
 Pillow
+folium
+streamlit-folium
+geopandas
