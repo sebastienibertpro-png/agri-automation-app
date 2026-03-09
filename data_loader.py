@@ -98,6 +98,23 @@ class DataLoader:
         """Loads REF_COMPTEURS (ID_Compteur, Numero_Serie_Compteur, Reseau_type, Mail_Contact-Reseau, Usage%)."""
         return self._get_data("REF_COMPTEURS")
 
+    def get_compteurs_gps(self):
+        """Loads REF_COMPTEURS and cleans up Latitude and Longitude columns."""
+        df = self.get_ref_compteurs()
+        if df.empty:
+            return pd.DataFrame()
+            
+        # Provide defaults if missing
+        if 'Latitude' not in df.columns: df['Latitude'] = None
+        if 'Longitude' not in df.columns: df['Longitude'] = None
+        
+        # Clean up commas to dots for robust parsing
+        df['Latitude'] = pd.to_numeric(df['Latitude'].astype(str).str.replace(',', '.'), errors='coerce')
+        df['Longitude'] = pd.to_numeric(df['Longitude'].astype(str).str.replace(',', '.'), errors='coerce')
+        
+        # Return only rows with valid GPS coordinates
+        return df.dropna(subset=['Latitude', 'Longitude'])
+
     def get_ref_secteurs(self):
         """Loads REF_SECTEURS (ID_Secteur, ID_Compteur, Surface_ha, etc.)."""
         return self._get_data("REF_SECTEURS")
