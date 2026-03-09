@@ -9,3 +9,5 @@ pyarrow
 requests
 streamlit
 st-gsheets-connection
+qrcode
+Pillow
