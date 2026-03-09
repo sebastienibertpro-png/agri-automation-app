@@ -775,9 +775,9 @@ with st.expander("Voir le reste à apporter (N) par parcelle", expanded=False):
                 ppf_display_data.append({
                     'Parcelle': p_id,
                     'Culture': culture,
-                    'Dose X Prévue (U)': round(dose_x, 1),
-                    'N Apporté (U)': round(n_apport, 1),
-                    'Reste à Apporter (U)': round(reste, 1)
+                    'Dose X Prévue (U)': int(round(dose_x)),
+                    'N Apporté (U)': int(round(n_apport)),
+                    'Reste à Apporter (U)': int(round(reste))
                 })
                 
             if ppf_display_data:
