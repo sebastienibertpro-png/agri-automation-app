@@ -104,15 +104,29 @@ class DataLoader:
         if df.empty:
             return pd.DataFrame()
             
-        # Provide defaults if missing
-        if 'Latitude' not in df.columns: df['Latitude'] = None
-        if 'Longitude' not in df.columns: df['Longitude'] = None
-        
-        # Clean up commas to dots for robust parsing
-        df['Latitude'] = pd.to_numeric(df['Latitude'].astype(str).str.replace(',', '.'), errors='coerce')
-        df['Longitude'] = pd.to_numeric(df['Longitude'].astype(str).str.replace(',', '.'), errors='coerce')
+        # Parse Localisation_GPS column
+        # Example format "46.603354, 1.888334"
+        if 'Localisation_GPS' in df.columns:
+            # Drop empty strings or NAs
+            df = df.dropna(subset=['Localisation_GPS'])
+            df = df[df['Localisation_GPS'].astype(str).str.strip() != '']
+            
+            # Split by comma
+            # expand=True returns a DataFrame with 2 columns
+            gps_split = df['Localisation_GPS'].astype(str).str.split(',', expand=True)
+            
+            if gps_split.shape[1] >= 2:
+                df['Latitude'] = pd.to_numeric(gps_split[0], errors='coerce')
+                df['Longitude'] = pd.to_numeric(gps_split[1], errors='coerce')
+            else:
+                 df['Latitude'] = None
+                 df['Longitude'] = None
+        else:
+             df['Latitude'] = None
+             df['Longitude'] = None
         
         # Return only rows with valid GPS coordinates
+        return df.dropna(subset=['Latitude', 'Longitude'])
         return df.dropna(subset=['Latitude', 'Longitude'])
 
     def get_ref_secteurs(self):
