@@ -63,8 +63,8 @@ st.subheader("🌾 Assolement en un coup d'œil")
 df_asso = active_loader.get_assolement(selected_campaign)
 if not df_asso.empty:
     # Filter for specific crops requested or all
-    # Maïs, Maïs Pop corn, Blé, Jachère
-    crops_to_show = ["Maïs", "Maïs Pop corn", "Blé", "Jachère"]
+    # Maïs, Maïs Pop corn, Blé
+    crops_to_show = ["Maïs", "Maïs Pop corn", "Blé"]
     
     # Calculate totals
     asso_summary = df_asso.groupby('Culture')['Surface_Référence_Ha'].sum().reset_index()
@@ -85,7 +85,7 @@ col_left, col_right = st.columns(2)
 with col_left:
     st.subheader("⏱️ Dernière Intervention")
     # Get last "Réalisé" intervention
-    df_realised = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.startswith('réalise')]
+    df_realised = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.startswith('réalise')].copy()
     if not df_realised.empty:
         # Sort by date
         df_realised['Date_dt'] = pd.to_datetime(df_realised['Date'], errors='coerce', dayfirst=True)
@@ -106,9 +106,9 @@ with col_left:
 
 with col_right:
     st.subheader("📅 Interventions Prévues")
-    df_planned = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.startswith('prév')]
+    df_planned = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.startswith('prév')].copy()
     if not df_planned.empty:
-        # Display top 3 planned
+        # Display top 5 planned
         df_planned['Date_dt'] = pd.to_datetime(df_planned['Date'], errors='coerce', dayfirst=True)
         top_planned = df_planned.sort_values('Date_dt').head(5)
         
