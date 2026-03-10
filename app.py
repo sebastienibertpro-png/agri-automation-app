@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import pandas as pd
 from shared import init_campaign_selector
 
 st.set_page_config(page_title="Agri Automation - Accueil", page_icon="🚜", layout="centered")
