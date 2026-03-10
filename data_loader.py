@@ -61,6 +61,13 @@ class DataLoader:
     def get_interventions(self):
         return self._get_data("JOURNAL_INTERVENTION")
 
+    def get_cartographie_ref(self):
+        """Loads REF_CARTOGRAPHIE for Telepac GeoJSON storage."""
+        try:
+            return self._get_data("REF_CARTOGRAPHIE")
+        except:
+             return pd.DataFrame()
+
     def get_intrants(self):
         """Loads REF_INTRANTS."""
         return self._get_data("REF_INTRANTS")
@@ -537,3 +544,84 @@ class DataLoader:
         if not df.empty and n_amm and "N_AMM" in df.columns:
             df = df[df["N_AMM"].astype(str).str.strip() == str(n_amm).strip()]
         return df
+
+    # -----------------------------------------------------------------------
+    # SAUVEGARDE CARTOGRAPHIE DANS GOOGLE SHEETS
+    # -----------------------------------------------------------------------
+
+    def save_telepac_to_cloud(self, campaign: str, geojson_str: str) -> bool:
+        """
+        Sauvegarde le GeoJSON (sous forme de chaîne texte compressée ou brute) 
+        dans l'onglet REF_CARTOGRAPHIE pour une campagne donnée.
+        """
+        if not self.conn:
+            st.error("Sauvegarde Cloud impossible en local.")
+            return False
+            
+        try:
+            # 1. Lire (ou créer) l'onglet REF_CARTOGRAPHIE
+            try:
+                df = self.conn.read(worksheet="REF_CARTOGRAPHIE", ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            except Exception:
+                df = pd.DataFrame(columns=["Campagne", "GeoJSON_Data", "Date_Maj"])
+                
+            # 2. Préparer la nouvelle ligne
+            # Attention: si la chaîne est trop longue (limite Google Sheets de 50000 caractères par cellule), 
+            # il faudrait la découper. Mais gpd.to_json() pour une exploitation est souvent gérable.
+            # On découpe en "chunks" de 40000 caractères si nécessaire.
+            
+            chunk_size = 40000
+            chunks = [geojson_str[i:i+chunk_size] for i in range(0, len(geojson_str), chunk_size)]
+            
+            new_rows = []
+            for i, chunk in enumerate(chunks):
+                 new_rows.append({
+                     "Campagne": str(campaign),
+                     "Chunk_Index": i,
+                     "Total_Chunks": len(chunks),
+                     "GeoJSON_Data": chunk,
+                     "Date_Maj": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+                 })
+            
+            new_df = pd.DataFrame(new_rows)
+
+            # 3. Supprimer les anciennes données de cette campagne
+            if not df.empty and "Campagne" in df.columns:
+                df = df[df["Campagne"].astype(str).str.strip() != str(campaign).strip()]
+                # S'assurer que les colonnes chunk existent
+                for col in ["Chunk_Index", "Total_Chunks", "GeoJSON_Data"]:
+                     if col not in df.columns:
+                          df[col] = 0 if "Index" in col or "Total" in col else ""
+                
+            # 4. Ajouter et pousser
+            df = pd.concat([df, new_df], ignore_index=True)
+            self.conn.update(worksheet="REF_CARTOGRAPHIE", data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop("REF_CARTOGRAPHIE", None)
+            st.cache_data.clear()
+            return True
+            
+        except Exception as e:
+            st.error(f"Erreur lors de la sauvegarde cartographique sur le Cloud : {e}")
+            return False
+
+    def load_telepac_from_cloud(self, campaign: str) -> str:
+        """
+        Récupère le GeoJSON reconstitué depuis REF_CARTOGRAPHIE.
+        Retourne la chaîne JSON, ou None si introuvable.
+        """
+        df = self.get_cartographie_ref()
+        if df.empty or "Campagne" not in df.columns:
+            return None
+            
+        # Filtrer la campagne
+        df_camp = df[df["Campagne"].astype(str).str.strip() == str(campaign).strip()]
+        if df_camp.empty:
+            return None
+            
+        # Trier par chunk index et reconstituer
+        if "Chunk_Index" in df_camp.columns:
+            df_camp = df_camp.sort_values("Chunk_Index")
+            return "".join(df_camp["GeoJSON_Data"].astype(str).tolist())
+        else:
+             # Ancien format (sans chunks)
+             return str(df_camp["GeoJSON_Data"].iloc[0])
