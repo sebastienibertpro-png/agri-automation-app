@@ -75,8 +75,12 @@ if uploaded_file is not None:
                 telepac_gdf = gpd.read_file(filepath)
                 
             if telepac_gdf is not None:
+                # If CRS is missing (e.g. no .prj file), assume Lambert 93 (EPSG:2154) for French Telepac data
+                if telepac_gdf.crs is None:
+                    telepac_gdf.set_crs(epsg=2154, inplace=True)
+                
                 # Ensure CRS is web mercator for Folium (WGS84 EPSG:4326)
-                if telepac_gdf.crs and telepac_gdf.crs.to_epsg() != 4326:
+                if telepac_gdf.crs.to_epsg() != 4326:
                     telepac_gdf = telepac_gdf.to_crs(epsg=4326)
                 st.sidebar.success("Fichier Télépac chargé avec succès !")
                 
