@@ -86,7 +86,7 @@ col_left, col_right = st.columns(2)
 with col_left:
     st.subheader("⏱️ Dernière Intervention")
     # Get last "Réalisé" intervention
-    df_realised = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.startswith('réalise')].copy()
+    df_realised = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.contains('réalise')].copy()
     if not df_realised.empty:
         # Sort by date
         df_realised['Date_dt'] = pd.to_datetime(df_realised['Date'], errors='coerce', dayfirst=True)
@@ -94,27 +94,28 @@ with col_left:
         
         # Synthetic display style ITK
         st.markdown(f"""
-        <div style="padding:15px; border-radius:10px; border-left: 5px solid #4CAF50; background-color: #f9f9f9;">
-            <h4 style="margin:0;">{last_interv['Nature_Intervention']}</h4>
+        <div style="padding:15px; border-radius:10px; border-left: 5px solid #4CAF50; background-color: #f9f9f9; color: black;">
+            <h4 style="margin:0; color: #2E7D32;">{last_interv['Nature_Intervention']} - {last_interv['Type_Intervention'] or ''}</h4>
             <p style="margin:5px 0;"><b>Date :</b> {last_interv['Date']} | <b>Parcelle :</b> {last_interv['ID_Parcelle']}</p>
             <p style="margin:0;"><b>Outil :</b> {last_interv['Outil'] or 'N/A'}</p>
             <p style="margin:0;"><b>Produit :</b> {last_interv['Nom_Produit'] or 'N/A'}</p>
-            <p style="margin:0; font-size:0.9em; color:gray;"><i>Obs: {last_interv['Observations'] or '-'}</i></p>
+            <p style="margin:5px 0 0 0; font-size:0.9em; color:gray;"><i>Obs: {last_interv['Observations'] or '-'}</i></p>
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("Aucune intervention réalisée enregistrée.")
+        st.info("Aucune intervention réalisée trouvée.")
 
 with col_right:
     st.subheader("📅 Interventions Prévues")
-    df_planned = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.startswith('prév')].copy()
+    df_planned = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.contains('prév')].copy()
     if not df_planned.empty:
         # Display top 5 planned
         df_planned['Date_dt'] = pd.to_datetime(df_planned['Date'], errors='coerce', dayfirst=True)
         top_planned = df_planned.sort_values('Date_dt').head(5)
         
         for _, row in top_planned.iterrows():
-            st.markdown(f"• **{row['Date']}** : {row['Nature_Intervention']} sur {row['ID_Parcelle']}")
+            type_str = f" ({row['Type_Intervention']})" if pd.notnull(row['Type_Intervention']) and str(row['Type_Intervention']).strip() else ""
+            st.markdown(f"• **{row['Date']}** : {row['Nature_Intervention']}{type_str} sur {row['ID_Parcelle']}")
     else:
         st.info("Aucune intervention prévue.")
 
@@ -126,10 +127,5 @@ df_fuel = active_loader.get_fuel_conso(selected_campaign)
 if not df_fuel.empty:
     total_fuel = df_fuel['FUEL_quantité_L'].sum()
     st.metric("Consommation Totale Campagne", f"{total_fuel:.0f} L", delta=None)
-    
-    # Optional: Small bar chart or breakdown?
-    if 'ID_Materiel' in df_fuel.columns:
-        fuel_by_mat = df_fuel.groupby('ID_Materiel')['FUEL_quantité_L'].sum().reset_index()
-        st.bar_chart(fuel_by_mat.set_index('ID_Materiel'))
 else:
     st.info("Aucune donnée de consommation fuel pour cette campagne.")
