@@ -228,7 +228,7 @@ if telepac_gdf is not None:
     def get_crop_style(feature):
         props = feature.get('properties', {})
         # Different fields possible for crop depending on the shapefile version
-        crop_code = props.get('CULTURE', props.get('CODE_CULTU', props.get('LIB_CULTU', 'DEFAULT')))
+        crop_code = props.get('TYPE', props.get('CULTURE', props.get('CODE_CULTU', props.get('LIB_CULTU', 'DEFAULT'))))
         
         # If it's a string, uppercase it
         if isinstance(crop_code, str):
@@ -254,7 +254,14 @@ if telepac_gdf is not None:
     
     # Try to find a good tooltip attribute, like 'NUM_ILOT' or 'ID_PARCEL'
     fields = telepac_gdf.columns.tolist()
-    tooltip_fields = [f for f in fields if f.upper() in ['NUM_ILOT', 'NUM_PARCEL', 'CULTURE', 'SURFACE']]
+    # Adding 2025 Telepac format columns ('TEST', 'TYPE', 'NUMERO_I', 'SURF')
+    desired_fields = ['TYPE', 'NUMERO_I', 'SURF', 'NUM_ILOT', 'NUM_PARCEL', 'CULTURE', 'SURFACE']
+    tooltip_fields = [f for f in desired_fields if f in fields]
+    
+    # If standard names fail, try uppercase matches just in case
+    if not tooltip_fields:
+        tooltip_fields = [f for f in fields if f.upper() in desired_fields]
+        
     if not tooltip_fields and fields and fields[0] != 'geometry':
         tooltip_fields = [fields[0]]
 
