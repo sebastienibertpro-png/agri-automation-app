@@ -625,3 +625,14 @@ class DataLoader:
         else:
              # Ancien format (sans chunks)
              return str(df_camp["GeoJSON_Data"].iloc[0])
+    def get_fuel_conso(self, campaign=None):
+        """Loads CONSO_FUEL and filters by campaign year."""
+        df = self._get_data("CONSO_FUEL")
+        if df.empty:
+            return pd.DataFrame()
+            
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
+            if campaign:
+                df = df[df['Date'].dt.year == int(campaign)]
+        return df
