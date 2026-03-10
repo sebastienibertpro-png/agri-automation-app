@@ -16,8 +16,15 @@ def get_dataloader():
         return loader
     return None
 
-def init_campaign_selector():
+# Hack to force reload of cached dataloader if it lacks new methods
+dl = get_dataloader()
+if dl and not hasattr(dl, "load_telepac_from_cloud"):
+    st.cache_resource.clear()
     active_loader = get_dataloader()
+else:
+    active_loader = dl
+
+def init_campaign_selector():
     if not active_loader:
         st.error("Impossible de se connecter à 'MASTER_EXPLOITATION'. Vérifiez vos secrets ou votre connexion.")
         st.stop()
