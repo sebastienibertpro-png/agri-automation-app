@@ -7,6 +7,7 @@ import tempfile
 import os
 import zipfile
 from datetime import datetime
+import shutil
 from shared import init_campaign_selector
 
 st.set_page_config(page_title="Cartographie", page_icon="🗺️", layout="wide")
@@ -51,28 +52,100 @@ if not df_gps.empty:
 
 # Optional: Upload Telepac GeoJSON/Shapefile
 st.sidebar.header("📁 Couches Cartographiques")
+
+# Repertoire de sauvegarde pour les cartes Télépac de la campagne
+MAP_SAVE_DIR = f"data/telepac/{selected_campaign}"
+if not os.path.exists(MAP_SAVE_DIR):
+    os.makedirs(MAP_SAVE_DIR, exist_ok=True)
+
+# Chercher un fichier sauvegardé
+saved_files = [f for f in os.listdir(MAP_SAVE_DIR) if f.endswith('.zip') or f.endswith('.geojson')]
+saved_file_path = os.path.join(MAP_SAVE_DIR, saved_files[0]) if saved_files else None
+
+# Upload component
 uploaded_file = st.sidebar.file_uploader("Importer fichier Télépac (GeoJSON ou ZIP Shapefile)", type=['geojson', 'zip'])
 telepac_gdf = None
 
+# Déterminer quel fichier utiliser (téléversé en priorité, puis sauvegardé)
+file_to_process = None
+file_name = None
+
 if uploaded_file is not None:
+    # Sauvegarde du nouveau fichier
+    file_name = uploaded_file.name
+    file_to_process = os.path.join(MAP_SAVE_DIR, file_name)
+    
+    # Nettoyer les anciens fichiers pour cette campagne
+    for f in saved_files:
+        try:
+            os.remove(os.path.join(MAP_SAVE_DIR, f))
+        except:
+            pass
+            
+    # Ecrire le nouveau fichier
+    with open(file_to_process, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+        
+    st.sidebar.success("Fichier sauvegardé en local !")
+    
+    # Process immediately to save to Cloud
+    with st.spinner("Synchronisation Cloud en cours..."):
+        try:
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                temp_gdf = None
+                if file_name.endswith(".zip"):
+                    with zipfile.ZipFile(file_to_process, 'r') as zip_ref:
+                        zip_ref.extractall(tmpdirname)
+                        shp_files = [f for f in os.listdir(tmpdirname) if f.endswith('.shp')]
+                        if shp_files:
+                            temp_gdf = gpd.read_file(os.path.join(tmpdirname, shp_files[0]))
+                elif file_name.endswith(".geojson"):
+                    temp_gdf = gpd.read_file(file_to_process)
+                    
+                if temp_gdf is not None:
+                    # Uniformiser le CRS avant sauvegarde cloud
+                    if temp_gdf.crs is None:
+                        temp_gdf.set_crs(epsg=2154, inplace=True)
+                    if temp_gdf.crs.to_epsg() != 4326:
+                        temp_gdf = temp_gdf.to_crs(epsg=4326)
+                        
+                    geojson_str = temp_gdf.to_json()
+                    success = active_loader.save_telepac_to_cloud(selected_campaign, geojson_str)
+                    if success:
+                        st.sidebar.success("✅ Synchronisé sur tous vos appareils !")
+        except Exception as e:
+            st.sidebar.warning(f"La synchronisation Cloud a échoué (sauvegardé en local). Erreur: {e}")
+
+elif saved_file_path:
+    # Utiliser le fichier précédemment sauvegardé localement
+    file_to_process = saved_file_path
+    file_name = os.path.basename(saved_file_path)
+    st.sidebar.info(f"Fichier local chargé : {file_name}")
+else:
+    # Pas de fichier local, tenter de charger depuis le Cloud
+    with st.spinner("Recherche des contours depuis le Cloud..."):
+        geojson_str = active_loader.load_telepac_from_cloud(selected_campaign)
+        if geojson_str:
+            # Reconstruire un GDF
+            import json
+            telepac_gdf = gpd.GeoDataFrame.from_features(json.loads(geojson_str)["features"])
+            telepac_gdf.set_crs(epsg=4326, inplace=True)
+            st.sidebar.info("Cartographie chargée depuis le Cloud ☁️")
+
+# N'extraire/lire que si on n'a pas déjà récupéré du Cloud (telepac_gdf est None)
+if file_to_process is not None and telepac_gdf is None:
     try:
         with tempfile.TemporaryDirectory() as tmpdirname:
-            filename = uploaded_file.name
-            filepath = os.path.join(tmpdirname, filename)
-            
-            with open(filepath, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-                
-            if filename.endswith(".zip"):
-                with zipfile.ZipFile(filepath, 'r') as zip_ref:
+            if file_name.endswith(".zip"):
+                with zipfile.ZipFile(file_to_process, 'r') as zip_ref:
                     zip_ref.extractall(tmpdirname)
                     shp_files = [f for f in os.listdir(tmpdirname) if f.endswith('.shp')]
                     if shp_files:
                         telepac_gdf = gpd.read_file(os.path.join(tmpdirname, shp_files[0]))
                     else:
                         st.sidebar.error("Aucun fichier .shp trouvé dans le ZIP.")
-            elif filename.endswith(".geojson"):
-                telepac_gdf = gpd.read_file(filepath)
+            elif file_name.endswith(".geojson"):
+                telepac_gdf = gpd.read_file(file_to_process)
                 
             if telepac_gdf is not None:
                 # If CRS is missing (e.g. no .prj file), assume Lambert 93 (EPSG:2154) for French Telepac data
@@ -123,13 +196,61 @@ meter_fg.add_to(m)
 # Layer 2: Telepac Contours
 telepac_fg = folium.FeatureGroup(name="Contours Parcelles (Télépac)")
 if telepac_gdf is not None:
-    # Use standard style
-    style_function = lambda x: {
-        'fillColor': '#4CAF50',
-        'color': '#1B5E20',
-        'weight': 2,
-        'fillOpacity': 0.4
+    # Colors mapping based on typical French crop codes (Télépac codes or names)
+    # You can expand this based on the actual codes in the 'CULTURE' field
+    CROP_COLORS = {
+        'BTH': '#f1c40f', # Blé tendre (Yellow)
+        'Bled tendre': '#f1c40f',
+        'BLE': '#f1c40f',
+        'ORP': '#e67e22', # Orge de printemps (Orange)
+        'ORH': '#d35400', # Orge d'hiver (Dark Orange)
+        'ORGE': '#e67e22',
+        'CZH': '#9b59b6', # Colza d'hiver (Purple)
+        'COLZA': '#9b59b6',
+        'MIS': '#f39c12', # Maïs semence
+        'MID': '#f39c12', # Maïs doux
+        'MAI': '#f39c12', # Maïs (Gold)
+        'MAIS': '#f39c12',
+        'TRN': '#2ecc71', # Tournesol (Greenish)
+        'TOURNESOL': '#2ecc71',
+        'PTR': '#27ae60', # Prairies temporaires (Green)
+        'PPH': '#2ed573', # Prairies permanentes
+        'PRL': '#2ed573', # Prairies / Herbe
+        'J6S': '#bdc3c7', # Jachères (Grey)
+        'J5M': '#bdc3c7',
+        'JACHERE': '#bdc3c7',
+        'LUZ': '#8e44ad', # Luzerne 
+        'Pois': '#1abc9c',
+        'POI': '#1abc9c',
+        'DEFAULT': '#3498db' # Blue for unknown crops
     }
+    
+    def get_crop_style(feature):
+        props = feature.get('properties', {})
+        # Different fields possible for crop depending on the shapefile version
+        crop_code = props.get('CULTURE', props.get('CODE_CULTU', props.get('LIB_CULTU', 'DEFAULT')))
+        
+        # If it's a string, uppercase it
+        if isinstance(crop_code, str):
+            crop_code_upper = crop_code.upper()
+            # Find matching color
+            fill_color = CROP_COLORS.get(crop_code_upper, CROP_COLORS['DEFAULT'])
+            # Soft fallback if string contains the word
+            if fill_color == CROP_COLORS['DEFAULT']:
+                for key, color in CROP_COLORS.items():
+                    if key in crop_code_upper:
+                        fill_color = color
+                        break
+        else:
+            fill_color = CROP_COLORS['DEFAULT']
+
+        return {
+            'fillColor': fill_color,
+            'color': '#2c3e50', # Dark border
+            'weight': 1.5,
+            'fillOpacity': 0.6
+        }
+    
     
     # Try to find a good tooltip attribute, like 'NUM_ILOT' or 'ID_PARCEL'
     fields = telepac_gdf.columns.tolist()
@@ -139,7 +260,7 @@ if telepac_gdf is not None:
 
     folium.GeoJson(
         telepac_gdf,
-        style_function=style_function,
+        style_function=get_crop_style,
         tooltip=folium.GeoJsonTooltip(fields=tooltip_fields) if tooltip_fields else None
     ).add_to(telepac_fg)
 telepac_fg.add_to(m)
