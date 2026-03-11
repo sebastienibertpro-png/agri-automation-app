@@ -636,3 +636,22 @@ class DataLoader:
             if campaign:
                 df = df[df['Date'].dt.year == int(campaign)]
         return df
+
+    def get_achats(self, campaign=None):
+        """Loads ACHAT_MASTER and filters by campaign year."""
+        df = self._get_data("ACHAT_MASTER")
+        if df.empty:
+            return pd.DataFrame()
+            
+        # Assuming there is a Date column
+        if 'Date' in df.columns:
+            df['Date_dt'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
+            if campaign:
+                df = df[df['Date_dt'].dt.year == int(campaign)]
+        
+        # Alternatively, if there is a 'Campagne' column
+        elif 'Campagne' in df.columns and campaign:
+            df['Campagne'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+            df = df[df['Campagne'] == int(campaign)]
+            
+        return df
