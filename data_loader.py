@@ -643,15 +643,96 @@ class DataLoader:
         if df.empty:
             return pd.DataFrame()
             
-        # Assuming there is a Date column
-        if 'Date' in df.columns:
-            df['Date_dt'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
-            if campaign:
-                df = df[df['Date_dt'].dt.year == int(campaign)]
-        
-        # Alternatively, if there is a 'Campagne' column
-        elif 'Campagne' in df.columns and campaign:
+        if 'Campagne' in df.columns and campaign:
             df['Campagne'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
             df = df[df['Campagne'] == int(campaign)]
+        elif 'Date_facture' in df.columns and campaign:
+            df['Date_dt'] = pd.to_datetime(df['Date_facture'], errors='coerce', dayfirst=True)
+            df = df[df['Date_dt'].dt.year == int(campaign)]
             
         return df
+
+    def get_etat_stocks(self, campaign):
+        """Calcule l'état des stocks (Achats - Consommations) pour une campagne donnée."""
+        df_achats = self.get_achats(campaign)
+        df_interv = self.get_interventions()
+        
+        if df_achats.empty:
+            return pd.DataFrame()
+            
+        # 1. Agrégation des Achats
+        df_achats['Nom_Produit_Norm'] = df_achats['Nom_Produit'].astype(str).str.strip().str.upper()
+        df_achats['Quantité_Achetée'] = pd.to_numeric(df_achats['Quantité_Achetée'], errors='coerce').fillna(0)
+        df_achats['Montant_Total_Produit_HT'] = pd.to_numeric(df_achats['Montant_Total_Produit_HT'], errors='coerce').fillna(0)
+        
+        achats_agg = df_achats.groupby('Nom_Produit_Norm').agg({
+            'Nom_Produit': 'first',
+            'Catégorie': 'first',
+            'Unité_Achat': 'first',
+            'Quantité_Achetée': 'sum',
+            'Montant_Total_Produit_HT': 'sum'
+        }).reset_index()
+        
+        # 2. Agrégation des Consommations
+        consos_agg = pd.DataFrame(columns=['Nom_Produit_Norm', 'Quantité_Consommée'])
+        if not df_interv.empty and 'Nom_Produit' in df_interv.columns:
+            df_interv['Campagne'] = pd.to_numeric(df_interv['Campagne'], errors='coerce').fillna(0).astype(int)
+            df_interv = df_interv[df_interv['Campagne'] == int(campaign)]
+            
+            # Seulement les statuts Réalisés
+            status_col = None
+            for col in ['Stat_Intervention', 'Statut_Intervention', 'Statut', 'Etat']:
+                if col in df_interv.columns:
+                    status_col = col; break
+                    
+            if status_col:
+                df_interv = df_interv[df_interv[status_col].astype(str).str.strip().str.lower().str.startswith('réal')]
+                
+            df_interv['Nom_Produit_Norm'] = df_interv['Nom_Produit'].astype(str).str.strip().str.upper()
+            
+            # Les quantités sont soit dans Quantité_Totale_Produit (Phyto/Engrais) ou Quantité_semence_totale (Semis)
+            q_phyto = pd.to_numeric(df_interv.get('Quantité_Totale_Produit', 0), errors='coerce').fillna(0)
+            q_semis = pd.to_numeric(df_interv.get('Quantité_semence_totale', 0), errors='coerce').fillna(0)
+            df_interv['Quantité_Consommée'] = q_phyto + q_semis
+            
+            consos_agg = df_interv.groupby('Nom_Produit_Norm')['Quantité_Consommée'].sum().reset_index()
+            
+        # 2a. Agrégation des Consommations GNR (Fuel)
+        df_fuel = self.get_fuel_conso(campaign)
+        if not df_fuel.empty and 'FUEL_quantité_L' in df_fuel.columns:
+            # Aggregate fuel consumption
+            fuel_vol = pd.to_numeric(df_fuel['FUEL_quantité_L'], errors='coerce').fillna(0).sum()
+            # In ACHAT_MASTER, fuel might be named "GNR", "Carburant", "Fioul" etc. 
+            # We add it as "GNR" by default but should match user's ACHAT_MASTER naming.
+            # Assuming the name in ACHAT_MASTER is "GNR" or similar, we will append it.
+            # If the user buys fuel under specific names, it might need fuzzy matching, 
+            # but usually it's categorized and named 'GNR'.
+            
+            # Find the exact product name for GNR in purchases if possible, or just use 'GNR'
+            fuel_names = df_achats[df_achats['Catégorie'].astype(str).str.contains('GNR|Carburant|Fuel', case=False, na=False)]['Nom_Produit_Norm'].unique()
+            
+            for fuel_name in fuel_names:
+                # If there are multiple fuel entries, just assign total conso to the first one for simplicity, 
+                # or distribute. Usually there's only one.
+                fuel_row = pd.DataFrame([{'Nom_Produit_Norm': fuel_name, 'Quantité_Consommée': fuel_vol}])
+                consos_agg = pd.concat([consos_agg, fuel_row], ignore_index=True)
+                break # Just apply to the first found fuel purchase entry
+                
+        # 3. Fusion et calculs
+        df_stock = pd.merge(achats_agg, consos_agg, on='Nom_Produit_Norm', how='left')
+        df_stock['Quantité_Consommée'] = df_stock['Quantité_Consommée'].fillna(0)
+        
+        df_stock['Reste_en_Stock'] = df_stock['Quantité_Achetée'] - df_stock['Quantité_Consommée']
+        
+        # Calcul du prix moyen unitaire et de la valeur estimée (Prorata)
+        df_stock['Prix_Moyen_Unitaire'] = 0.0
+        df_stock['Valeur_Stock_Estimee'] = 0.0
+        
+        mask = df_stock['Quantité_Achetée'] > 0
+        df_stock.loc[mask, 'Prix_Moyen_Unitaire'] = df_stock.loc[mask, 'Montant_Total_Produit_HT'] / df_stock.loc[mask, 'Quantité_Achetée']
+        df_stock.loc[mask, 'Valeur_Stock_Estimee'] = df_stock.loc[mask, 'Prix_Moyen_Unitaire'] * df_stock.loc[mask, 'Reste_en_Stock']
+        
+        # Clean columns
+        df_stock = df_stock.drop(columns=['Nom_Produit_Norm'])
+        
+        return df_stock
