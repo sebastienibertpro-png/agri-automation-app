@@ -106,7 +106,7 @@ if uploaded_file is not None:
                     # Uniformiser le CRS avant sauvegarde cloud
                     if temp_gdf.crs is None:
                         temp_gdf.set_crs(epsg=2154, inplace=True)
-                    if temp_gdf.crs.toepsg() != 4326:
+                    if temp_gdf.crs.to_epsg() != 4326:
                         temp_gdf = temp_gdf.to_crs(epsg=4326)
                         
                     # Save a localized geojson string
