@@ -133,13 +133,17 @@ if uploaded_file is not None:
                         f.write(geojson_str)
                         
                     file_id = uploader.upload_file(drive_filepath, drive_folder_id)
-                    
-                    if file_id:
-                        st.sidebar.success("✅ Synchronisé sur Google Drive !")
-                    else:
-                        st.sidebar.warning("Échec de la synchronisation Drive (sauvegardé en local).")
+                    st.sidebar.success("✅ Synchronisé sur Google Drive !")
         except Exception as e:
-            st.sidebar.warning(f"La synchronisation Drive a échoué. Erreur: {e}")
+            import json
+            client_email = "le compte de service"
+            try:
+                if "gcp_service_account" in st.secrets:
+                    client_email = dict(st.secrets["gcp_service_account"]).get("client_email", client_email)
+            except: pass
+            
+            st.sidebar.error(f"Erreur de synchronisation Drive: {e}")
+            st.sidebar.info(f"💡 Pensez à partager ce dossier Google Drive avec l'adresse : **{client_email}** (en mode Éditeur).")
 
 elif saved_file_path:
     # Utiliser le fichier précédemment sauvegardé localement
@@ -164,22 +168,32 @@ else:
         drive_filename = f"Cartographie_{selected_campaign}.geojson"
         dest_path = os.path.join(MAP_SAVE_DIR, drive_filename)
         
-        # DriveUploader takes prefix, so we can pass the exact filename
-        success = uploader.download_latest_file_from_folder(drive_folder_id, drive_filename, dest_path)
-        
-        if success and os.path.exists(dest_path):
-            # Load it
-            telepac_gdf = gpd.read_file(dest_path)
-            if telepac_gdf.crs is None:
-                telepac_gdf.set_crs(epsg=4326, inplace=True)
-            elif telepac_gdf.crs.to_epsg() != 4326:
-                telepac_gdf = telepac_gdf.to_crs(epsg=4326)
+        try:
+            # DriveUploader takes prefix, so we can pass the exact filename
+            success = uploader.download_latest_file_from_folder(drive_folder_id, drive_filename, dest_path)
             
-            st.sidebar.info("Cartographie chargée depuis Google Drive ☁️")
-            
-            # Since we downloaded it, set file context for bounds later
-            file_to_process = dest_path
-            file_name = drive_filename
+            if success and os.path.exists(dest_path):
+                # Load it
+                telepac_gdf = gpd.read_file(dest_path)
+                if telepac_gdf.crs is None:
+                    telepac_gdf.set_crs(epsg=4326, inplace=True)
+                elif telepac_gdf.crs.to_epsg() != 4326:
+                    telepac_gdf = telepac_gdf.to_crs(epsg=4326)
+                
+                st.sidebar.info("Cartographie chargée depuis Google Drive ☁️")
+                
+                # Since we downloaded it, set file context for bounds later
+                file_to_process = dest_path
+                file_name = drive_filename
+        except Exception as e:
+            import json
+            client_email = "le compte de service"
+            try:
+                if "gcp_service_account" in st.secrets:
+                    client_email = dict(st.secrets["gcp_service_account"]).get("client_email", client_email)
+            except: pass
+            st.sidebar.error(f"Erreur de lecture Drive: {e}")
+            st.sidebar.info(f"💡 Partagez le dossier avec : **{client_email}**")
 
 # N'extraire/lire que si on n'a pas déjà récupéré du Cloud (telepac_gdf est None)
 if file_to_process is not None and telepac_gdf is None:
