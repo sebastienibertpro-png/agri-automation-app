@@ -64,7 +64,7 @@ else:
         
         # Add total row
         total_valeur_cat = df_disp['Valeur Estimée (€)'].sum()
-        total_row = pd.DataFrame([['TOTAL', '', '', '', '', '', total_valeur_cat]], columns=df_disp.columns)
+        total_row = pd.DataFrame([['TOTAL', None, None, None, None, '', total_valeur_cat]], columns=df_disp.columns)
         df_disp = pd.concat([df_disp, total_row], ignore_index=True)
         
         # Sort by Value
@@ -81,7 +81,7 @@ else:
                 "Consommé": "{:.2f}",
                 "Reste": "{:.2f}",
                 "Valeur Estimée (€)": "{:,.2f} €"
-            }).apply(highlight_neg, subset=['Reste']),
+            }, na_rep="").apply(highlight_neg, subset=['Reste']),
             use_container_width=True,
             hide_index=True
         )
