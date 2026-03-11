@@ -4,14 +4,20 @@ from googleapiclient.http import MediaFileUpload
 from oauth2client.service_account import ServiceAccountCredentials
 
 class DriveUploader:
-    def __init__(self, credentials_path):
+    def __init__(self, credentials_path=None, credentials_dict=None):
         self.credentials_path = credentials_path
+        self.credentials_dict = credentials_dict
         self.service = self._authenticate()
 
     def _authenticate(self):
         scope = ['https://www.googleapis.com/auth/drive']
         try:
-            creds = ServiceAccountCredentials.from_json_keyfile_name(self.credentials_path, scope)
+            if self.credentials_dict:
+                creds = ServiceAccountCredentials.from_json_keyfile_dict(self.credentials_dict, scope)
+            elif self.credentials_path and os.path.exists(self.credentials_path):
+                creds = ServiceAccountCredentials.from_json_keyfile_name(self.credentials_path, scope)
+            else:
+                raise Exception("Aucun identifiant de service compte fourni (fichier introuvable ou dictionnaire vide).")
             service = build('drive', 'v3', credentials=creds)
             return service
         except Exception as e:
