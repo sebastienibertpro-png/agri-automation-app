@@ -1230,21 +1230,27 @@ class ReportGenerator:
             print(f"PDF Generated: {self.filename}")
             return
             
-        total_valeur = df_stocks['Valeur_Stock_Estimee'].sum()
+        cat_col = 'Catégorie' if 'Catégorie' in df_stocks.columns else 'Categorie'
+        def get_df_for_category(keyword):
+            if cat_col not in df_stocks.columns:
+                return pd.DataFrame()
+            mask = df_stocks[cat_col].astype(str).str.contains(keyword, case=False, na=False)
+            return df_stocks[mask]
+
+        df_semences = get_df_for_category('Semence')
+        df_engrais = get_df_for_category('Engrais')
+        df_phyto = get_df_for_category('Phyto')
+        df_gnr = get_df_for_category('GNR|Carburant|Fuel')
+
+        total_valeur = 0
+        for df_sub in [df_semences, df_engrais, df_phyto, df_gnr]:
+            if not df_sub.empty:
+                total_valeur += df_sub['Valeur_Stock_Estimee'].sum()
+                
         self.add_paragraph(f"<b>Valeur Globale Estimée du Stock Restant :</b> {total_valeur:,.2f} €".replace(',', ' '), style_name='Heading3')
         self.elements.append(Spacer(1, 10))
         
-        cat_col = 'Catégorie' if 'Catégorie' in df_stocks.columns else 'Categorie'
-        
-        def add_category_table(title, keyword, is_other=False):
-            if cat_col not in df_stocks.columns: return
-            
-            if is_other:
-                mask = ~df_stocks[cat_col].astype(str).str.contains('Semence|Engrais|Phyto', case=False, na=False)
-            else:
-                mask = df_stocks[cat_col].astype(str).str.contains(keyword, case=False, na=False)
-                
-            df_sub = df_stocks[mask]
+        def add_category_table(title, df_sub):
             if df_sub.empty: return
             
             self.elements.append(Paragraph(f"<b>{title}</b>", self.styles['Heading3']))
@@ -1254,7 +1260,10 @@ class ReportGenerator:
             # Sort by value
             df_sub = df_sub.sort_values(by="Valeur_Stock_Estimee", ascending=False)
             
+            total_valeur_cat = 0
             for _, row in df_sub.iterrows():
+                valeur = row['Valeur_Stock_Estimee']
+                total_valeur_cat += valeur
                 table_data.append([
                     str(row['Nom_Produit']),
                     f"{row.get('Prix_Moyen_Unitaire', 0.0):.2f}",
@@ -1262,8 +1271,13 @@ class ReportGenerator:
                     f"{row['Quantité_Consommée']:.2f}",
                     f"{row['Reste_en_Stock']:.2f}",
                     str(row['Unité_Achat']),
-                    f"{row['Valeur_Stock_Estimee']:,.2f} €".replace(',', ' ')
+                    f"{valeur:,.2f} €".replace(',', ' ')
                 ])
+                
+            # Add TOTAL row at the bottom
+            table_data.append([
+                'TOTAL', '', '', '', '', '', f"{total_valeur_cat:,.2f} €".replace(',', ' ')
+            ])
                 
             # Table formatting (Landscape A4 gives us ~27cm width to play with)
             t = Table(table_data, colWidths=[7.5*cm, 2.5*cm, 3.5*cm, 3.5*cm, 2.5*cm, 2*cm, 4*cm])
@@ -1277,14 +1291,17 @@ class ReportGenerator:
                 ('BOTTOMPADDING', (0,0), (-1,-1), 6),
                 ('TOPPADDING', (0,0), (-1,-1), 6),
                 ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                # Style the TOTAL row
+                ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#e0e0e0')),
             ]))
             self.elements.append(t)
             self.elements.append(Spacer(1, 15))
             
-        add_category_table("🌾 Semences", "Semence")
-        add_category_table("🧪 Engrais", "Engrais")
-        add_category_table("🛡️ Phytosanitaires", "Phyto")
-        add_category_table("⚙️ Autres", "", is_other=True)
+        add_category_table("🌾 Semences", df_semences)
+        add_category_table("🧪 Engrais", df_engrais)
+        add_category_table("🛡️ Phytosanitaires", df_phyto)
+        add_category_table("⛽ GNR (Carburant)", df_gnr)
         
         self.doc.build(self.elements)
         print(f"PDF Generated: {self.filename}")
