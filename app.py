@@ -60,7 +60,7 @@ if intervention_id:
 st.markdown(f"## 📋 Vue d'ensemble - Campagne {selected_campaign}")
 
 # 1. ASSOLEMENT (Quick Glance)
-st.subheader("🌾 Assolement en un coup d'œil")
+st.subheader("🌾 Assolement synthétique")
 df_asso = active_loader.get_assolement(selected_campaign)
 if not df_asso.empty:
     # Filter for specific crops requested or all
@@ -72,7 +72,10 @@ if not df_asso.empty:
     
     m_cols = st.columns(len(crops_to_show))
     for i, crop in enumerate(crops_to_show):
-        row = asso_summary[asso_summary['Culture'].str.contains(crop, case=False, na=False)]
+        if crop == "Maïs":
+            row = asso_summary[asso_summary['Culture'].str.contains("Maïs", case=False, na=False) & ~asso_summary['Culture'].str.contains("Pop", case=False, na=False)]
+        else:
+            row = asso_summary[asso_summary['Culture'].str.contains(crop, case=False, na=False)]
         surf = row['Surface_Référence_Ha'].sum() if not row.empty else 0.0
         m_cols[i].metric(label=crop, value=f"{surf:.1f} ha")
 else:
@@ -86,7 +89,7 @@ col_left, col_right = st.columns(2)
 with col_left:
     st.subheader("⏱️ Dernière Intervention")
     # Get last "Réalisé" intervention
-    df_realised = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.contains('réalise')].copy()
+    df_realised = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.contains('réalisé')].copy()
     if not df_realised.empty:
         # Sort by date
         df_realised['Date_dt'] = pd.to_datetime(df_realised['Date'], errors='coerce', dayfirst=True)
