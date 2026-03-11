@@ -95,14 +95,25 @@ with col_left:
         df_realised['Date_dt'] = pd.to_datetime(df_realised['Date'], errors='coerce', dayfirst=True)
         last_interv = df_realised.sort_values('Date_dt', ascending=False).iloc[0]
         
+        # Handle potential nan values safely
+        type_int = last_interv['Type_Intervention'] if pd.notnull(last_interv['Type_Intervention']) and str(last_interv['Type_Intervention']).lower() != 'nan' else ''
+        outil = last_interv['Outil'] if pd.notnull(last_interv['Outil']) and str(last_interv['Outil']).lower() != 'nan' else 'N/A'
+        produit = last_interv['Nom_Produit'] if pd.notnull(last_interv['Nom_Produit']) and str(last_interv['Nom_Produit']).lower() != 'nan' else 'N/A'
+        obs = last_interv['Observations'] if pd.notnull(last_interv['Observations']) and str(last_interv['Observations']).lower() != 'nan' else '-'
+        
+        # Format the title (only add a hyphen if there is a Type_Intervention)
+        title = last_interv['Nature_Intervention']
+        if type_int:
+            title += f" - {type_int}"
+
         # Synthetic display style ITK
         st.markdown(f"""
         <div style="padding:15px; border-radius:10px; border-left: 5px solid #4CAF50; background-color: #f9f9f9; color: black;">
-            <h4 style="margin:0; color: #2E7D32;">{last_interv['Nature_Intervention']} - {last_interv['Type_Intervention'] or ''}</h4>
+            <h4 style="margin:0; color: #2E7D32;">{title}</h4>
             <p style="margin:5px 0;"><b>Date :</b> {last_interv['Date']} | <b>Parcelle :</b> {last_interv['ID_Parcelle']}</p>
-            <p style="margin:0;"><b>Outil :</b> {last_interv['Outil'] or 'N/A'}</p>
-            <p style="margin:0;"><b>Produit :</b> {last_interv['Nom_Produit'] or 'N/A'}</p>
-            <p style="margin:5px 0 0 0; font-size:0.9em; color:gray;"><i>Obs: {last_interv['Observations'] or '-'}</i></p>
+            <p style="margin:0;"><b>Outil :</b> {outil}</p>
+            <p style="margin:0;"><b>Produit :</b> {produit}</p>
+            <p style="margin:5px 0 0 0; font-size:0.9em; color:gray;"><i>Obs: {obs}</i></p>
         </div>
         """, unsafe_allow_html=True)
     else:
