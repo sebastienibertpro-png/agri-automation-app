@@ -117,14 +117,13 @@ if uploaded_file is not None:
                     drive_folder_id = "1BD2fZikCkIbEo89J33kignWI63wbhYlx"
                     
                     # Credentials handling for DriveUploader
-                    creds_path = "gcp_service_account.json"
+                    creds_dict = None
                     if "gcp_service_account" in st.secrets:
-                        # Write secrets to a temporary file for DriveUploader to use
-                        import json
-                        with open(creds_path, "w") as f:
-                            json.dump(dict(st.secrets["gcp_service_account"]), f)
+                        creds_dict = dict(st.secrets["gcp_service_account"])
+                    elif "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+                        creds_dict = dict(st.secrets["connections"]["gsheets"])
                             
-                    uploader = DriveUploader(creds_path)
+                    uploader = DriveUploader(credentials_path="gcp_service_account.json", credentials_dict=creds_dict)
                     
                     # Create a specific file name for the campaign
                     drive_filename = f"Cartographie_{selected_campaign}.geojson"
@@ -156,13 +155,13 @@ else:
         from drive_utils import DriveUploader
         drive_folder_id = "1BD2fZikCkIbEo89J33kignWI63wbhYlx"
         
-        creds_path = "gcp_service_account.json"
-        if "gcp_service_account" in st.secrets and not os.path.exists(creds_path):
-            import json
-            with open(creds_path, "w") as f:
-                json.dump(dict(st.secrets["gcp_service_account"]), f)
+        creds_dict = None
+        if "gcp_service_account" in st.secrets:
+            creds_dict = dict(st.secrets["gcp_service_account"])
+        elif "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+            creds_dict = dict(st.secrets["connections"]["gsheets"])
                 
-        uploader = DriveUploader(creds_path)
+        uploader = DriveUploader(credentials_path="gcp_service_account.json", credentials_dict=creds_dict)
         
         # Download the specific campaign file
         drive_filename = f"Cartographie_{selected_campaign}.geojson"
