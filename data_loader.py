@@ -712,9 +712,19 @@ class DataLoader:
             fuel_names = df_achats[df_achats['Catégorie'].astype(str).str.contains('GNR|Carburant|Fuel', case=False, na=False)]['Nom_Produit_Norm'].unique()
             
             for fuel_name in fuel_names:
+                # Get purchase unit for this fuel to convert L to m3 if needed
+                try:
+                    unit = achats_agg.loc[achats_agg['Nom_Produit_Norm'] == fuel_name, 'Unité_Achat'].iloc[0]
+                    if pd.notna(unit) and str(unit).strip().lower() in ['m3', 'm³']:
+                        converted_vol = fuel_vol / 1000.0
+                    else:
+                        converted_vol = fuel_vol
+                except Exception:
+                    converted_vol = fuel_vol
+                
                 # If there are multiple fuel entries, just assign total conso to the first one for simplicity, 
                 # or distribute. Usually there's only one.
-                fuel_row = pd.DataFrame([{'Nom_Produit_Norm': fuel_name, 'Quantité_Consommée': fuel_vol}])
+                fuel_row = pd.DataFrame([{'Nom_Produit_Norm': fuel_name, 'Quantité_Consommée': converted_vol}])
                 consos_agg = pd.concat([consos_agg, fuel_row], ignore_index=True)
                 break # Just apply to the first found fuel purchase entry
                 
