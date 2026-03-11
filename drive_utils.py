@@ -21,12 +21,10 @@ class DriveUploader:
     def upload_file(self, file_path, folder_id):
         """Uploads a file to a specific Google Drive folder."""
         if not self.service:
-            print("Service Drive non initialisé. Upload annulé.")
-            return None
+            raise Exception("Service Drive non initialisé.")
 
         if not os.path.exists(file_path):
-            print(f"Fichier introuvable: {file_path}")
-            return None
+            raise Exception(f"Fichier introuvable: {file_path}")
 
         file_name = os.path.basename(file_path)
         file_metadata = {
@@ -47,13 +45,12 @@ class DriveUploader:
             return file.get('id')
         except Exception as e:
             print(f"Erreur lors de l'upload: {e}", flush=True)
-            return None
+            raise Exception(str(e))
 
     def download_latest_file_from_folder(self, folder_id, file_prefix, destination_path):
         """Finds the most recent file in a folder starting with prefix and downloads it."""
         if not self.service:
-            print("Service Drive non initialisé. Download annulé.")
-            return False
+            raise Exception("Service Drive non initialisé.")
             
         try:
             # Search for files with the prefix in the folder, ordered by modified time descending
@@ -90,4 +87,4 @@ class DriveUploader:
             
         except Exception as e:
              print(f"Erreur lors du téléchargement: {e}")
-             return False
+             raise Exception(str(e))
