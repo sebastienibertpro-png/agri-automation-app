@@ -17,15 +17,32 @@ df_stocks = active_loader.get_etat_stocks(selected_campaign)
 if df_stocks is None or df_stocks.empty:
     st.info(f"Aucune donnée d'achat trouvée pour la campagne {selected_campaign}.")
 else:
-    # Top KPI
-    total_valeur = df_stocks['Valeur_Stock_Estimee'].sum()
+    cat_col = 'Catégorie' if 'Catégorie' in df_stocks.columns else 'Categorie'
+    
+    def get_df_for_category(keyword):
+        if cat_col not in df_stocks.columns:
+            return pd.DataFrame()
+        # Case insensitive match
+        mask = df_stocks[cat_col].astype(str).str.contains(keyword, case=False, na=False)
+        return df_stocks[mask]
+
+    # Calculate Top KPI only for relevant categories
+    df_semences = get_df_for_category('Semence')
+    df_engrais = get_df_for_category('Engrais')
+    df_phyto = get_df_for_category('Phyto')
+    df_gnr = get_df_for_category('GNR|Carburant|Fuel')
+    
+    total_valeur = 0
+    for df_sub in [df_semences, df_engrais, df_phyto, df_gnr]:
+        if not df_sub.empty:
+            total_valeur += df_sub['Valeur_Stock_Estimee'].sum()
+            
     st.metric("Valeur Globale Estimée du Stock Restant", f"{total_valeur:,.2f} €".replace(',', ' '))
     st.divider()
 
     # Define Categories based on common groupings if available
     # The prompt categorizes loosely into Semences, Engrais, Phytos
     
-    cat_col = 'Catégorie' if 'Catégorie' in df_stocks.columns else 'Categorie'
     
     # Let's map keywords to 3 main tabs, plus 'GNR'
     tab_semences, tab_engrais, tab_phyto, tab_gnr = st.tabs(["🌾 Semences", "🧪 Engrais", "🛡️ Phytosanitaires", "⛽ GNR (Carburant)"])
@@ -44,6 +61,11 @@ else:
             
         df_disp = df_subset[['Nom_Produit', 'Prix_Moyen_Unitaire', 'Quantité_Achetée', 'Quantité_Consommée', 'Reste_en_Stock', 'Unité_Achat', 'Valeur_Stock_Estimee']].copy()
         df_disp.columns = ['Produit', 'Prix Moyen Unit. (€)', 'Acheté', 'Consommé', 'Reste', 'Unité', 'Valeur Estimée (€)']
+        
+        # Add total row
+        total_valeur_cat = df_disp['Valeur Estimée (€)'].sum()
+        total_row = pd.DataFrame([['TOTAL', '', '', '', '', '', total_valeur_cat]], columns=df_disp.columns)
+        df_disp = pd.concat([df_disp, total_row], ignore_index=True)
         
         # Sort by Value
         df_disp = df_disp.sort_values(by="Valeur Estimée (€)", ascending=False)
