@@ -1216,3 +1216,76 @@ class ReportGenerator:
 
         self.doc.build(self.elements)
         print(f"Parcel Irrigation PDF Generated: {self.filename}")
+
+    def generate_etat_stocks_report(self, campaign, df_stocks):
+        """
+        Generates the Stock Status Report.
+        """
+        self.doc.pagesize = landscape(A4)
+        self.add_title(f"État des Stocks - Campagne {campaign}")
+        
+        if df_stocks.empty:
+            self.add_paragraph("Aucune donnée de stock trouvée pour cette campagne.")
+            self.doc.build(self.elements)
+            print(f"PDF Generated: {self.filename}")
+            return
+            
+        total_valeur = df_stocks['Valeur_Stock_Estimee'].sum()
+        self.add_paragraph(f"<b>Valeur Globale Estimée du Stock Restant :</b> {total_valeur:,.2f} €".replace(',', ' '), style_name='Heading3')
+        self.elements.append(Spacer(1, 10))
+        
+        cat_col = 'Catégorie' if 'Catégorie' in df_stocks.columns else 'Categorie'
+        
+        def add_category_table(title, keyword, is_other=False):
+            if cat_col not in df_stocks.columns: return
+            
+            if is_other:
+                mask = ~df_stocks[cat_col].astype(str).str.contains('Semence|Engrais|Phyto', case=False, na=False)
+            else:
+                mask = df_stocks[cat_col].astype(str).str.contains(keyword, case=False, na=False)
+                
+            df_sub = df_stocks[mask]
+            if df_sub.empty: return
+            
+            self.elements.append(Paragraph(f"<b>{title}</b>", self.styles['Heading3']))
+            
+            table_data = [['Produit', 'Prix Moyen\nUnit. (€)', 'Quantité\nAchetée', 'Quantité\nConsommée', 'Reste en\nStock', 'Unité', 'Valeur\nEstimée (€)']]
+            
+            # Sort by value
+            df_sub = df_sub.sort_values(by="Valeur_Stock_Estimee", ascending=False)
+            
+            for _, row in df_sub.iterrows():
+                table_data.append([
+                    str(row['Nom_Produit']),
+                    f"{row.get('Prix_Moyen_Unitaire', 0.0):.2f}",
+                    f"{row['Quantité_Achetée']:.2f}",
+                    f"{row['Quantité_Consommée']:.2f}",
+                    f"{row['Reste_en_Stock']:.2f}",
+                    str(row['Unité_Achat']),
+                    f"{row['Valeur_Stock_Estimee']:,.2f} €".replace(',', ' ')
+                ])
+                
+            # Table formatting (Landscape A4 gives us ~27cm width to play with)
+            t = Table(table_data, colWidths=[7.5*cm, 2.5*cm, 3.5*cm, 3.5*cm, 2.5*cm, 2*cm, 4*cm])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#4CAF50')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('ALIGN', (0,0), (0,-1), 'LEFT'), # Produit left aligned
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,0), 10),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                ('TOPPADDING', (0,0), (-1,-1), 6),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ]))
+            self.elements.append(t)
+            self.elements.append(Spacer(1, 15))
+            
+        add_category_table("🌾 Semences", "Semence")
+        add_category_table("🧪 Engrais", "Engrais")
+        add_category_table("🛡️ Phytosanitaires", "Phyto")
+        add_category_table("⚙️ Autres", "", is_other=True)
+        
+        self.doc.build(self.elements)
+        print(f"PDF Generated: {self.filename}")
+
