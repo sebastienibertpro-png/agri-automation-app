@@ -48,3 +48,46 @@ class DriveUploader:
         except Exception as e:
             print(f"Erreur lors de l'upload: {e}", flush=True)
             return None
+
+    def download_latest_file_from_folder(self, folder_id, file_prefix, destination_path):
+        """Finds the most recent file in a folder starting with prefix and downloads it."""
+        if not self.service:
+            print("Service Drive non initialisé. Download annulé.")
+            return False
+            
+        try:
+            # Search for files with the prefix in the folder, ordered by modified time descending
+            query = f"'{folder_id}' in parents and name contains '{file_prefix}' and trashed = false"
+            results = self.service.files().list(
+                q=query,
+                orderBy="modifiedTime desc",
+                pageSize=1,
+                fields="files(id, name)"
+            ).execute()
+            
+            items = results.get('files', [])
+            
+            if not items:
+                print(f"Aucun fichier trouvé pour '{file_prefix}' dans le dossier {folder_id}.")
+                return False
+                
+            file_id = items[0]['id']
+            file_name_remote = items[0]['name']
+            print(f"Téléchargement de {file_name_remote} (ID: {file_id})...")
+            
+            request = self.service.files().get_media(fileId=file_id)
+            import io
+            from googleapiclient.http import MediaIoBaseDownload
+            
+            fh = io.FileIO(destination_path, 'wb')
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+                
+            print(f"Téléchargement terminé vers {destination_path}.")
+            return True
+            
+        except Exception as e:
+             print(f"Erreur lors du téléchargement: {e}")
+             return False
