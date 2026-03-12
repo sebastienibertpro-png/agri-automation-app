@@ -4,6 +4,7 @@ from data_loader import DataLoader
 import os
 
 APP_BASE_URL = "https://agri-automation-app-kwz7hjkyb8hjxwhe9w7rsv.streamlit.app"
+EPHY_DRIVE_FOLDER_ID = "1YDTwRXHFTxPmM4QD84nTnQYmMZqz60dc"
 
 @st.cache_resource
 def get_dataloader():
@@ -15,6 +16,21 @@ def get_dataloader():
     if loader.load_source():
         return loader
     return None
+
+@st.cache_resource
+def get_drive_uploader():
+    from drive_utils import DriveUploader
+    credentials_dict = None
+    if "gcp_service_account" in st.secrets:
+        credentials_dict = dict(st.secrets["gcp_service_account"])
+    
+    # On privilégie credentials.json si présent, sinon le dictionnaire des secrets
+    cred_path = "credentials.json"
+    if not os.path.exists(cred_path):
+        cred_path = None
+        
+    uploader = DriveUploader(credentials_path=cred_path, credentials_dict=credentials_dict)
+    return uploader if uploader.service else None
 
 # Hack to force reload of cached dataloader if it lacks new methods
 dl = get_dataloader()
