@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from data_loader import DataLoader
-from shared import init_session_state
+from shared import init_campaign_selector
 from report_gen import generate_ppf_pdf
 
 st.set_page_config(page_title="Plan Prévisionnel de Fumure", page_icon="🌿", layout="wide")
@@ -9,16 +9,17 @@ st.set_page_config(page_title="Plan Prévisionnel de Fumure", page_icon="🌿", 
 st.title("🌿 Plan Prévisionnel de Fumure (PPF)")
 st.markdown("---")
 
-init_session_state()
+active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
+dl = active_loader
+campagne_input = int(selected_campaign)
 
-dl = DataLoader(st.session_state["local_file_path"], use_cloud=st.session_state["use_cloud"])
-if not dl.load_source():
+if not dl:
     st.warning("⚠️ Mode Local actif (Lecture seule). Aucune sauvegarde possible.")
 
 # 1. Sélection de la Campagne et Parcelle
 col1, col2 = st.columns(2)
 with col1:
-    campagne_input = st.number_input("Campagne", min_value=2000, max_value=2100, value=2024, step=1)
+    st.text_input("Campagne Option", value=str(campagne_input), disabled=True)
 with col2:
     # Récupérer les métadonnées de l'assolement pour la campagne
     parcels_meta = dl.get_parcel_metadata(campagne_input)
