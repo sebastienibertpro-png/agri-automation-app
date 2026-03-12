@@ -10,9 +10,9 @@ from shared import get_dataloader, get_drive_uploader
 from pdf_analyzer import PDFAnalyzer
 
 # Configuration
-DRIVE_FOLDER_NAME = "AGRI_AUTOMATION" # Dossier parent
+DRIVE_FOLDER_NAME = "08_Factures_Achats_Ventes" # Dossier parent
 DRIVE_SUBFOLDER_NAME = "A_Traiter"     # Dossier source des factures
-SPREADSHEET_ID = "MASTER_EXPLOITATION" 
+SPREADSHEET_ID = "1rNY5Skg8hTekiKKbJrPibB4kmbkQjq0uQpzEnhXPmBA" 
 SHEET_NAME = "ACHAT_MASTER"
 
 st.set_page_config(page_title="Bot Comptable", page_icon="🤖", layout="wide")
