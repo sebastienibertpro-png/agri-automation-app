@@ -733,6 +733,35 @@ class DataLoader:
             df = df[df['Date_dt'].dt.year == int(campaign)]
             
         return df
+    def append_achat_master(self, sheet_values: list[list]) -> bool:
+        """Appends new rows to the ACHAT_MASTER sheet."""
+        if not self.conn:
+            st.error("Écriture impossible en local.")
+            return False
+        try:
+            SHEET_NAME = "ACHAT_MASTER"
+            SPREADSHEET_NAME = "MASTER_EXPLOITATION"
+            
+            # Read current
+            df_existing = self.conn.read(worksheet=SHEET_NAME, ttl=0, spreadsheet=SPREADSHEET_NAME)
+            
+            if df_existing.empty:
+                # If first time, we just create it with some default columns or as provided
+                df_final = pd.DataFrame(sheet_values)
+            else:
+                # Create new DF with matching columns
+                df_new = pd.DataFrame(sheet_values, columns=df_existing.columns[:len(sheet_values[0])])
+                # Combine
+                df_final = pd.concat([df_existing, df_new], ignore_index=True)
+            
+            # Update
+            self.conn.update(worksheet=SHEET_NAME, data=df_final, spreadsheet=SPREADSHEET_NAME)
+            self._cache.pop(SHEET_NAME, None)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Erreur append_achat_master : {e}")
+            return False
 
     def get_etat_stocks(self, campaign):
         """Calcule l'état des stocks (Achats - Consommations) pour une campagne donnée."""
