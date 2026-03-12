@@ -3,7 +3,8 @@ import pandas as pd
 from datetime import datetime
 import os
 from ephy_fetcher import EphyFetcher
-from shared import get_dataloader
+from shared import get_dataloader, get_drive_uploader, EPHY_DRIVE_FOLDER_ID
+import time
 
 st.set_page_config(page_title="Référentiel E-Phy", page_icon="🌿", layout="wide")
 
@@ -28,12 +29,20 @@ active_loader = get_dataloader()
 with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGES_PHYTO", expanded=False):
 
     if "ephy_fetcher" not in st.session_state:
-        with st.spinner("🔄 Chargement du référentiel E-Phy (première fois : ~30s)..."):
-            try:
-                st.session_state["ephy_fetcher"] = EphyFetcher(auto_refresh=True)
-            except Exception as e_init:
-                st.error(f"❌ Erreur initialisation E-Phy : {e_init}")
-                st.session_state["ephy_fetcher"] = None
+        # Initialisation silencieuse (sans téléchargement ANSES)
+        try:
+            fetcher = EphyFetcher(auto_refresh=False)
+            st.session_state["ephy_fetcher"] = fetcher
+            
+            # Si le cache local est vide, on tente une synchro Drive immédiate
+            if fetcher.nb_produits == 0:
+                uploader = get_drive_uploader()
+                if uploader:
+                    with st.spinner("☁️ Synchronisation du référentiel depuis le Cloud..."):
+                        fetcher.download_from_drive(uploader, EPHY_DRIVE_FOLDER_ID)
+        except Exception as e_init:
+            st.error(f"❌ Erreur initialisation E-Phy : {e_init}")
+            st.session_state["ephy_fetcher"] = None
 
     fetcher: EphyFetcher | None = st.session_state.get("ephy_fetcher")
 
@@ -43,14 +52,23 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
     with col_info2:
         st.metric("📅 Dernière MAJ", fetcher.last_update if fetcher else "N/A")
     with col_info3:
-        if st.button("🔄 Forcer mise à jour E-Phy", key="btn_refresh_ephy"):
-            with st.spinner("Téléchargement du référentiel E-Phy en cours..."):
+        if st.button("🔄 Mettre à jour (ANSES → Drive)", key="btn_refresh_ephy"):
+            with st.spinner("📥 Téléchargement ANSES... (~1-2 min)"):
+                # 1. Refresh depuis ANSES
                 ok = fetcher.refresh(force=True) if fetcher else False
-            if ok:
-                st.success("✅ Référentiel E-Phy mis à jour !")
-                st.rerun()
-            else:
-                st.error("❌ Échec de la mise à jour.")
+                
+                if ok:
+                    # 2. Upload vers Drive pour les autres appareils
+                    st.toast("✅ Téléchargement réussi ! Envoi vers le Cloud Drive...")
+                    uploader = get_drive_uploader()
+                    if uploader:
+                        fetcher.upload_to_drive(uploader, EPHY_DRIVE_FOLDER_ID)
+                    
+                    st.success("✅ Référentiel E-Phy mis à jour et synchronisé !")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("❌ Échec du téléchargement ANSES.")
 
     st.markdown("---")
 
