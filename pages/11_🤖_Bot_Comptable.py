@@ -204,8 +204,27 @@ def process_invoices_ui():
         st.error(f"❌ Une erreur globale est survenue : {e_global}")
 
 # Main execution
-if "gcp_service_account" not in st.secrets:
-    st.warning("⚠️ Compte de service Google non configuré dans les secrets Streamlit.")
+# On vérifie si on a soit les secrets Streamlit, soit un fichier credentials.json local
+has_creds = ("gcp_service_account" in st.secrets) or os.path.exists("credentials.json")
+has_gemini = "GEMINI_API_KEY" in st.secrets
+
+if not has_creds:
+    st.warning("⚠️ **Compte de service Google non configuré.**")
+    st.markdown("""
+    Pour utiliser le Bot Comptable sur Streamlit Cloud :
+    1. Allez dans le tableau de bord Streamlit Cloud de votre app.
+    2. Allez dans **Settings > Secrets**.
+    3. Copiez-collez le contenu de votre fichier `credentials.json` sous la clé `gcp_service_account` comme ceci :
+    ```toml
+    [gcp_service_account]
+    type = "service_account"
+    project_id = "..."
+    ...
+    ```
+    """)
+elif not has_gemini:
+    st.warning("⚠️ **Clé API Gemini manquante.**")
+    st.info("Ajoutez `GEMINI_API_KEY = 'votre_cle_ici'` dans vos Secrets Streamlit.")
 else:
     process_invoices_ui()
 
