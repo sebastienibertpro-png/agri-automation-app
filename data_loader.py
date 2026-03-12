@@ -661,17 +661,13 @@ class DataLoader:
                 df = pd.DataFrame(columns=["Campagne", "GeoJSON_Data", "Date_Maj"])
                 
             # 2. Préparer la nouvelle ligne
-            # Attention: si la chaîne est trop longue (limite Google Sheets de 50000 caractères par cellule), 
-            # il faudrait la découper. Mais gpd.to_json() pour une exploitation est souvent gérable.
-            # On découpe en "chunks" de 40000 caractères si nécessaire.
-            
             chunk_size = 40000
             chunks = [geojson_str[i:i+chunk_size] for i in range(0, len(geojson_str), chunk_size)]
             
             new_rows = []
             for i, chunk in enumerate(chunks):
                  new_rows.append({
-                     "Campagne": str(campaign),
+                     "Campagne": int(campaign),
                      "Chunk_Index": i,
                      "Total_Chunks": len(chunks),
                      "GeoJSON_Data": chunk,
@@ -682,7 +678,11 @@ class DataLoader:
 
             # 3. Supprimer les anciennes données de cette campagne
             if not df.empty and "Campagne" in df.columns:
-                df = df[df["Campagne"].astype(str).str.strip() != str(campaign).strip()]
+                # Robust conversion to int for filtering
+                df['Camp_Int'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+                df = df[df["Camp_Int"] != int(campaign)]
+                df = df.drop(columns=['Camp_Int'])
+                
                 # S'assurer que les colonnes chunk existent
                 for col in ["Chunk_Index", "Total_Chunks", "GeoJSON_Data"]:
                      if col not in df.columns:
@@ -708,18 +708,26 @@ class DataLoader:
         if df.empty or "Campagne" not in df.columns:
             return None
             
-        # Filtrer la campagne
-        df_camp = df[df["Campagne"].astype(str).str.strip() == str(campaign).strip()]
+        # Filtrer la campagne (conversion robuste en int)
+        try:
+            df['Camp_Int'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+            df_camp = df[df["Camp_Int"] == int(campaign)]
+        except:
+            # Fallback string matching if numeric conversion fails
+            df_camp = df[df["Campagne"].astype(str).str.strip() == str(campaign).strip()]
+        
         if df_camp.empty:
             return None
             
         # Trier par chunk index et reconstituer
         if "Chunk_Index" in df_camp.columns:
             df_camp = df_camp.sort_values("Chunk_Index")
-            return "".join(df_camp["GeoJSON_Data"].astype(str).tolist())
+            # Clear any potential NaNs in GeoJSON_Data to avoid "nan" string in concatenation
+            return "".join(df_camp["GeoJSON_Data"].dropna().astype(str).tolist())
         else:
              # Ancien format (sans chunks)
-             return str(df_camp["GeoJSON_Data"].iloc[0])
+             val = df_camp["GeoJSON_Data"].iloc[0]
+             return str(val) if pd.notna(val) else None
     def get_fuel_conso(self, campaign=None):
         """Loads CONSO_FUEL and filters by campaign year."""
         df = self._get_data("CONSO_FUEL")
