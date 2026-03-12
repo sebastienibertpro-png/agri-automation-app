@@ -4,6 +4,7 @@ from data_loader import DataLoader
 import os
 
 # Helper for E-Phy cloud storage
+APP_BASE_URL = "https://agri-automation-app-kwz7hjkyb8hjxwhe9w7rsv.streamlit.app"
 EPHY_DRIVE_FOLDER_ID = "1YDTwRXHFTxPmM4QD84nTnQYmMZqz60dc"
 
 @st.cache_resource
