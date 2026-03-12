@@ -1306,3 +1306,139 @@ class ReportGenerator:
         self.doc.build(self.elements)
         print(f"PDF Generated: {self.filename}")
 
+import io
+
+def generate_ppf_pdf(ppf_dict, interv_list):
+    """
+    Helper function to generate the PPF PDF and return it as bytes.
+    """
+    buffer = io.BytesIO()
+    report = ReportGenerator(buffer)
+    
+    # --- Title & Header ---
+    campagne = ppf_dict.get('Campagne', 'N/A')
+    parcelle = ppf_dict.get('ID_Parcelle', 'N/A')
+    
+    report.add_title(f"Plan Prévisionnel de Fumure (PPF) - {campagne}")
+    
+    header_text = f"<b>Parcelle : {parcelle}</b>"
+    ilot = ppf_dict.get('îlot PAC', '')
+    if ilot and ilot != 'nan':
+        header_text += f" (Ilot PAC: {ilot})"
+    report.elements.append(Paragraph(header_text, report.styles['Heading2']))
+    
+    sub_header = f"Culture : {ppf_dict.get('Culture', '')} {ppf_dict.get('Variété', '')} | Surface : {ppf_dict.get('Surface_Référence_Ha', 0)} ha | Type de Sol : {ppf_dict.get('Type_sol', '')}"
+    report.elements.append(Paragraph(sub_header, report.styles['Normal']))
+    report.elements.append(Spacer(1, 15))
+    
+    # --- Rappel Formule COMIFER ---
+    comifer_text = "<b>Méthode Officielle COMIFER :</b> Dose X = (Besoins Culture + Azote Fermeture) - (Fournitures du Sol + Reliquats + Précédent + CIPAN)"
+    report.elements.append(Paragraph(comifer_text, ParagraphStyle('Comifer', parent=report.styles['Normal'], backColor=colors.HexColor('#e8f4f8'), borderPadding=5)))
+    report.elements.append(Spacer(1, 15))
+    
+    # --- Table du Bilan Azoté ---
+    report.elements.append(Paragraph("<b>Détail du Calcul de la Dose X (en kg N/ha)</b>", report.styles['Heading3']))
+    
+    b_pf = ppf_dict.get('Besoin_Culture(Pf)', 0)
+    b_rf = ppf_dict.get('Azote_Fermeture_Bilan(Rf)', 0)
+    tot_besoin = b_pf + b_rf
+    
+    f_pi = ppf_dict.get('Azote_deja_aborbé(Pi)', 0)
+    f_ri = ppf_dict.get('Reliquat_Sortie_Hiver(Ri)', 0)
+    f_mh = ppf_dict.get('Minéralisation_Humus(Mh)', 0)
+    f_mr = ppf_dict.get('Effet_précédent(Mr)', 0)
+    f_mrci = ppf_dict.get('Effet_CIPAN(MrCi)', 0)
+    f_nirr = ppf_dict.get('Fourniture_Irrigation(Nirr)', 0)
+    tot_fourni = f_pi + f_ri + f_mh + f_mr + f_mrci + f_nirr
+    
+    dose_x = ppf_dict.get('Dose_X', 0)
+    
+    col_w = [8*cm, 3*cm, 8*cm, 3*cm]
+    bilan_data = [
+        ['BESOINS', '', 'FOURNITURES', ''],
+        [f"Besoin Culture (Pf) : Objectif {ppf_dict.get('Objectif_Rendement_Qx_Ha', 0)} Qx", f"{b_pf:.1f}", "Azote déjà absorbé (Pi)", f"{f_pi:.1f}"],
+        ["Azote Fermeture Bilan (Rf)", f"{b_rf:.1f}", "Reliquat Sortie Hiver (Ri)", f"{f_ri:.1f}"],
+        ["", "", f"Minéralisation Humus (Mh) [{ppf_dict.get('Type_sol','')}]", f"{f_mh:.1f}"],
+        ["", "", f"Effet Précédent (Mr) [{ppf_dict.get('Precedent_Cultural','')}]", f"{f_mr:.1f}"],
+        ["", "", f"Effet CIPAN (MrCi) [{ppf_dict.get('CIPAN_Type','')}]", f"{f_mrci:.1f}"],
+        ["", "", "Fourniture Irrigation (Nirr)", f"{f_nirr:.1f}"],
+        ["TOTAL BESOINS", f"{tot_besoin:.1f}", "TOTAL FOURNITURES", f"{tot_fourni:.1f}"],
+    ]
+    
+    t_bilan = Table(bilan_data, colWidths=col_w)
+    t_bilan.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (1,0), colors.HexColor('#d9edf7')), # Light blue
+        ('BACKGROUND', (2,0), (3,0), colors.HexColor('#dff0d8')), # Light green
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+        ('ALIGN', (3,0), (3,-1), 'RIGHT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('BACKGROUND', (0,-1), (1,-1), colors.HexColor('#c4e3f3')),
+        ('BACKGROUND', (2,-1), (3,-1), colors.HexColor('#c8e5bc')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+    ]))
+    report.elements.append(t_bilan)
+    report.elements.append(Spacer(1, 15))
+    
+    dose_text = f"🎯 DOSE X CALCULÉE : {dose_x:.1f} Unités (kg N/ha)"
+    report.elements.append(Paragraph(dose_text, ParagraphStyle('DoseX', parent=report.styles['Heading2'], alignment=1, textColor=colors.HexColor('#2E7D32'))))
+    report.elements.append(Spacer(1, 20))
+    
+    # --- Tableau du Fractionnement Pévu ---
+    report.elements.append(Paragraph("<b>🛠️ Fractionnement / Apports Prévus</b>", report.styles['Heading3']))
+    
+    # Total Prévu
+    total_prevu = 0.0
+    
+    if interv_list:
+        frac_data = [['Date Prévue', 'Produit (Engrais)', 'Dose par Ha (Unités N)']]
+        for i in interv_list:
+            d_val = i.get('Dose_Ha', '0').replace('Unités', '').strip()
+            try: d_num = float(d_val)
+            except: d_num = 0.0
+            total_prevu += d_num
+            
+            frac_data.append([i.get('Date', ''), i.get('Produit', ''), f"{d_num:.1f} U"])
+            
+        frac_data.append(['TOTAL PRÉVU', '', f"{total_prevu:.1f} U"])
+        
+        t_frac = Table(frac_data, colWidths=[4*cm, 10*cm, 5*cm])
+        t_frac.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e0e0e0')),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.lightgrey),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ('TOPPADDING', (0,0), (-1,-1), 6),
+        ]))
+        report.elements.append(t_frac)
+    else:
+        report.elements.append(Paragraph("<i>Aucun apport prévu enregistré.</i>", report.styles['Normal']))
+        
+    report.elements.append(Spacer(1, 15))
+    
+    # Alert
+    if total_prevu > dose_x:
+        alert = f"⚠️ ATTENTION : La dose totale prévue ({total_prevu:.1f} U) dépasse la Dose X maximale réglementaire ({dose_x:.1f} U) !"
+        report.elements.append(Paragraph(alert, ParagraphStyle('Alert', parent=report.styles['Normal'], textColor=colors.red, fontName='Helvetica-Bold')))
+    elif total_prevu > 0:
+        alert = f"✅ La dose totale prévue ({total_prevu:.1f} U) respecte la Dose X calculée."
+        report.elements.append(Paragraph(alert, ParagraphStyle('Alert', parent=report.styles['Normal'], textColor=colors.HexColor('#2E7D32'), fontName='Helvetica-Bold')))
+        
+    # Build
+    try:
+        report.doc.build(report.elements)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        return pdf_bytes
+    except Exception as e:
+        print(f"Error generating PPF PDF: {e}")
+        return None
+
