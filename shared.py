@@ -3,7 +3,7 @@ import pandas as pd
 from data_loader import DataLoader
 import os
 
-APP_BASE_URL = "https://agri-automation-app-kwz7hjkyb8hjxwhe9w7rsv.streamlit.app"
+# Helper for E-Phy cloud storage
 EPHY_DRIVE_FOLDER_ID = "1YDTwRXHFTxPmM4QD84nTnQYmMZqz60dc"
 
 @st.cache_resource
@@ -32,13 +32,15 @@ def get_drive_uploader():
     uploader = DriveUploader(credentials_path=cred_path, credentials_dict=credentials_dict)
     return uploader if uploader.service else None
 
-# Hack to force reload of cached dataloader if it lacks new methods
-dl = get_dataloader()
-if dl and not hasattr(dl, "load_telepac_from_cloud"):
-    st.cache_resource.clear()
-    active_loader = get_dataloader()
-else:
-    active_loader = dl
+# Lazy check for loader capabilities
+def get_active_loader():
+    dl = get_dataloader()
+    if dl and not hasattr(dl, "load_telepac_from_cloud"):
+        st.cache_resource.clear()
+        return get_dataloader()
+    return dl
+
+active_loader = get_active_loader()
 
 def init_campaign_selector():
     if not active_loader:
