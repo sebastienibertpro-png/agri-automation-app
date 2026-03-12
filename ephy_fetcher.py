@@ -43,11 +43,15 @@ class EphyFetcher:
     Conçu pour être instancié une seule fois (ex: dans app.py ou session Streamlit).
     """
 
-    def __init__(self, auto_refresh: bool = True):
+    def __init__(self, auto_refresh: bool = False):
         os.makedirs(CACHE_DIR, exist_ok=True)
         self._df_produits: pd.DataFrame = pd.DataFrame()
         self._df_usages: pd.DataFrame = pd.DataFrame()
-        if auto_refresh:
+        
+        # Charger le cache existant s'il est là (silencieux)
+        self._load_cache()
+
+        if auto_refresh and not self._is_cache_fresh():
             self.refresh()
 
     # ------------------------------------------------------------------
@@ -526,7 +530,54 @@ class EphyFetcher:
             logger.error(f"Erreur chargement cache E-Phy: {e}")
 
     # ------------------------------------------------------------------
-    # 4. RECHERCHE PAR NOM COMMERCIAL
+    # 4. SYNCHRO GOOGLE DRIVE
+    # ------------------------------------------------------------------
+
+    def upload_to_drive(self, uploader, folder_id: str) -> bool:
+        """Téléverse les fichiers de cache locaux vers Google Drive."""
+        if not uploader:
+            return False
+        files_to_upload = [CACHE_PRODUITS, CACHE_USAGES, CACHE_DATE_FILE]
+        success = True
+        for f in files_to_upload:
+            if os.path.exists(f):
+                try:
+                    uploader.upload_file(f, folder_id)
+                except Exception as e:
+                    logger.error(f"Erreur upload {f} vers Drive: {e}")
+                    success = False
+        return success
+
+    def download_from_drive(self, uploader, folder_id: str) -> bool:
+        """Télécharge les derniers fichiers de cache depuis Google Drive."""
+        if not uploader:
+            return False
+        
+        # On définit les fichiers à récupérer
+        sync_map = {
+            "produits.parquet": CACHE_PRODUITS,
+            "usages.parquet": CACHE_USAGES,
+            "last_update.txt": CACHE_DATE_FILE
+        }
+        
+        success = True
+        for remote_name, local_path in sync_map.items():
+            try:
+                # Utilise drive_utils.DriveUploader.download_latest_file_from_folder
+                ok = uploader.download_latest_file_from_folder(folder_id, remote_name, local_path)
+                if not ok:
+                    success = False
+            except Exception as e:
+                logger.error(f"Erreur download {remote_name} depuis Drive: {e}")
+                success = False
+        
+        if success:
+            self._load_cache()
+            
+        return success
+
+    # ------------------------------------------------------------------
+    # 5. RECHERCHE PAR NOM COMMERCIAL
     # ------------------------------------------------------------------
 
     def search(self, nom_commercial: str, top_n: int = 5) -> list[dict]:
