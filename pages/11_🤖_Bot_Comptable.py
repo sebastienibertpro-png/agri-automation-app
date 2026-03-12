@@ -8,6 +8,9 @@ import time
 
 from shared import get_dataloader, get_drive_uploader
 from pdf_analyzer import PDFAnalyzer
+import traceback
+import io
+from googleapiclient.http import MediaIoBaseDownload
 
 # Configuration
 DRIVE_FOLDER_NAME = "08_Factures_Achats_Ventes" # Dossier parent
@@ -50,20 +53,53 @@ def process_invoices_ui():
     
     try:
         # 1. Obtenir les IDs des dossiers via le service drive de l'uploader
-        # On doit d'abord trouver le dossier parent
+        # On ajoute supportsAllDrives pour les dossiers partagés
         query_parent = f"name = '{DRIVE_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-        parent_results = uploader.service.files().list(q=query_parent, fields="files(id, name)").execute()
+        parent_results = uploader.service.files().list(
+            q=query_parent, 
+            fields="files(id, name)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute()
         parent_folders = parent_results.get('files', [])
         
         if not parent_folders:
             st.error(f"❌ Dossier parent '{DRIVE_FOLDER_NAME}' introuvable sur votre Drive.")
+            
+            # Aide au débogage : lister ce que le robot voit
+            with st.expander("🔍 Pourquoi mon dossier n'est pas trouvé ?", expanded=True):
+                st.write("Le robot (compte de service) ne voit que les dossiers partagés explicitement avec lui.")
+                st.write(f"Adresse du robot : `{st.secrets['gcp_service_account']['client_email']}`")
+                
+                if st.button("👁️ Lister les dossiers accessibles"):
+                    res = uploader.service.files().list(
+                        q="mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+                        pageSize=20,
+                        fields="files(name)",
+                        supportsAllDrives=True,
+                        includeItemsFromAllDrives=True
+                    ).execute()
+                    folders_seen = [f['name'] for f in res.get('files', [])]
+                    if folders_seen:
+                        st.write("Dossiers que le robot arrive à voir :")
+                        for f in folders_seen:
+                            st.write(f"- {f}")
+                        if DRIVE_FOLDER_NAME not in folders_seen:
+                            st.warning(f"⚠️ `{DRIVE_FOLDER_NAME}` n'est pas dans la liste. Vérifiez le partage !")
+                    else:
+                        st.warning("Le robot ne voit aucun dossier. Le partage n'a probablement pas été fait.")
             return
         
         parent_id = parent_folders[0]['id']
         
         # Trouver le sous-dossier A_Traiter
         query_sub = f"name = '{DRIVE_SUBFOLDER_NAME}' and '{parent_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-        sub_results = uploader.service.files().list(q=query_sub, fields="files(id, name)").execute()
+        sub_results = uploader.service.files().list(
+            q=query_sub, 
+            fields="files(id, name)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute()
         sub_folders = sub_results.get('files', [])
         
         if not sub_folders:
@@ -99,15 +135,26 @@ def process_invoices_ui():
                     
                     status_text.text(f"Traitement de {original_name} ({idx+1}/{len(files)})...")
                     
-                    # Téléchargement
+                    # Téléchargement robuste
                     local_path = os.path.join(download_dir, original_name)
-                    request = uploader.service.files().get_media(fileId=file_id)
-                    with open(local_path, 'wb') as fh:
-                        fh.write(request.execute())
+                    try:
+                        request = uploader.service.files().get_media(fileId=file_id)
+                        fh = io.FileIO(local_path, 'wb')
+                        downloader = MediaIoBaseDownload(fh, request)
+                        done = False
+                        while done is False:
+                            status, done = downloader.next_chunk()
+                    except Exception as e_dl:
+                        st.error(f"❌ Erreur téléchargement {original_name} : {e_dl}")
+                        continue
                     
                     # Analyse IA
                     with st.spinner(f"Analyse IA en cours pour {original_name}..."):
-                        rows_data = analyzer.analyze_invoice(local_path)
+                        try:
+                            rows_data = analyzer.analyze_invoice(local_path)
+                        except Exception as e_ia:
+                            st.error(f"❌ Erreur IA pour {original_name} : {e_ia}")
+                            rows_data = None
                     
                     if not rows_data:
                         st.error(f"⚠️ Échec analyse pour {original_name}")
@@ -134,25 +181,17 @@ def process_invoices_ui():
                             row.get("TVA_%", ""),
                             row.get("Montant_Total_Facture_TTC", ""),
                             str(len(rows_data)),
-                            "", # ID_Parcelle_Liée (Optionnel)
+                            "", # ID_Parcelle_Liée
                             "", # Affectation_Type
                             view_link,
                             ""  # Commentaires
                         ]
                         sheet_values.append(formatted_row)
                     
-                    # Insertion Sheets via DataLoader (on utilise le DataLoader partagé)
-                    loader = get_dataloader()
-                    if loader and loader.conn:
-                        # On réutilise une méthode d'insertion ou on en crée une propre
-                        # Pour simplifier, on concatène et update ACHAT_MASTER
-                        try:
-                            df_existing = loader.conn.read(worksheet=SHEET_NAME, ttl=0, spreadsheet=SPREADSHEET_ID)
-                            df_new = pd.DataFrame(sheet_values, columns=df_existing.columns[:len(sheet_values[0])])
-                            # S'assurer que les colonnes correspondent
-                            df_final = pd.concat([df_existing, df_new], ignore_index=True)
-                            loader.conn.update(worksheet=SHEET_NAME, data=df_final, spreadsheet=SPREADSHEET_ID)
-                            
+                    # Insertion via DataLoader
+                    try:
+                        loader = get_dataloader()
+                        if loader and loader.append_achat_master(sheet_values):
                             st.toast(f"✅ {original_name} ajouté au Sheet !")
                             
                             # Classement Drive
@@ -161,13 +200,12 @@ def process_invoices_ui():
                             short_year = str(compta_year)[-2:] if str(compta_year).isdigit() else "XX"
                             subfolder_name = f"{sous_cat}_compta{short_year}"
                             
-                            # Helper local pour dossier (car drive_utils est limité)
                             def get_or_create_sub(name, pid):
                                 q = f"name = '{name}' and '{pid}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-                                r = uploader.service.files().list(q=q).execute().get('files', [])
+                                r = uploader.service.files().list(q=q, supportsAllDrives=True, includeItemsFromAllDrives=True).execute().get('files', [])
                                 if r: return r[0]['id']
                                 meta = {'name': name, 'parents': [pid], 'mimeType': 'application/vnd.google-apps.folder'}
-                                return uploader.service.files().create(body=meta, fields='id').execute().get('id')
+                                return uploader.service.files().create(body=meta, fields='id', supportsAllDrives=True).execute().get('id')
 
                             year_fid = get_or_create_sub(target_folder_name, parent_id)
                             final_fid = get_or_create_sub(subfolder_name, year_fid)
@@ -176,7 +214,8 @@ def process_invoices_ui():
                             uploader.service.files().update(
                                 fileId=file_id,
                                 addParents=final_fid,
-                                removeParents=a_traiter_id
+                                removeParents=a_traiter_id,
+                                supportsAllDrives=True
                             ).execute()
                             
                             results_summary.append({
@@ -185,9 +224,12 @@ def process_invoices_ui():
                                 "Total TTC": first_row.get("Montant_Total_Facture_TTC"),
                                 "Statut": "Traité & Archivé"
                             })
+                        else:
+                            st.error(f"❌ Échec de l'insertion dans le Sheet pour {original_name}")
                             
-                        except Exception as e_sheet:
-                            st.error(f"❌ Erreur Sheets/Drive pour {original_name} : {e_sheet}")
+                    except Exception as e_sheet:
+                        st.error(f"❌ Erreur Sheets/Drive pour {original_name}")
+                        st.exception(e_sheet)
 
                     # Mise à jour barre
                     progress_bar.progress((idx + 1) / len(files))
