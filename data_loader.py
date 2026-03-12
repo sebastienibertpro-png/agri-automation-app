@@ -350,24 +350,37 @@ class DataLoader:
         def get_rank(p_item):
             # Try multiple keys for product name
             p_name = str(p_item.get('Produit', p_item.get('Nom_Produit', ''))).strip().lower()
-            form = form_map.get(p_name, '')
+            form_orig = form_map.get(p_name, '')
+            form_upper = form_orig.upper()
             
-            # --- CRITICAL FIX: Inject Formulation back into item ---
-            p_item['Formulation'] = form
-            # -------------------------------------------------------
+            # --- CRITICAL FIX: Abbreviate and Inject Formulation back into item ---
+            # Default to original if no match
+            short_form = form_orig
+            rank = 99
             
             # 1. Sachets
-            if 'SACHET' in form or 'HYDROSOLUBLE' in form or form in ['WS', 'SB']: return 1
-            # 2. WP / WG
-            if form in ['WP', 'WG', 'GR', 'SG', 'DG']: return 2
-            # 3. SC
-            if form in ['SC', 'CS', 'SE']: return 3
-            # 4. EC
-            if form in ['EC', 'EW', 'EO', 'ME']: return 4
-            # 5. SL
-            if form in ['SL', 'SP']: return 5
+            if any(k in form_upper for k in ['SACHET', 'HYDROSOLUBLE', 'WS', 'SB']): 
+                short_form = "Sachet"
+                rank = 1
+            # 2. WP / WG (Poudres / Granulés)
+            elif any(k in form_upper for k in ['POUDRE', 'GRANULE', 'WP', 'WG', 'SG', 'DG', 'GR']): 
+                short_form = "WG/WP"
+                rank = 2
+            # 3. SC (Suspensions)
+            elif any(k in form_upper for k in ['SUSPENSION', 'SC', 'CS', 'SE']): 
+                short_form = "SC"
+                rank = 3
+            # 4. Emulsions (EC)
+            elif any(k in form_upper for k in ['EMULSION', 'EC', 'EW', 'EO', 'ME']): 
+                short_form = "EC"
+                rank = 4
+            # 5. Solutions (SL)
+            elif any(k in form_upper for k in ['SOLUTION', 'LIQUIDE', 'SL', 'SP']): 
+                short_form = "SL"
+                rank = 5
             
-            return 99 # Unknown/Last
+            p_item['Formulation'] = short_form[:15] if len(short_form) > 15 else short_form
+            return rank
             
         return sorted(products_list, key=get_rank)
 
