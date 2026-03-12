@@ -179,6 +179,18 @@ class DataLoader:
             df = df[df['Campagne'] == int(campaign)]
         return df
 
+    def get_ref_gren_cipan(self):
+        return self._get_data("REF_GREN_CIPAN")
+        
+    def get_ref_gren_precedents(self):
+        return self._get_data("REF_GREN_Précédents")
+        
+    def get_ref_gren_humus(self):
+        return self._get_data("REF_GREN_Humus")
+        
+    def get_ref_gren_coef(self):
+        return self._get_data("REF_GREN_Coef")
+
     def get_consumption_data(self, campaign):
         """
         Calculates consumption per meter for a given campaign.
@@ -266,6 +278,26 @@ class DataLoader:
             df = df[df[status_col].astype(str).str.strip().str.lower().str.startswith("prév")]
         
         df = df[df['Nature_Intervention'] == "Traitement"]
+        return df
+
+    def get_planned_fertilization(self, campaign):
+        df = self.get_interventions()
+        if df.empty: return pd.DataFrame()
+        
+        # Filter Campaign
+        df['Campagne'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+        df = df[df['Campagne'] == int(campaign)]
+        
+        # Filter Planned & Fertilisation
+        status_col = None
+        for col in ['Stat_Intervention', 'Statut_Intervention', 'Statut', 'Etat']:
+            if col in df.columns:
+                status_col = col; break
+                
+        if status_col:
+            df = df[df[status_col].astype(str).str.strip().str.lower().str.startswith("prév")]
+            
+        df = df[df['Nature_Intervention'].astype(str).str.strip().str.lower() == "fertilisation"]
         return df
 
     def sort_products_by_formulation(self, products_list):
@@ -449,6 +481,56 @@ class DataLoader:
             
         except Exception as e:
             st.error(f"Erreur lors de l'insertion en masse : {e}")
+            return False
+
+    def update_ppf(self, ppf_dict: dict) -> bool:
+        """
+        Inserts or updates a PPF entry for a given Campaign and Parcel.
+        Requires Cloud Connection.
+        """
+        if not self.conn:
+            st.error("Écriture impossible en local (Lecture seule).")
+            return False
+        try:
+            try:
+                df = self.conn.read(worksheet="PPF", ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            except Exception:
+                # If the tab does not exist, we cannot safely initialize it without full context.
+                # Assuming PPF tab exists as stated.
+                st.error("L'onglet PPF est introuvable.")
+                return False
+
+            campagne = str(ppf_dict.get("Campagne", "")).strip()
+            parcelle = str(ppf_dict.get("ID_Parcelle", "")).strip()
+            
+            if not campagne or not parcelle:
+                st.error("Campagne et ID_Parcelle sont obligatoires pour sauvegarder.")
+                return False
+
+            # Ensure all dictionary keys exist in the DF
+            for col in ppf_dict:
+                if col not in df.columns:
+                    df[col] = ""
+
+            # Check for existing match
+            mask = (df["Campagne"].astype(str).str.strip() == campagne) & \
+                   (df["ID_Parcelle"].astype(str).str.strip() == parcelle)
+
+            new_row = pd.DataFrame([ppf_dict])
+
+            if mask.any():
+                idx = df[mask].index[0]
+                for col in ppf_dict:
+                    df.at[idx, col] = ppf_dict[col]
+            else:
+                df = pd.concat([df, new_row], ignore_index=True)
+
+            self.conn.update(worksheet="PPF", data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop("PPF", None)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Erreur écriture PPF : {e}")
             return False
 
     # -----------------------------------------------------------------------
