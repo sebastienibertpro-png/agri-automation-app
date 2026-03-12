@@ -120,17 +120,25 @@ elif saved_file_path:
     # Utiliser le fichier précédemment sauvegardé localement
     file_to_process = saved_file_path
     file_name = os.path.basename(saved_file_path)
-    st.sidebar.info(f"Fichier local chargé : {file_name}")
+    # Ne pas afficher de message pour ne pas polluer l'UI, on le charge silencieusement.
 else:
     # Pas de fichier local, tenter de charger depuis le Cloud
     with st.spinner("Recherche des contours depuis le Cloud..."):
         geojson_str = active_loader.load_telepac_from_cloud(selected_campaign)
-        if geojson_str:
-            # Reconstruire un GDF
-            import json
-            telepac_gdf = gpd.GeoDataFrame.from_features(json.loads(geojson_str)["features"])
-            telepac_gdf.set_crs(epsg=4326, inplace=True)
-            st.sidebar.info("Cartographie chargée depuis le Cloud ☁️")
+        if geojson_str and len(geojson_str) > 50: # Ensure valid length
+            try:
+                # Sauvegarder localement pour les prochaines exécutions (Cache)
+                local_cache_path = os.path.join(MAP_SAVE_DIR, f"telepac_{selected_campaign}.geojson")
+                with open(local_cache_path, "w", encoding="utf-8") as f:
+                     f.write(geojson_str)
+                
+                import json
+                telepac_gdf = gpd.GeoDataFrame.from_features(json.loads(geojson_str)["features"])
+                telepac_gdf.set_crs(epsg=4326, inplace=True)
+                st.sidebar.success("Cartographie synchronisée depuis le Cloud ☁️")
+            except Exception as e:
+                st.sidebar.error(f"Erreur lors de la lecture des données Cloud : {e}")
+                telepac_gdf = None
 
 # N'extraire/lire que si on n'a pas déjà récupéré du Cloud (telepac_gdf est None)
 if file_to_process is not None and telepac_gdf is None:
