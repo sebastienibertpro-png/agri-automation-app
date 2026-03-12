@@ -1314,6 +1314,7 @@ def generate_ppf_pdf(ppf_dict, interv_list):
     """
     buffer = io.BytesIO()
     report = ReportGenerator(buffer)
+    report.doc.pagesize = landscape(A4) # Force Landscape
     
     # --- Title & Header ---
     campagne = ppf_dict.get('Campagne', 'N/A')
@@ -1353,7 +1354,8 @@ def generate_ppf_pdf(ppf_dict, interv_list):
     
     dose_x = ppf_dict.get('Dose_X', 0)
     
-    col_w = [8*cm, 3*cm, 8*cm, 3*cm]
+    # Landscape width is ~26-27cm usable. 
+    col_w = [9*cm, 3.5*cm, 9*cm, 3.5*cm]
     bilan_data = [
         ['BESOINS', '', 'FOURNITURES', ''],
         [f"Besoin Culture (Pf) : Objectif {ppf_dict.get('Objectif_Rendement_Qx_Ha', 0)} Qx", f"{b_pf:.1f}", "Azote déjà absorbé (Pi)", f"{f_pi:.1f}"],
@@ -1407,7 +1409,7 @@ def generate_ppf_pdf(ppf_dict, interv_list):
             
         frac_data.append(['TOTAL PRÉVU', '', f"{total_prevu:.1f} U"])
         
-        t_frac = Table(frac_data, colWidths=[4*cm, 10*cm, 5*cm])
+        t_frac = Table(frac_data, colWidths=[6*cm, 12*cm, 7*cm])
         t_frac.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e0e0e0')),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
