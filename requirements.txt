@@ -16,3 +16,4 @@ streamlit-folium
 geopandas
 plotly
 google-generativeai
+streamlit-js-eval
