@@ -585,6 +585,20 @@ class DataLoader:
             st.error(f"Erreur écriture PPF : {e}")
             return False
 
+    def get_observations(self, campagne=None):
+        """
+        Retrieves field observations from JOURNAL_INTERVENTION.
+        """
+        df = self.get_interventions()
+        if df.empty:
+            return df
+        
+        mask = df['Nature_Intervention'].astype(str).str.upper() == 'OBSERVATION'
+        if campagne:
+            mask = mask & (df['Campagne'].astype(str) == str(campagne))
+            
+        return df[mask].copy()
+
     # -----------------------------------------------------------------------
     # RÉFÉRENTIEL PHYTO — Écriture REF_INTRANTS + REF_USAGES_PHYTO
     # -----------------------------------------------------------------------
