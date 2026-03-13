@@ -2,11 +2,24 @@ import streamlit as st
 import pandas as pd
 import string
 import random
+from datetime import datetime
 from shared import init_campaign_selector
 
 st.set_page_config(page_title="Saisie Intervention", page_icon="✍️", layout="centered")
 
-st.title("✍️ Saisie Rapide Multi-Interventions")
+# --- GESTION DU MODE ÉDITION ---
+is_edit_mode = False
+edit_data = {}
+if "edit_intervention" in st.session_state and st.session_state.edit_intervention:
+    is_edit_mode = True
+    edit_data = st.session_state.edit_intervention
+    st.title("✍️ Modifier l'Intervention")
+    st.info(f"Mode Édition activé pour l'intervention du {edit_data.get('Date', '')} sur {edit_data.get('ID_Parcelle', '')}")
+    if st.button("❌ Annuler l'édition"):
+        st.session_state.edit_intervention = None
+        st.rerun()
+else:
+    st.title("✍️ Saisie Rapide Multi-Interventions")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
@@ -17,41 +30,64 @@ nature_options = ["Traitement", "Fertilisation", "Semis", "Déchaumage", "Prépa
 
 st.markdown("##### 1. Informations Générales")
 
-nature_interv = st.selectbox("Nature de l'intervention", nature_options)
+# Détermination des index par défaut si mode édition
+def get_index(options, value):
+    try: return options.index(value)
+    except: return 0
+
+default_nature = get_index(nature_options, edit_data.get('Nature_Intervention', 'Traitement'))
+nature_interv = st.selectbox("Nature de l'intervention", nature_options, index=default_nature)
 
 col_g1, col_g2, col_g3 = st.columns(3)
 with col_g1:
-    date_interv = st.date_input("Date de l'intervention")
+    try:
+        default_date = datetime.strptime(edit_data['Date'], '%d/%m/%Y').date() if is_edit_mode else datetime.now().date()
+    except:
+        default_date = datetime.now().date()
+    date_interv = st.date_input("Date de l'intervention", value=default_date)
 with col_g2:
-    statut = st.selectbox("Statut", ["Prévu", "Réalisé"])
+    default_statut = get_index(["Prévu", "Réalisé"], edit_data.get('Statut_Intervention', 'Réalisé'))
+    statut = st.selectbox("Statut", ["Prévu", "Réalisé"], index=default_statut)
 with col_g3:
-    campagne_saisie = st.number_input("Campagne", value=int(selected_campaign), format="%d")
+    default_campagne = int(edit_data.get('Campagne', selected_campaign))
+    campagne_saisie = st.number_input("Campagne", value=default_campagne, format="%d")
     
 col_m1, col_m2, col_m3 = st.columns(3)
 with col_m1:
     if nature_interv == "Traitement":
-        type_interv = st.selectbox("Type d'intervention", ["Herbicide", "Fongicide", "Insecticide", "Régulateur", "Autre"])
+        default_type = get_index(["Herbicide", "Fongicide", "Insecticide", "Régulateur", "Autre"], edit_data.get('Type_Intervention', 'Herbicide'))
+        type_interv = st.selectbox("Type d'intervention", ["Herbicide", "Fongicide", "Insecticide", "Régulateur", "Autre"], index=default_type)
     elif nature_interv == "Fertilisation":
-        type_interv = st.selectbox("Type d'intervention", ["Minérale", "Organique", "Foliaire"])
+        default_type = get_index(["Minérale", "Organique", "Foliaire"], edit_data.get('Type_Intervention', 'Minérale'))
+        type_interv = st.selectbox("Type d'intervention", ["Minérale", "Organique", "Foliaire"], index=default_type)
     else:
-        type_interv = st.text_input("Type d'intervention", disabled=True)
+        type_interv = st.text_input("Type d'intervention", value=edit_data.get('Type_Intervention', ''), disabled=True)
         
 with col_m2:
-    tracteur = st.selectbox("Tracteur", ["130_CVX", "220_CVX", "Berthoud_Raptor", "Axial_5140"])
+    tracteur_options = ["130_CVX", "220_CVX", "Berthoud_Raptor", "Axial_5140"]
+    default_tracteur = get_index(tracteur_options, edit_data.get('Tracteur', '130_CVX'))
+    tracteur = st.selectbox("Tracteur", tracteur_options, index=default_tracteur)
 with col_m3:
-    outil = st.selectbox("Outil", ["- Aucun -", "Agata", "Ependeur_Engrais", "DDI", "Rotative", "Cultivateur_Bonnel", "Bineuse", "Fissurateur", "Rabe"])
+    outil_options = ["- Aucun -", "Agata", "Ependeur_Engrais", "DDI", "Rotative", "Cultivateur_Bonnel", "Bineuse", "Fissurateur", "Rabe"]
+    default_outil = get_index(outil_options, edit_data.get('Outil', '- Aucun -'))
+    outil = st.selectbox("Outil", outil_options, index=default_outil)
     
-stade = st.selectbox("Stade Culture", ["Pré-levée", "Levée", "2F", "4-6F", "8-10F", "12F", "Floraison", "Tallage", "Epis 1cm", "Montaison", "Maturité", "Récolte"])
+stade_options = ["Pré-levée", "Levée", "2F", "4-6F", "8-10F", "12F", "Floraison", "Tallage", "Epis 1cm", "Montaison", "Maturité", "Récolte"]
+default_stade = get_index(stade_options, edit_data.get('Stade_Culture', 'Tallage'))
+stade = st.selectbox("Stade Culture", stade_options, index=default_stade)
 
 if nature_interv == "Traitement":
-    volume_bouillie = st.number_input("Volume Bouillie (L/ha)", min_value=0.0, value=100.0, step=10.0)
+    try: default_vol = float(edit_data.get('Volume_Bouillie_L_Ha', 100.0) or 100.0)
+    except: default_vol = 100.0
+    volume_bouillie = st.number_input("Volume Bouillie (L/ha)", min_value=0.0, value=default_vol, step=10.0)
 else:
     volume_bouillie = 0.0
     
-observations = st.text_input("Observations")
+observations = st.text_input("Observations", value=edit_data.get('Observations', ''))
 
 st.markdown("##### 2. Choix des Parcelles")
-selected_p_for_entry = st.multiselect("Parcelles concernées", available_parcelles)
+default_parcelles = [edit_data['ID_Parcelle']] if is_edit_mode else []
+selected_p_for_entry = st.multiselect("Parcelles concernées", available_parcelles, default=default_parcelles)
 
 parcelles_data = [] 
 if selected_p_for_entry:
@@ -61,10 +97,16 @@ if selected_p_for_entry:
     for i, p_id in enumerate(selected_p_for_entry):
         p_meta = metadata.get(p_id, {})
         culture_ref = p_meta.get('Culture', 'Inconnue')
-        try:
-            surf_ref = float(str(p_meta.get('Surface', 0.0)).replace(',', '.'))
-        except:
-            surf_ref = 0.0
+        
+        # En mode édition, si c'est la parcelle d'origine, on prend sa surface saisie
+        if is_edit_mode and p_id == edit_data['ID_Parcelle']:
+            try: surf_ref = float(edit_data.get('Surface_Travaillée_Ha', 0.0) or 0.0)
+            except: surf_ref = 0.0
+        else:
+            try:
+                surf_ref = float(str(p_meta.get('Surface', 0.0)).replace(',', '.'))
+            except:
+                surf_ref = 0.0
             
         with cols[i % 4]:
              surf_input = st.number_input(f"{p_id} ({culture_ref})", value=surf_ref, step=0.5, key=f"surf_input_{p_id}")
@@ -80,6 +122,13 @@ try:
      df_intrants = active_loader._get_data("REF_INTRANTS")
 except Exception:
      df_intrants = pd.DataFrame()
+
+# Pré-remplissage des produits en mode édition
+raw_products = []
+if is_edit_mode:
+    df_raw = active_loader.get_interventions()
+    mask = df_raw['ID_Intervention'].isin(edit_data['ID_Intervention'])
+    raw_products = df_raw[mask].to_dict('records')
 
 if nature_interv == "Traitement":
     liste_produits = []
@@ -119,17 +168,33 @@ if nature_interv == "Traitement":
          
     for i in range(1, 6): 
         c1, c2, c3, c4 = st.columns([2, 1.5, 1, 1])
+        
+        # Valeurs par défaut en mode édition
+        p_val = "- Aucun -"
+        c_val = ""
+        d_val = 0.0
+        u_val = "L/ha"
+        
+        if is_edit_mode and (i-1) < len(raw_products):
+            row_p = raw_products[i-1]
+            p_val = row_p.get('Nom_Produit', "- Aucun -")
+            c_val = row_p.get('Cible', "")
+            try: d_val = float(row_p.get('Dose_Ha', 0.0))
+            except: d_val = 0.0
+            u_val = row_p.get('Unité_Dose', "L/ha")
+
         with c1:
-            prod = st.selectbox(f"Produit {i}", ["- Aucun -"] + liste_produits, key=f"prod_name_{i}")
+            prod = st.selectbox(f"Produit {i}", ["- Aucun -"] + liste_produits, key=f"prod_name_{i}", index=get_index(["- Aucun -"] + liste_produits, p_val))
         
         cible_val = ""
         if prod != "- Aucun -":
             cibles_dispo = get_cibles_for_product(prod)
             with c2:
                 if cibles_dispo:
-                    cible_val = st.selectbox(f"Cible {i}", [""] + cibles_dispo, key=f"prod_cible_{i}")
+                    cible_val = st.selectbox(f"Cible {i}", [""] + cibles_dispo, key=f"prod_cible_{i}", index=get_index([""] + cibles_dispo, c_val))
                 else:
-                    cible_val = st.text_input(f"Cible {i}", key=f"prod_cible_txt_{i}", placeholder="Saisir la cible")
+                    cible_val = st.text_input(f"Cible {i}", key=f"prod_cible_txt_{i}", value=c_val)
+            
             auto_dose, auto_unite = get_dose_for_cible(prod, cible_val) if cible_val else (None, None)
         else:
             with c2: st.text_input(f"Cible {i}", key=f"prod_cible_empty_{i}", disabled=True)
@@ -138,16 +203,22 @@ if nature_interv == "Traitement":
         col_key_prod = f"last_prod_{i}"
         col_key_cible = f"last_cible_{i}"
         
-        if col_key_prod not in st.session_state: st.session_state[col_key_prod] = "- Aucun -"
-        if col_key_cible not in st.session_state: st.session_state[col_key_cible] = ""
+        if col_key_prod not in st.session_state: st.session_state[col_key_prod] = p_val
+        if col_key_cible not in st.session_state: st.session_state[col_key_cible] = c_val
             
         unite_options = ["L/ha", "Kg/ha", "g/ha"]
 
+        # Si l'utilisateur change de produit/cible, on applique la dose auto
         if st.session_state[col_key_prod] != prod or st.session_state[col_key_cible] != cible_val:
             st.session_state[col_key_prod] = prod
             st.session_state[col_key_cible] = cible_val
             st.session_state[f"prod_dose_{i}"] = float(auto_dose) if auto_dose is not None else 0.0
             st.session_state[f"prod_unite_{i}"] = auto_unite if auto_unite in unite_options else "L/ha"
+        elif is_edit_mode and f"first_load_{i}" not in st.session_state:
+            # Premier chargement en mode édition : on force les valeurs de l'intervention
+            st.session_state[f"prod_dose_{i}"] = d_val
+            st.session_state[f"prod_unite_{i}"] = u_val
+            st.session_state[f"first_load_{i}"] = True
 
         with c3:
             dose = st.number_input(f"Dose/ha", min_value=0.0, step=0.1, key=f"prod_dose_{i}")
@@ -167,13 +238,25 @@ elif nature_interv == "Fertilisation":
              
     if not liste_engrais: liste_engrais = ["(Saisir manuellement)"]
     
+    # Defaults
+    e_val = "- Aucun -"
+    d_f_val = 100.0
+    u_f_val = "Kg/ha"
+    
+    if is_edit_mode and raw_products:
+        row_e = raw_products[0]
+        e_val = row_e.get('Nom_Produit', "- Aucun -")
+        try: d_f_val = float(row_e.get('Dose_Ha', 0.0))
+        except: d_f_val = 100.0
+        u_f_val = row_e.get('Unité_Dose', "Kg/ha")
+
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
-         engrais_prod = st.selectbox("Engrais", ["- Aucun -"] + liste_engrais)
+         engrais_prod = st.selectbox("Engrais", ["- Aucun -"] + liste_engrais, index=get_index(["- Aucun -"] + liste_engrais, e_val))
     with c2:
-         dose_ferti = st.number_input("Dose/ha", min_value=0.0, step=10.0, value=100.0)
+         dose_ferti = st.number_input("Dose/ha", min_value=0.0, step=10.0, value=d_f_val)
     with c3:
-         unite_ferti = st.selectbox("Unité", ["Kg/ha", "L/ha", "T/ha"])
+         unite_ferti = st.selectbox("Unité", ["Kg/ha", "L/ha", "T/ha"], index=get_index(["Kg/ha", "L/ha", "T/ha"], u_f_val))
          
     pct_n, pct_p, pct_k = 0.0, 0.0, 0.0
     if engrais_prod != "- Aucun -" and not df_intrants.empty:
@@ -213,12 +296,26 @@ elif nature_interv == "Semis":
          else:
              liste_semences = sorted(df_intrants['Nom_Produit'].dropna().unique().tolist())
     if not liste_semences: liste_semences = ["(Saisir manuellement)"]
+    
+    s_val = "- Aucun -"
+    dens_val = 0.0
+    u_dens_val = "Grains/m²"
+    pmg_val = 0.0
+    
+    if is_edit_mode and raw_products:
+        row_s = raw_products[0]
+        s_val = row_s.get('Nom_Produit', "- Aucun -")
+        try: dens_val = float(row_s.get('Densité_Semis', 0.0))
+        except: dens_val = 0.0
+        u_dens_val = row_s.get('Unité_Densité', "Grains/m²")
+        try: pmg_val = float(row_s.get('PMG', 0.0))
+        except: pmg_val = 0.0
              
     c1, c2, c3, c4 = st.columns(4)
-    with c1: semence_prod = st.selectbox("Semence / Variété", ["- Aucun -"] + liste_semences)
-    with c2: densite = st.number_input("Densité (Unité/ha)", min_value=0.0, step=1.0)
-    with c3: unite_densite = st.selectbox("Unité Semis", ["Grains/m²", "Doses/ha", "Kg/ha"])
-    with c4: pmg = st.number_input("PMG (g)", min_value=0.0, step=1.0)
+    with c1: semence_prod = st.selectbox("Semence / Variété", ["- Aucun -"] + liste_semences, index=get_index(["- Aucun -"] + liste_semences, s_val))
+    with c2: densite = st.number_input("Densité (Unité/ha)", min_value=0.0, step=1.0, value=dens_val)
+    with c3: unite_densite = st.selectbox("Unité Semis", ["Grains/m²", "Doses/ha", "Kg/ha"], index=get_index(["Grains/m²", "Doses/ha", "Kg/ha"], u_dens_val))
+    with c4: pmg = st.number_input("PMG (g)", min_value=0.0, step=1.0, value=pmg_val)
     
     st.markdown("##### Produits Associés au Semis (Optionnel)")
     liste_autres = []
@@ -227,14 +324,26 @@ elif nature_interv == "Semis":
     if not liste_autres: liste_autres = ["(Saisir manuellement)"]
     
     semis_assoc_prods = []
+    assoc_rows = raw_products[1:] if is_edit_mode else []
+    
     for i in range(1, 4):
         c_p1, c_p2, c_p3 = st.columns([2, 1, 1])
+        ap_val = "- Aucun -"
+        ad_val = 0.0
+        au_val = "Kg/ha"
+        if (i-1) < len(assoc_rows):
+            r_ap = assoc_rows[i-1]
+            ap_val = r_ap.get('Nom_Produit', "- Aucun -")
+            try: ad_val = float(r_ap.get('Dose_Ha', 0.0))
+            except: ad_val = 0.0
+            au_val = r_ap.get('Unité_Dose', "Kg/ha")
+
         with c_p1:
-            p_nom = st.selectbox(f"Produit Associé {i}", ["- Aucun -"] + liste_autres, key=f"semis_prod_{i}")
+            p_nom = st.selectbox(f"Produit Associé {i}", ["- Aucun -"] + liste_autres, key=f"semis_prod_{i}", index=get_index(["- Aucun -"] + liste_autres, ap_val))
         with c_p2:
-            p_dose = st.number_input(f"Dose/ha {i}", min_value=0.0, step=0.1, key=f"semis_dose_{i}")
+            p_dose = st.number_input(f"Dose/ha {i}", min_value=0.0, step=0.1, key=f"semis_dose_{i}", value=ad_val)
         with c_p3:
-            p_unite = st.selectbox(f"Unité {i}", ["Kg/ha", "L/ha", "g/ha"], key=f"semis_unite_{i}")
+            p_unite = st.selectbox(f"Unité {i}", ["Kg/ha", "L/ha", "g/ha"], key=f"semis_unite_{i}", index=get_index(["Kg/ha", "L/ha", "g/ha"], au_val))
             
         if p_nom != "- Aucun -":
             pct_n, pct_p, pct_k = 0.0, 0.0, 0.0
@@ -251,57 +360,42 @@ elif nature_interv == "Semis":
                      pct_p = get_safely_p('Element_P')
                      pct_k = get_safely_p('Element_K')
             
-            def get_npk_ratio(val):
+            def get_npk_ratio_s(val):
                 return val if abs(val) <= 1.0 and val != 0 else val / 100.0
 
-            n_ha = round(p_dose * get_npk_ratio(pct_n), 1)
-            p_ha = round(p_dose * get_npk_ratio(pct_p), 1)
-            k_ha = round(p_dose * get_npk_ratio(pct_k), 1)
-            
-            semis_assoc_prods.append({
-                'nom': p_nom, 'dose': p_dose, 'unite': p_unite,
-                'N_ha': n_ha, 'P_ha': p_ha, 'K_ha': k_ha
-            })
+            n_ha = round(p_dose * get_npk_ratio_s(pct_n), 1)
+            p_ha = round(p_dose * get_npk_ratio_s(pct_p), 1)
+            k_ha = round(p_dose * get_npk_ratio_s(pct_k), 1)
+            semis_assoc_prods.append({'nom': p_nom, 'dose': p_dose, 'unite': p_unite, 'N_ha': n_ha, 'P_ha': p_ha, 'K_ha': k_ha})
     
     if semence_prod != "- Aucun -":
-         semis_data = {
-             'nom': semence_prod, 'densite': densite, 'unite': unite_densite, 'pmg': pmg,
-             'assoc_prods': semis_assoc_prods
-         }
+         semis_data = {'nom': semence_prod, 'densite': densite, 'unite': unite_densite, 'pmg': pmg, 'assoc_prods': semis_assoc_prods}
 
 elif nature_interv == "Récolte":
+    r_val = ""
+    rdt_val = 0.0
+    h_val = 14.0
+    ps_val = 76.0
+    if is_edit_mode and raw_products:
+        row_r = raw_products[0]
+        r_val = row_r.get('Produit_Récolté', "")
+        try: rdt_val = float(row_r.get('Rendement_Ha', 0.0))
+        except: rdt_val = 0.0
+        try: h_val = float(row_r.get('Humidité_récolte', 14.0))
+        except: h_val = 14.0
+        try: ps_val = float(row_r.get('PS', 76.0))
+        except: ps_val = 76.0
+
     c1, c2, c3, c4 = st.columns(4)
-    with c1: prod_recolte = st.text_input("Produit Récolté", placeholder="Ex: Blé Tendre")
-    with c2: rdt_ha = st.number_input("Rendement (Qx/ha ou T/ha)", min_value=0.0, step=0.1)
-    with c3: humidite = st.number_input("Humidité (%)", min_value=0.0, value=14.0, step=0.1)
-    with c4: ps = st.number_input("PS", min_value=0.0, value=76.0, step=0.1)
-    
-    if prod_recolte:
-         recolte_data = {
-             'produit': prod_recolte, 'rendement': rdt_ha, 'humidite': humidite, 'ps': ps
-         }
-         
-elif nature_interv in ["Déchaumage", "Préparation Printemps", "Binage", "Fissuration"]:
-    st.info(f"Aucun produit nécessaire pour l'intervention : {nature_interv}.")
+    with c1: prod_recolte = st.text_input("Produit Récolté", value=r_val, placeholder="Ex: Blé Tendre")
+    with c2: rdt_ha = st.number_input("Rendement (Qx/ha ou T/ha)", min_value=0.0, step=0.1, value=rdt_val)
+    with c3: humidite = st.number_input("Humidité (%)", min_value=0.0, value=h_val, step=0.1)
+    with c4: ps = st.number_input("PS", min_value=0.0, value=ps_val, step=0.1)
+    if prod_recolte: recolte_data = {'produit': prod_recolte, 'rendement': rdt_ha, 'humidite': humidite, 'ps': ps}
 
 st.markdown("<br>", unsafe_allow_html=True)
-
-# Generate Button styling
-st.markdown("""
-<style>
-    .stButton>button {
-        width: 100%;
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 8px;
-    }
-    .stButton>button:hover {
-        background-color: #45a049;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-submitted = st.button(f"Enregistrer ({nature_interv}) 🚀")
+btn_label = "Mettre à jour l'intervention 🔄" if is_edit_mode else f"Enregistrer ({nature_interv}) 🚀"
+submitted = st.button(btn_label)
 
 if submitted:
     if not selected_p_for_entry:
@@ -315,103 +409,67 @@ if submitted:
     else:
          rows_to_insert = []
          for p in parcelles_data:
-              uid = generate_intervention_id()
-              
+              uid = edit_data.get('ID_Intervention')[0] if is_edit_mode and isinstance(edit_data.get('ID_Intervention'), list) else (edit_data.get('ID_Intervention') or generate_intervention_id())
+              if len(parcelles_data) > 1 and is_edit_mode: uid = generate_intervention_id() 
+
               base_row = {
-                  'ID_Intervention': uid,
-                  'ID_Parcelle': p['id'],
-                  'Campagne': campagne_saisie,
-                  'Date': date_interv.strftime('%d/%m/%Y'),
-                  'Statut_Intervention': statut,
-                  'Nature_Intervention': nature_interv,
-                  'Type_Intervention': type_interv,
-                  'Culture': p['culture'],
-                  'Surface_Travaillée_Ha': p['surface'],
-                  'Tracteur': tracteur,
-                  'Outil': outil if outil != "- Aucun -" else "",
-                  'Stade_Culture': stade,
-                  'Observations': observations,
+                  'ID_Intervention': uid, 'ID_Parcelle': p['id'], 'Campagne': campagne_saisie,
+                  'Date': date_interv.strftime('%d/%m/%Y'), 'Statut_Intervention': statut,
+                  'Nature_Intervention': nature_interv, 'Type_Intervention': type_interv,
+                  'Culture': p['culture'], 'Surface_Travaillée_Ha': p['surface'],
+                  'Tracteur': tracteur, 'Outil': outil if outil != "- Aucun -" else "",
+                  'Stade_Culture': stade, 'Observations': observations,
                   'Nom_Produit': '', 'Cible': '', 'Dose_Ha': '', 'Unité_Dose': '', 'Quantité_Totale_Produit': '', 'Unité_Quantité': '',
-                  'N/ha': '', 'P/ha': '', 'K/ha': '',
-                  'Volume_Bouillie_L_Ha': volume_bouillie if volume_bouillie > 0 else '', 'Volume_Total_Bouillie_L': '',
-                  'Densité_Semis': '', 'Unité_Densité': '', 'PMG': '', 'Quantité_semence_totale': '',
+                  'N/ha': '', 'P/ha': '', 'K/ha': '', 'Volume_Bouillie_L_Ha': volume_bouillie if volume_bouillie > 0 else '',
+                  'Volume_Total_Bouillie_L': '', 'Densité_Semis': '', 'Unité_Densité': '', 'PMG': '', 'Quantité_semence_totale': '',
                   'Produit_Récolté': '', 'Rendement_Ha': '', 'Humidité_récolte': '', 'PS': '', 'Quantité_Récoltée_Totale': ''
               }
               
               if nature_interv == "Traitement":
                   for prod in produits_data:
                        row = base_row.copy()
-                       row['Nom_Produit'] = prod['nom']
-                       row['Cible'] = prod.get('cible', '')
-                       row['Dose_Ha'] = prod['dose']
-                       row['Unité_Dose'] = prod['unite']
+                       row['Nom_Produit'], row['Cible'], row['Dose_Ha'], row['Unité_Dose'] = prod['nom'], prod.get('cible', ''), prod['dose'], prod['unite']
                        row['Quantité_Totale_Produit'] = round(prod['dose'] * p['surface'], 2)
                        row['Unité_Quantité'] = str(prod['unite']).replace('/ha', '').replace('/Ha', '')
                        row['Volume_Total_Bouillie_L'] = round(volume_bouillie * p['surface'], 2)
                        rows_to_insert.append(row)
-                       
               elif nature_interv == "Fertilisation":
                   for prod in produits_data:
                        row = base_row.copy()
-                       row['Nom_Produit'] = prod['nom']
-                       row['Dose_Ha'] = prod['dose']
-                       row['Unité_Dose'] = prod['unite']
+                       row['Nom_Produit'], row['Dose_Ha'], row['Unité_Dose'] = prod['nom'], prod['dose'], prod['unite']
                        row['Quantité_Totale_Produit'] = round(prod['dose'] * p['surface'], 2)
                        row['Unité_Quantité'] = str(prod['unite']).replace('/ha', '').replace('/Ha', '')
-                       row['N/ha'] = prod['N_ha']
-                       row['P/ha'] = prod['P_ha']
-                       row['K/ha'] = prod['K_ha']
+                       row['N/ha'], row['P/ha'], row['K/ha'] = prod['N_ha'], prod['P_ha'], prod['K_ha']
                        rows_to_insert.append(row)
-                       
               elif nature_interv == "Semis":
                   row = base_row.copy()
-                  row['Nom_Produit'] = semis_data['nom']
-                  row['Densité_Semis'] = semis_data['densite']
-                  row['Unité_Densité'] = semis_data['unite']
-                  row['PMG'] = semis_data['pmg']
-                  
-                  if semis_data['unite'] == "Kg/ha":
-                      qte = semis_data['densite'] * p['surface']
-                  elif semis_data['unite'] == "Doses/ha":
-                      qte = semis_data['densite'] * p['surface'] 
-                  else: 
-                      if semis_data['pmg'] > 0:
-                           kg_ha = semis_data['densite'] * 10000 * semis_data['pmg'] / 1000000
-                           qte = kg_ha * p['surface']
-                      else: qte = 0
+                  row['Nom_Produit'], row['Densité_Semis'], row['Unité_Densité'], row['PMG'] = semis_data['nom'], semis_data['densite'], semis_data['unite'], semis_data['pmg']
+                  if semis_data['unite'] == "Kg/ha": qte = semis_data['densite'] * p['surface']
+                  elif semis_data['unite'] == "Doses/ha": qte = semis_data['densite'] * p['surface'] 
+                  else: qte = (semis_data['densite'] * 10000 * semis_data['pmg'] / 1000000) * p['surface'] if semis_data['pmg'] > 0 else 0
                   row['Quantité_semence_totale'] = round(qte, 2)
                   rows_to_insert.append(row)
-                  
                   for p_assoc in semis_data.get('assoc_prods', []):
                        row_p = base_row.copy()
-                       row_p['Nom_Produit'] = p_assoc['nom']
-                       row_p['Dose_Ha'] = p_assoc['dose']
-                       row_p['Unité_Dose'] = p_assoc['unite']
+                       row_p['Nom_Produit'], row_p['Dose_Ha'], row_p['Unité_Dose'] = p_assoc['nom'], p_assoc['dose'], p_assoc['unite']
                        row_p['Quantité_Totale_Produit'] = round(p_assoc['dose'] * p['surface'], 2)
                        row_p['Unité_Quantité'] = str(p_assoc['unite']).replace('/ha', '').replace('/Ha', '')
-                       row_p['N/ha'] = p_assoc['N_ha']
-                       row_p['P/ha'] = p_assoc['P_ha']
-                       row_p['K/ha'] = p_assoc['K_ha']
+                       row_p['N/ha'], row_p['P/ha'], row_p['K/ha'] = p_assoc['N_ha'], p_assoc['P_ha'], p_assoc['K_ha']
                        rows_to_insert.append(row_p)
-                  
               elif nature_interv == "Récolte":
                   row = base_row.copy()
-                  row['Produit_Récolté'] = recolte_data['produit']
-                  row['Rendement_Ha'] = recolte_data['rendement']
-                  row['Humidité_récolte'] = recolte_data['humidite']
-                  row['PS'] = recolte_data['ps']
+                  row['Produit_Récolté'], row['Rendement_Ha'], row['Humidité_récolte'], row['PS'] = recolte_data['produit'], recolte_data['rendement'], recolte_data['humidite'], recolte_data['ps']
                   row['Quantité_Récoltée_Totale'] = round(recolte_data['rendement'] * p['surface'], 2)
                   rows_to_insert.append(row)
-                  
-              elif nature_interv in ["Déchaumage", "Préparation Printemps", "Binage", "Fissuration"]:
-                  row = base_row.copy()
-                  rows_to_insert.append(row)
-         
+              else: rows_to_insert.append(base_row)
+          
          df_new = pd.DataFrame(rows_to_insert)
-         
-         with st.spinner(f"Insertion de {len(df_new)} ligne(s) dans le journal..."):
+         with st.spinner("Mise à jour du journal..."):
+              if is_edit_mode: active_loader.delete_interventions(edit_data['ID_Intervention'])
               success = active_loader.bulk_insert_interventions(df_new)
               if success:
-                   st.success("✅ Interventions enregistrées avec succès ! (Rechargez la page pour la mise à jour des rapports)")
-              else:
-                   st.error("❌ Échec de l'insertion.")
+                   st.success("✅ Mis à jour !" if is_edit_mode else "✅ Enregistré !")
+                   if is_edit_mode:
+                       st.session_state.edit_intervention = None
+                       st.rerun()
+              else: st.error("❌ Échec.")
