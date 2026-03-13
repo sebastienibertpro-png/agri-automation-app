@@ -4,6 +4,7 @@ import tempfile
 import os
 import folium
 from streamlit_folium import st_folium
+from streamlit_js_eval import get_geolocation
 from report_gen import ReportGenerator
 from shared import init_campaign_selector, APP_BASE_URL, OBSERVATION_DRIVE_FOLDER_ID, get_drive_uploader
 
@@ -19,8 +20,29 @@ st.subheader("📍 Carte des Observations")
 
 df_obs = active_loader.get_observations(selected_campaign)
 
-# Maïs-Center coords roughly
-m_map = folium.Map(location=[45.0, 1.0], zoom_start=13)
+# Initialisation de la carte avec Satellite par défaut
+m_map = folium.Map(location=[45.0, 1.0], zoom_start=13, tiles=None)
+
+# Ajout des couches de tuiles (Satellite Google par défaut)
+folium.TileLayer(
+    tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    attr='Google',
+    name='Satellite Hybrid (Google)',
+    overlay=False,
+    control=True
+).add_to(m_map)
+
+folium.TileLayer(
+    tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    attr='Google',
+    name='Satellite (Google)',
+    overlay=False,
+    control=True
+).add_to(m_map)
+
+folium.TileLayer('openstreetmap', name='Plan (OSM)').add_to(m_map)
+
+folium.LayerControl().add_to(m_map)
 
 if not df_obs.empty:
     for _, row in df_obs.iterrows():
@@ -33,7 +55,6 @@ if not df_obs.empty:
                 
                 popup_html = f"<b>{row['ID_Parcelle']}</b><br>{row['Date']}<br>{obs_text}"
                 if photo_id:
-                    # Lien direct vers Drive
                     photo_url = f"https://drive.google.com/uc?id={photo_id}"
                     popup_html += f"<br><img src='{photo_url}' width='200'>"
                 
@@ -44,6 +65,7 @@ if not df_obs.empty:
                     icon=folium.Icon(color='green', icon='camera', prefix='fa')
                 ).add_to(m_map)
                 
+                # Center on last observation
                 m_map.location = [lat, lon]
             except: pass
 
@@ -60,36 +82,27 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=False):
         obs_parcelle = st.selectbox("Parcelle", available_parcelles, key="obs_p")
         obs_date = st.date_input("Date", key="obs_d")
     with col_o2:
-        obs_stade = st.selectbox("Stade Culture", ["Levée", "4F", "8F", "Floraison", "Maturité", "Récolte"], key="obs_s")
+        obs_stade = st.selectbox("Stade Culture", ["Levée", "3F", "6F", "10F", "Floraison", "Maturité", "Récolte"], key="obs_s")
         obs_photo = st.file_uploader("Prendre une photo (ou charger)", type=["jpg", "jpeg", "png"], key="obs_img")
 
     obs_text = st.text_area("Observations au champ", placeholder="Saisir vos remarques ici...")
 
-    # Gestion GPS simplifiée pour éviter streamlit-js-eval si non installé
+    # Gestion GPS Automatique
     st.markdown("**Localisation (GPS)**")
-    gps_coords = st.text_input("Coordonnées GPS (ex: 45.1, 1.2)", help="Saisissez ou capturez les coordonnées", key="obs_gps_coord")
     
-    # Alternative simple pour capturer la position via Javascript directement dans Streamlit
-    components_html = """
-    <script>
-    function getLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(showPosition);
-      }
-    }
-    function showPosition(position) {
-      window.parent.postMessage({
-        type: 'streamlit:set_component_value',
-        value: position.coords.latitude + ", " + position.coords.longitude
-      }, '*');
-    }
-    </script>
-    <button onclick="getLocation()">📌 Capturer ma position GPS</button>
-    """
-    # Note: L'intégration propre du GPS sans module tiers demande un peu de JS personnalisé
-    # Pour l'instant on reste sur la saisie manuelle ou extraction EXIF si possible
-    st.info("💡 Conseil : Copiez vos coordonnées Google Maps ou activez la géolocalisation sur votre appareil.")
+    # On récupère la géolocalisation si le composant est activé
+    # Note: Dans Streamlit, get_geolocation() renvoie None tant qu'on n'a pas bougé ou que le user n'a pas validé
+    loc = get_geolocation()
+    
+    default_gps = ""
+    if loc:
+        default_gps = f"{loc['coords']['latitude']}, {loc['coords']['longitude']}"
+        st.success(f"📍 Position GPS détectée : {default_gps}")
+    else:
+        st.info("ℹ️ Pour capturer votre position automatiquement, assurez-vous que la localisation est activée sur votre appareil.")
 
+    gps_coords = st.text_input("Coordonnées GPS", value=default_gps, help="Les coordonnées sont remplies automatiquement si le GPS est activé", key="obs_gps_coord")
+    
     if st.button("🚀 Enregistrer l'observation", type="primary", use_container_width=True):
         if not obs_text and not obs_photo:
             st.error("Veuillez saisir au moins une observation ou une photo.")
