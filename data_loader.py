@@ -496,6 +496,45 @@ class DataLoader:
             st.error(f"Erreur lors de l'insertion en masse : {e}")
             return False
 
+    def delete_interventions(self, intervention_ids: list) -> bool:
+        """
+        Deletes interventions from the JOURNAL_INTERVENTION sheet by ID.
+        Requires Cloud Connection.
+        """
+        if not self.conn:
+            st.error("Suppression impossible en local (Lecture seule).")
+            return False
+            
+        try:
+            # 1. Read fresh data
+            df = self.conn.read(worksheet="JOURNAL_INTERVENTION", ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            
+            # 2. Filter out the IDs to delete
+            # Convert both to string for robust comparison
+            intervention_ids = [str(i) for i in intervention_ids]
+            
+            if 'ID_Intervention' not in df.columns:
+                st.error("Colonne 'ID_Intervention' introuvable.")
+                return False
+                
+            original_count = len(df)
+            df = df[~df['ID_Intervention'].astype(str).isin(intervention_ids)]
+            new_count = len(df)
+            
+            if original_count == new_count:
+                st.warning("Aucune ligne correspondante trouvée pour la suppression.")
+                return False
+                
+            # 3. Write back
+            self.conn.update(worksheet="JOURNAL_INTERVENTION", data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop("JOURNAL_INTERVENTION", None)
+            st.cache_data.clear()
+            return True
+            
+        except Exception as e:
+            st.error(f"Erreur lors de la suppression : {e}")
+            return False
+
     def update_ppf(self, ppf_dict: dict) -> bool:
         """
         Inserts or updates a PPF entry for a given Campaign and Parcel.
