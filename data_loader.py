@@ -807,6 +807,34 @@ class DataLoader:
             df = df[df['Date_dt'].dt.year == int(campaign)]
             
         return df
+    def get_product_prices(self, campaign):
+        """
+        Calculates average unit price per product for a given campaign from ACHAT_MASTER.
+        Returns a dictionary { 'PRODUCT_NAME_NORM': price_per_unit }
+        """
+        df_achats = self.get_achats(campaign)
+        if df_achats.empty:
+            return {}
+
+        df_achats['Nom_Produit_Norm'] = df_achats['Nom_Produit'].astype(str).str.strip().str.upper()
+        df_achats['Quantité_Achetée'] = pd.to_numeric(df_achats['Quantité_Achetée'], errors='coerce').fillna(0)
+        df_achats['Montant_Total_Produit_HT'] = pd.to_numeric(df_achats['Montant_Total_Produit_HT'], errors='coerce').fillna(0)
+
+        # Aggregate to get average price
+        prices_agg = df_achats.groupby('Nom_Produit_Norm').agg({
+            'Quantité_Achetée': 'sum',
+            'Montant_Total_Produit_HT': 'sum'
+        })
+
+        prices_dict = {}
+        for name, row in prices_agg.iterrows():
+            if row['Quantité_Achetée'] > 0:
+                prices_dict[name] = row['Montant_Total_Produit_HT'] / row['Quantité_Achetée']
+            else:
+                prices_dict[name] = 0.0
+        
+        return prices_dict
+
     def append_achat_master(self, sheet_values: list[list]) -> bool:
         """Appends new rows to the ACHAT_MASTER sheet."""
         if not self.conn:
