@@ -291,6 +291,11 @@ class ReportGenerator:
             self.add_paragraph("Aucune donnée disponible pour l'itinéraire technique.")
 
         product_prices = data_grouped.get('product_prices', {})
+
+        for parcelle, content in data_grouped.items():
+            if parcelle == 'product_prices': continue
+            
+            total_parcel_cost = 0.0
             meta = content.get('meta', {})
             
             # --- Header ITK ---
@@ -363,10 +368,12 @@ class ReportGenerator:
             # 2. Semis
             # Cols: Date, Produit, Dose, Unité, Obs
             def map_semi(r):
-                d = r['Date']
+                d = r.get('Date')
                 if d and hasattr(d, 'strftime'): d_str = d.strftime('%d/%m/%Y')
                 else: d_str = str(d) if not pd.isnull(d) else ""
                 
+                prod = str(r.get('Nom_Produit', ''))
+                dose_val = str(r.get('Dose_Ha', ''))
                 unit = str(r.get('Unité_Dose', ''))
                 obs = str(r.get('Observations', ''))
                 cost = get_row_cost(r)
@@ -439,6 +446,7 @@ class ReportGenerator:
                 prod = str(r.get('Nom_Produit', ''))
                 dose = f"{r.get('Dose_Ha', '')}"
                 unit = str(r.get('Unité_Dose', ''))
+                n = f"{r.get('N/ha', '')}"
                 p = f"{r.get('P/ha', '')}"
                 k = f"{r.get('K/ha', '')}"
                 cost = get_row_cost(r)
@@ -462,6 +470,7 @@ class ReportGenerator:
                 else: d_str = str(d) if not pd.isnull(d) else ""
                 
                 prod = str(r.get('Nom_Produit', ''))
+                dose = f"{r.get('Dose_Ha', '')}"
                 unit = str(r.get('Unité_Dose', ''))
                 cible = str(r.get('Cible', ''))
                 obs = str(r.get('Observations', ''))
