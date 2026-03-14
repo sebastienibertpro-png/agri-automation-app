@@ -31,6 +31,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 def generate_and_download(report_type):
     metadata_map = active_loader.get_parcel_metadata(selected_campaign)
+    product_prices = active_loader.get_product_prices(selected_campaign)
     
     def patch_surface_column(df):
         if 'Surface_Travaillée_Ha' in df.columns:
@@ -90,6 +91,10 @@ def generate_and_download(report_type):
                      elif nature == 'Traitement': cat_data['Traitement'].append(record)
                      elif nature in ['Récolte', 'Moisson']: cat_data['Récolte'].append(record)
                  grouped_data[p] = cat_data
+            
+            # Injection des prix dans grouped_data pour usage global dans le générateur
+            grouped_data['product_prices'] = product_prices
+            
         return grouped_data, "generate_itk", "Itineraire_Technique"
 
     elif report_type == "IRRIG_PARCELLE":
