@@ -290,7 +290,7 @@ class ReportGenerator:
         if not data_grouped:
             self.add_paragraph("Aucune donnée disponible pour l'itinéraire technique.")
 
-        for parcelle, content in data_grouped.items():
+        product_prices = data_grouped.get('product_prices', {})
             meta = content.get('meta', {})
             
             # --- Header ITK ---
@@ -306,6 +306,18 @@ class ReportGenerator:
             self.elements.append(Paragraph(sub_header, self.styles['Normal']))
             self.elements.append(Spacer(1, 10))
             
+            # --- Helper to calculate row cost ---
+            def get_row_cost(r):
+                prods = str(r.get('Nom_Produit', '')).split('\n')
+                doses = str(r.get('Dose_Ha', '')).split('\n')
+                cost = 0.0
+                for p, d in zip(prods, doses):
+                    p_norm = p.strip().upper()
+                    if p_norm in product_prices:
+                        try: cost += float(d) * product_prices[p_norm]
+                        except: pass
+                return cost
+
             # --- Helper to add section table ---
             def add_section_table(title, rows, headers, col_widths, map_func):
                 if not rows: return
@@ -355,11 +367,12 @@ class ReportGenerator:
                 if d and hasattr(d, 'strftime'): d_str = d.strftime('%d/%m/%Y')
                 else: d_str = str(d) if not pd.isnull(d) else ""
                 
-                prod = str(r.get('Nom_Produit', '')) 
-                dose_val = str(r.get('Dose_Ha', ''))
                 unit = str(r.get('Unité_Dose', ''))
                 obs = str(r.get('Observations', ''))
-                return [d_str, prod, dose_val, unit, obs]
+                cost = get_row_cost(r)
+                nonlocal total_parcel_cost
+                total_parcel_cost += cost
+                return [d_str, prod, dose_val, unit, f"{cost:.2f} €", obs]
 
             # Grouping Logic for Semis
             raw_semis = content.get('Semis', [])
@@ -411,8 +424,8 @@ class ReportGenerator:
             add_section_table(
                 "Semis",
                 grouped_semis,
-                ['Date', 'Produit', 'Dose', 'Unité', 'Observations'],
-                [2.5*cm, 5*cm, 1.5*cm, 1.5*cm, 7.5*cm],
+                ['Date', 'Produit', 'Dose', 'Unité', 'Coût/ha', 'Observations'],
+                [2.5*cm, 5*cm, 1.5*cm, 1.5*cm, 2.0*cm, 5.5*cm],
                 map_semi
             )
 
@@ -426,16 +439,18 @@ class ReportGenerator:
                 prod = str(r.get('Nom_Produit', ''))
                 dose = f"{r.get('Dose_Ha', '')}"
                 unit = str(r.get('Unité_Dose', ''))
-                n = f"{r.get('N/ha', '')}"
                 p = f"{r.get('P/ha', '')}"
                 k = f"{r.get('K/ha', '')}"
-                return [d_str, prod, dose, unit, n, p, k]
+                cost = get_row_cost(r)
+                nonlocal total_parcel_cost
+                total_parcel_cost += cost
+                return [d_str, prod, dose, unit, n, p, k, f"{cost:.2f} €"]
             
             add_section_table(
                 "Fertilisation",
                 content.get('Fertilisation', []),
-                ['Date', 'Engrais', 'Dose', 'Unité', 'N', 'P', 'K'],
-                [2.5*cm, 5.5*cm, 1.5*cm, 1.5*cm, 1.8*cm, 1.8*cm, 1.8*cm],
+                ['Date', 'Engrais', 'Dose', 'Unité', 'N', 'P', 'K', 'Coût/ha'],
+                [2.5*cm, 4.0*cm, 1.5*cm, 1.5*cm, 1.5*cm, 1.5*cm, 1.5*cm, 2.0*cm],
                 map_ferti
             )
 
@@ -447,11 +462,13 @@ class ReportGenerator:
                 else: d_str = str(d) if not pd.isnull(d) else ""
                 
                 prod = str(r.get('Nom_Produit', ''))
-                dose = f"{r.get('Dose_Ha', '')}"
                 unit = str(r.get('Unité_Dose', ''))
                 cible = str(r.get('Cible', ''))
                 obs = str(r.get('Observations', ''))
-                return [d_str, prod, dose, unit, cible, obs]
+                cost = get_row_cost(r)
+                nonlocal total_parcel_cost
+                total_parcel_cost += cost
+                return [d_str, prod, dose, unit, cible, f"{cost:.2f} €", obs]
             
             # Grouping Logic for Phyto
             raw_treatments = content.get('Traitement', [])
@@ -506,8 +523,8 @@ class ReportGenerator:
             add_section_table(
                 "Protection des Plantes (Phyto)",
                 grouped_treatments,
-                ['Date', 'Produit', 'Dose', 'Unité', 'Cible', 'Observations'],
-                [2.5*cm, 4*cm, 1.5*cm, 1.5*cm, 3.5*cm, 5*cm],
+                ['Date', 'Produit', 'Dose', 'Unité', 'Cible', 'Coût/ha', 'Observations'],
+                [2.5*cm, 4*cm, 1.5*cm, 1.5*cm, 3.0*cm, 2.0*cm, 3.5*cm],
                 map_phyto
             )
 
@@ -531,7 +548,9 @@ class ReportGenerator:
                 map_recolte
             )
 
-            self.elements.append(Spacer(1, 20)) 
+            # --- Total Cost Summary ---
+            self.elements.append(Paragraph(f"<b>COÛT TOTAL ESTIMÉ (Produits) : {total_parcel_cost:.2f} € / ha</b>", self.styles['Normal']))
+            self.elements.append(Spacer(1, 20))
 
         self.doc.build(self.elements)
         print(f"PDF Generated: {self.filename}")
