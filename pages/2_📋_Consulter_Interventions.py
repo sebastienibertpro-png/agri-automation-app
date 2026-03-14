@@ -10,6 +10,9 @@ st.title("📋 Consulter mes Interventions")
 # 1. Utilisation du sélecteur de campagne partagé
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
+# Récupération des prix des produits
+product_prices = active_loader.get_product_prices(selected_campaign)
+
 # 2. Filtres supplémentaires en haut de page
 col_f1, col_f2 = st.columns([2, 1])
 
@@ -43,7 +46,24 @@ def group_interventions(df):
     keep_cols = ['Surface_Travaillée_Ha', 'Tracteur', 'Outil', 'Stade_Culture', 'Conditions_Météo', 'Observations', 'Statut_Intervention']
     for col in keep_cols:
         if col in df.columns: agg_cols[col] = 'first'
+    def calculate_cost(row):
+        prods = str(row['Nom_Produit']).split('\n')
+        doses = str(row['Dose_Ha']).split('\n')
+        total_cost = 0.0
+        for p, d in zip(prods, doses):
+            p_norm = p.strip().upper()
+            if p_norm in product_prices:
+                try:
+                    total_cost += float(d) * product_prices[p_norm]
+                except:
+                    pass
+        return total_cost
+
     df_grouped = df.groupby(group_cols, as_index=False).agg(agg_cols)
+    
+    # Ajout du coût à l'ha
+    df_grouped['Coût à l\'ha'] = df_grouped.apply(calculate_cost, axis=1)
+    
     return df_grouped
 
 df_display = group_interventions(df_filtered)
@@ -60,6 +80,7 @@ column_config = {
     "Dose_Ha": "Dose/ha",
     "Unité_Dose": "Unité",
     "Surface_Travaillée_Ha": "Surf. (ha)",
+    "Coût à l'ha": st.column_config.NumberColumn("Coût à l'ha", format="%.2f €"),
     "Statut_Intervention": "Statut",
     "ID_Intervention": None
 }
@@ -74,6 +95,10 @@ edited_df = st.data_editor(
     use_container_width=True,
     key="interventions_editor"
 )
+
+# Affichage du total
+total_cost_ha = edited_df['Coût à l\'ha'].sum()
+st.metric("💰 Coût Total à l'ha pour la sélection", f"{total_cost_ha:.2f} €")
 
 # 5. Actions : Suppression et Modification
 selected_rows = edited_df[edited_df["Sélect. ✅"] == True]
