@@ -9,27 +9,40 @@ class MeteusClient:
         # Load from secrets
         self.api_id = st.secrets["meteus"]["api_id"]
         self.api_password = st.secrets["meteus"]["api_password"]
-        # Use HTTPS to avoid RemoteDisconnected and add a standard User-Agent
-        self.base_url = "https://api.meteus.fr/api"
+        # Try HTTPS first, then fallback to HTTP if needed
+        self.proto = "https"
+        self.base_url = f"{self.proto}://api.meteus.fr/api"
         self.auth = HTTPBasicAuth(self.api_id, self.api_password)
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json'
         }
 
-    def get_stations(self):
+    @st.cache_data(ttl=86400) # Cache stations list for 24 hours
+    def get_stations(_self):
         """Returns the list of stations for the account."""
-        try:
-            response = requests.get(
-                f"{self.base_url}/export/stations", 
-                auth=self.auth, 
-                headers=self.headers,
-                timeout=10
-            )
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            st.error(f"Erreur lors de la récupération des stations : {e}")
-            return []
+        urls = [
+            f"https://api.meteus.fr/api/export/stations",
+            f"http://api.meteus.fr/api/export/stations"
+        ]
+        
+        last_error = None
+        for url in urls:
+            try:
+                response = requests.get(
+                    url, 
+                    auth=_self.auth, 
+                    headers=_self.headers,
+                    timeout=20
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                last_error = e
+                continue # Try next URL (HTTP fallback)
+        
+        st.error(f"Erreur de connexion Météus (Timeout) : {last_error}")
+        return []
 
     @st.cache_data(ttl=1800) # Cache for 30 minutes
     def get_weather_summary(_self, station_id):
@@ -48,18 +61,18 @@ class MeteusClient:
                 "type": "json"
             }
             
-            response = requests.get(
-                f"{_self.base_url}/export/history/get", 
-                auth=_self.auth, 
-                params=params,
-                headers=_self.headers,
-                timeout=30
-            )
+            # Try HTTPS then HTTP
+            url_https = f"https://api.meteus.fr/api/export/history/get"
+            url_http = f"http://api.meteus.fr/api/export/history/get"
             
-            if response.status_code != 200:
-                st.error(f"Erreur API Météus ({response.status_code})")
-                return None
-                
+            response = None
+            try:
+                response = requests.get(url_https, auth=_self.auth, params=params, headers=_self.headers, timeout=20)
+                response.raise_for_status()
+            except:
+                response = requests.get(url_http, auth=_self.auth, params=params, headers=_self.headers, timeout=20)
+                response.raise_for_status()
+            
             data = response.json()
             
             # Robust extraction: some APIs wrap the list in a dict (e.g. {"data": [...]})
