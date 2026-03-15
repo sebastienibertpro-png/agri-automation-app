@@ -118,22 +118,31 @@ class ReportGenerator:
                 obs = str(row['Observations']) if not pd.isnull(row['Observations']) else ""
                 culture = str(row['Culture']) if not pd.isnull(row['Culture']) else ""
 
-                table_data.append([date_str, culture, produit, dose, unite, surf, cible, obs])
+                # Wrap multi-line fields in Paragraphs
+                cell_style = ParagraphStyle('CellStyle', parent=self.styles['Normal'], fontSize=7, leading=9)
+                
+                p_prod = Paragraph(produit.replace('\n', '<br/>'), cell_style)
+                p_dose = Paragraph(dose.replace('\n', '<br/>'), cell_style)
+                p_unite = Paragraph(unite.replace('\n', '<br/>'), cell_style)
+                p_cible = Paragraph(cible.replace('\n', '<br/>'), cell_style)
+                p_obs = Paragraph(obs.replace('\n', '<br/>'), cell_style)
+
+                table_data.append([date_str, culture, p_prod, p_dose, p_unite, surf, p_cible, p_obs])
             
             if len(table_data) > 1: # Only add table if there are rows
                 # Table Style
-                # Reduced Widths for Portrait (Total ~18cm)
-                t = Table(table_data, colWidths=[2.0*cm, 2.5*cm, 3.5*cm, 1.5*cm, 1.2*cm, 1.3*cm, 2.5*cm, 3.5*cm])
+                t = Table(table_data, colWidths=[2.0*cm, 2.5*cm, 3.5*cm, 1.5*cm, 1.2*cm, 1.3*cm, 2.5*cm, 3.5*cm], repeatRows=1)
                 t.setStyle(TableStyle([
                     ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e0e0e0')),
                     ('TEXTCOLOR', (0,0), (-1,0), colors.black),
                     ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
                     ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0,0), (-1,0), 9), # Smaller Font
+                    ('FONTSIZE', (0,0), (-1,0), 9),
                     ('BOTTOMPADDING', (0,0), (-1,0), 12),
                     ('BACKGROUND', (0,1), (-1,-1), colors.white),
                     ('GRID', (0,0), (-1,-1), 1, colors.black),
-                    ('FONTSIZE', (0,1), (-1,-1), 7), # Smaller Content Font
+                    ('FONTSIZE', (0,1), (-1,-1), 7),
                 ]))
                 self.elements.append(t)
                 self.elements.append(Spacer(1, 20))
@@ -330,17 +339,29 @@ class ReportGenerator:
                 self.elements.append(Paragraph(f"<b>{title}</b>", self.styles['Heading3']))
                 
                 table_data = [headers]
-                for r in rows:
-                    table_data.append(map_func(r))
+                cell_style = ParagraphStyle('ITKCell', parent=self.styles['Normal'], fontSize=7, leading=9)
                 
-                t = Table(table_data, colWidths=col_widths)
+                for r in rows:
+                    raw_row = map_func(r)
+                    processed_row = []
+                    for cell in raw_row:
+                        # Wrap text in Paragraph if it contains \n
+                        if isinstance(cell, str) and '\n' in cell:
+                            processed_row.append(Paragraph(cell.replace('\n', '<br/>'), cell_style))
+                        else:
+                            processed_row.append(cell)
+                    table_data.append(processed_row)
+                
+                t = Table(table_data, colWidths=col_widths, repeatRows=1)
                 t.setStyle(TableStyle([
                     ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
                     ('TEXTCOLOR', (0,0), (-1,0), colors.black),
                     ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
                     ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0,0), (-1,0), 9),
                     ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                    ('FONTSIZE', (0,1), (-1,-1), 7),
                 ]))
                 self.elements.append(t)
                 self.elements.append(Spacer(1, 10))
