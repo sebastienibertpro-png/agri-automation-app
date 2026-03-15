@@ -872,12 +872,12 @@ class DataLoader:
             return False
         try:
             df = self.conn.read(worksheet="ACHAT_MASTER", ttl=0, spreadsheet="MASTER_EXPLOITATION")
-            if 'ID_Achat' not in df.columns:
-                st.error("Colonne 'ID_Achat' introuvable.")
+            if 'ID_Facture' not in df.columns:
+                st.error("Colonne 'ID_Facture' introuvable.")
                 return False
             
             purchase_ids = [str(i) for i in purchase_ids]
-            df = df[~df['ID_Achat'].astype(str).isin(purchase_ids)]
+            df = df[~df['ID_Facture'].astype(str).isin(purchase_ids)]
             
             self.conn.update(worksheet="ACHAT_MASTER", data=df, spreadsheet="MASTER_EXPLOITATION")
             self._cache.pop("ACHAT_MASTER", None)
@@ -894,11 +894,11 @@ class DataLoader:
             return False
         try:
             df = self.conn.read(worksheet="ACHAT_MASTER", ttl=0, spreadsheet="MASTER_EXPLOITATION")
-            if 'ID_Achat' not in df.columns:
-                st.error("Colonne 'ID_Achat' introuvable.")
+            if 'ID_Facture' not in df.columns:
+                st.error("Colonne 'ID_Facture' introuvable.")
                 return False
                 
-            mask = df['ID_Achat'].astype(str) == str(purchase_id)
+            mask = df['ID_Facture'].astype(str) == str(purchase_id)
             if not mask.any():
                 st.warning("Ligne d'achat non trouvée.")
                 return False
