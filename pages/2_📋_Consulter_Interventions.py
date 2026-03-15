@@ -62,7 +62,7 @@ def group_interventions(df):
     df_grouped = df.groupby(group_cols, as_index=False).agg(agg_cols)
     
     # Ajout du coût à l'ha
-    df_grouped['Coût à l\'ha'] = df_grouped.apply(calculate_cost, axis=1)
+    df_grouped['Coût à l\'ha'] = df_grouped.apply(calculate_cost, axis=1).round(1)
     
     return df_grouped
 
@@ -83,7 +83,7 @@ column_config = {
     "Dose_Ha": st.column_config.TextColumn("Dose/ha"),
     "Unité_Dose": st.column_config.TextColumn("Unité"),
     "Surface_Travaillée_Ha": "Surf. (ha)",
-    "Coût à l'ha": st.column_config.NumberColumn("Coût à l'ha", format="%.2f €"),
+    "Coût à l'ha": st.column_config.NumberColumn("Coût à l'ha", format="%.1f €"),
     "Statut_Intervention": "Statut",
     "ID_Intervention": None,
     "Sélect. ✅": "Sélect."
@@ -94,14 +94,68 @@ df_display.insert(0, "Sélect. ✅", False)
 if view_mode == "Vue visuelle (Lecture seule)":
     # Render with HTML for real line breaks
     df_html = df_display.copy()
-    for col in ['Nom_Produit', 'Dose_Ha', 'Unité_Dose', 'Type_Intervention', 'Cible']:
-        if col in df_html.columns:
+    
+    # Clean up column values: replace None/NaN with empty string and handle <br>
+    for col in df_html.columns:
+        df_html[col] = df_html[col].apply(lambda x: "" if pd.isna(x) or str(x).lower() == "none" else str(x))
+        if col in ['Nom_Produit', 'Dose_Ha', 'Unité_Dose', 'Type_Intervention', 'Cible']:
             df_html[col] = df_html[col].str.replace('\n', '<br>', regex=False)
     
     # Drop internal column
     df_html = df_html.drop(columns=['Sélect. ✅', 'ID_Intervention'])
     
-    st.write(df_html.to_html(escape=False, index=False), unsafe_allow_html=True)
+    # Extra CSS for the HTML table
+    st.markdown("""
+    <style>
+        .styled-table {
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 0.95em;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-width: 100%;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            background-color: white;
+        }
+        .styled-table thead tr {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: #ffffff;
+            text-align: center;
+            font-weight: 600;
+        }
+        .styled-table th,
+        .styled-table td {
+            padding: 14px 18px;
+            text-align: center;
+            vertical-align: middle;
+            border: 1px solid #f0f0f0;
+        }
+        .styled-table td {
+            color: #444;
+        }
+        .styled-table th {
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.85em;
+        }
+        .styled-table tbody tr {
+            border-bottom: 1px solid #eeeeee;
+            transition: background-color 0.2s ease;
+        }
+        .styled-table tbody tr:hover {
+            background-color: #f9f9f9;
+        }
+        .styled-table tbody tr:nth-of-type(even) {
+            background-color: #fafafa;
+        }
+        .styled-table tbody tr:last-of-type {
+            border-bottom: 3px solid #4CAF50;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.write(df_html.to_html(escape=False, index=False, classes="styled-table"), unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     edited_df = df_display # for total calculation
 else:
@@ -116,7 +170,7 @@ else:
 
 # Affichage du total
 total_cost_ha = edited_df['Coût à l\'ha'].sum()
-st.metric("💰 Coût Total à l'ha pour la sélection", f"{total_cost_ha:.2f} €")
+st.metric("💰 Coût Total à l'ha pour la sélection", f"{total_cost_ha:.1f} €")
 
 # 5. Actions : Suppression et Modification
 selected_rows = edited_df[edited_df["Sélect. ✅"] == True]
