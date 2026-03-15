@@ -9,13 +9,22 @@ class MeteusClient:
         # Load from secrets
         self.api_id = st.secrets["meteus"]["api_id"]
         self.api_password = st.secrets["meteus"]["api_password"]
-        self.base_url = "http://api.meteus.fr/api"
+        # Use HTTPS to avoid RemoteDisconnected and add a standard User-Agent
+        self.base_url = "https://api.meteus.fr/api"
         self.auth = HTTPBasicAuth(self.api_id, self.api_password)
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
 
     def get_stations(self):
         """Returns the list of stations for the account."""
         try:
-            response = requests.get(f"{self.base_url}/export/stations", auth=self.auth)
+            response = requests.get(
+                f"{self.base_url}/export/stations", 
+                auth=self.auth, 
+                headers=self.headers,
+                timeout=10
+            )
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -43,7 +52,13 @@ class MeteusClient:
                 "type": "json"
             }
             
-            response = requests.get(f"{_self.base_url}/export/history/get", auth=_self.auth, params=params)
+            response = requests.get(
+                f"{_self.base_url}/export/history/get", 
+                auth=_self.auth, 
+                params=params,
+                headers=_self.headers,
+                timeout=15
+            )
             response.raise_for_status()
             data = response.json()
             
