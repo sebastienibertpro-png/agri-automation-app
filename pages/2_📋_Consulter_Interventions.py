@@ -70,6 +70,9 @@ df_display = group_interventions(df_filtered)
 
 # 4. Affichage
 st.markdown("### Journal Détaillé")
+
+view_mode = st.radio("👀 Mode d'affichage", ["Tableau dynamique (Édition/Suppression)", "Vue visuelle (Lecture seule)"], horizontal=True)
+
 column_config = {
     "Select": st.column_config.CheckboxColumn("Sélect.", default=False),
     "Date": st.column_config.DateColumn("Date", format="DD/MM/YYYY"),
@@ -77,24 +80,39 @@ column_config = {
     "Nature_Intervention": "Nature",
     "Type_Intervention": st.column_config.TextColumn("Type"),
     "Nom_Produit": st.column_config.TextColumn("Produits"),
-    "Dose_Ha": "Dose/ha",
-    "Unité_Dose": "Unité",
+    "Dose_Ha": st.column_config.TextColumn("Dose/ha"),
+    "Unité_Dose": st.column_config.TextColumn("Unité"),
     "Surface_Travaillée_Ha": "Surf. (ha)",
     "Coût à l'ha": st.column_config.NumberColumn("Coût à l'ha", format="%.2f €"),
     "Statut_Intervention": "Statut",
-    "ID_Intervention": None
+    "ID_Intervention": None,
+    "Sélect. ✅": "Sélect."
 }
 
 df_display.insert(0, "Sélect. ✅", False)
 
-edited_df = st.data_editor(
-    df_display,
-    column_config=column_config,
-    disabled=[c for c in df_display.columns if c != "Sélect. ✅"],
-    hide_index=True,
-    use_container_width=True,
-    key="interventions_editor"
-)
+if view_mode == "Vue visuelle (Lecture seule)":
+    # Render with HTML for real line breaks
+    df_html = df_display.copy()
+    for col in ['Nom_Produit', 'Dose_Ha', 'Unité_Dose', 'Type_Intervention', 'Cible']:
+        if col in df_html.columns:
+            df_html[col] = df_html[col].str.replace('\n', '<br>', regex=False)
+    
+    # Drop internal column
+    df_html = df_html.drop(columns=['Sélect. ✅', 'ID_Intervention'])
+    
+    st.write(df_html.to_html(escape=False, index=False), unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    edited_df = df_display # for total calculation
+else:
+    edited_df = st.data_editor(
+        df_display,
+        column_config=column_config,
+        disabled=[c for c in df_display.columns if c != "Sélect. ✅"],
+        hide_index=True,
+        use_container_width=True,
+        key="interventions_editor"
+    )
 
 # Affichage du total
 total_cost_ha = edited_df['Coût à l\'ha'].sum()
