@@ -67,6 +67,12 @@ class MeteusClient:
                     except: continue
                 return None
 
+            # Helper to find a column case-insensitively
+            def get_col_name(columns, target):
+                for c in columns:
+                    if str(c).upper() == target.upper(): return c
+                return None
+
             # 1. Fetch LIVE data
             data_live = fetch({"id": station_id, "p": "1d", "scale": "hour", "type": "json"})
             if not data_live: return None
@@ -74,26 +80,19 @@ class MeteusClient:
             df = pd.DataFrame.from_records(data_live)
             if df.empty: return None
             
-            # Identify columns
-            actual_cols = df.columns.tolist()
-            def find_col(target):
-                for c in actual_cols:
-                    if str(c).upper() == target.upper(): return c
-                return None
-
-            dt_col = find_col('DATETIME') or find_col('DATE')
-            t_col = find_col('T')
-            u_col = find_col('U')
-            rr_col = find_col('RR')
-            
+            # Identify columns for LIVE
+            dt_col = get_col_name(df.columns, 'DATETIME') or get_col_name(df.columns, 'DATE')
             if not dt_col: return None
             
-            # Prepare DataFrame
+            t_col = get_col_name(df.columns, 'T')
+            u_col = get_col_name(df.columns, 'U')
+            rr_col = get_col_name(df.columns, 'RR')
+            
+            # Prepare LIVE DataFrame
             df[dt_col] = pd.to_datetime(df[dt_col], errors='coerce')
-            df = df.dropna(subset=[dt_col]).copy() # Use copy() to avoid view issues
+            df = df.dropna(subset=[dt_col]).copy()
             
             if t_col:
-                # Ensure T is numeric before filtering
                 df[t_col] = pd.to_numeric(df[t_col], errors='coerce')
                 df = df[df[t_col].notna()].copy()
                 
@@ -104,45 +103,37 @@ class MeteusClient:
             current_row = df.iloc[0]
             
             # Rain 24h
-            def safe_sum(dataframe, time_col, rain_col, delta):
-                if not rain_col: return 0.0
-                cutoff = now - delta
+            def safe_sum(dataframe, time_col, rain_col, delta, ref_time):
+                if not rain_col or rain_col not in dataframe.columns: return 0.0
+                cutoff = ref_time - delta
                 mask = dataframe[time_col] >= cutoff
-                # explicit conversion to avoid the "Mixing dicts" warning/error
                 subset = pd.to_numeric(dataframe.loc[mask, rain_col], errors='coerce').fillna(0.0)
                 return float(subset.sum())
 
-            rain_24h = safe_sum(df, dt_col, rr_col, timedelta(hours=24))
+            rain_24h = safe_sum(df, dt_col, rr_col, timedelta(hours=24), now)
             
             # 2. Fetch HISTORICAL for 3j and 7j
-            # Use scale='day' for historical to be sure we get full daily totals reliably
-            params_hist = {
-                "id": station_id,
-                "p": "1y", # Large period to ensure we have everything
-                "scale": "day",
-                "type": "json"
-            }
+            params_hist = {"id": station_id, "p": "1y", "scale": "day", "type": "json"}
             data_hist = fetch(params_hist)
             
             rain_3j, rain_7j = 0.0, 0.0
             if data_hist:
                 df_h = pd.DataFrame.from_records(data_hist)
                 if not df_h.empty:
-                    # Clean historical dataframe
-                    dt_h_col = find_col('DATETIME') or find_col('DATE')
-                    if dt_h_col:
+                    # Identify columns for HISTORICAL (might be different!)
+                    dt_h_col = get_col_name(df_h.columns, 'DATETIME') or get_col_name(df_h.columns, 'DATE')
+                    rr_h_col = get_col_name(df_h.columns, 'RR')
+                    
+                    if dt_h_col and rr_h_col:
                         df_h[dt_h_col] = pd.to_datetime(df_h[dt_h_col], errors='coerce')
                         df_h = df_h.dropna(subset=[dt_h_col]).copy()
                         
-                        # Calculate rain sums relative to the last record's day or 'now'
-                        # To be consistent with Météus app, we use 'today' as base
-                        # Note: In 'day' scale, DATETIME is often just the date
                         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
                         
                         def get_daily_rain(days_back):
-                            cutoff = today_start - timedelta(days=days_back-1) # Current day + X previous
+                            cutoff = today_start - timedelta(days=days_back-1)
                             mask = df_h[dt_h_col] >= cutoff
-                            subset = pd.to_numeric(df_h.loc[mask, rr_col], errors='coerce').fillna(0.0)
+                            subset = pd.to_numeric(df_h.loc[mask, rr_h_col], errors='coerce').fillna(0.0)
                             return float(subset.sum())
 
                         rain_3j = get_daily_rain(3)
