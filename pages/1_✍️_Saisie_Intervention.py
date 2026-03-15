@@ -40,10 +40,21 @@ nature_interv = st.selectbox("Nature de l'intervention", nature_options, index=d
 
 col_g1, col_g2, col_g3 = st.columns(3)
 with col_g1:
-    try:
-        default_date = datetime.strptime(edit_data['Date'], '%d/%m/%Y').date() if is_edit_mode else datetime.now().date()
-    except:
+    if is_edit_mode:
+        raw_date = edit_data.get('Date')
+        # Handle Timestamp, datetime, or date objects directly
+        if hasattr(raw_date, 'date'):
+            default_date = raw_date.date()
+        elif isinstance(raw_date, str):
+            try:
+                default_date = datetime.strptime(raw_date, '%d/%m/%Y').date()
+            except:
+                default_date = datetime.now().date()
+        else:
+            default_date = datetime.now().date()
+    else:
         default_date = datetime.now().date()
+        
     date_interv = st.date_input("Date de l'intervention", value=default_date)
 with col_g2:
     default_statut = get_index(["Prévu", "Réalisé"], edit_data.get('Statut_Intervention', 'Réalisé'))
