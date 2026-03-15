@@ -39,7 +39,7 @@ class MeteusClient:
         try:
             # We fetch 7 days of history
             today = datetime.now()
-            start_date = (today - timedelta(days=8)).strftime("%m-%d-%Y") # 8 to be safe for 7 full days
+            start_date = (today - timedelta(days=8)).strftime("%m-%d-%Y")
             
             params = {
                 "id": station_id,
@@ -61,46 +61,78 @@ class MeteusClient:
                 return None
                 
             data = response.json()
-            if not data:
+            
+            # Robust extraction: some APIs wrap the list in a dict (e.g. {"data": [...]})
+            if isinstance(data, dict):
+                # Try to find the list inside the dict
+                for key in data:
+                    if isinstance(data[key], list):
+                        data = data[key]
+                        break
+            
+            if not isinstance(data, list) or not data:
                 return None
             
-            df = pd.DataFrame(data)
+            # Create DataFrame from records list explicitly
+            df = pd.DataFrame.from_records(data)
+            
             if df.empty:
                 return None
             
-            # Identify columns
-            cols_map = {c.upper(): c for c in df.columns}
-            dt_col = cols_map.get('DATETIME') or cols_map.get('DATE')
-            
+            # Identify columns with case-insensitive search
+            actual_cols = df.columns.tolist()
+            def find_col(target):
+                for c in actual_cols:
+                    if str(c).upper() == target.upper():
+                        return c
+                return None
+
+            dt_col = find_col('DATETIME') or find_col('DATE')
             if not dt_col:
                 return None
 
-            df[dt_col] = pd.to_datetime(df[dt_col])
+            # Convert to datetime and sort
+            df[dt_col] = pd.to_datetime(df[dt_col], errors='coerce')
+            df = df.dropna(subset=[dt_col])
             df = df.sort_values(dt_col, ascending=False)
             
+            if df.empty:
+                return None
+
             now = datetime.now()
             current = df.iloc[0]
             
-            t_col = cols_map.get('T')
-            u_col = cols_map.get('U')
-            rr_col = cols_map.get('RR')
+            t_col = find_col('T')
+            u_col = find_col('U')
+            rr_col = find_col('RR')
             
-            # Totals
-            rain_24h = df[df[dt_col] >= (now - timedelta(hours=24))][rr_col].sum() if rr_col else 0
-            rain_3j = df[df[dt_col] >= (now - timedelta(days=3))][rr_col].sum() if rr_col else 0
-            rain_7j = df[df[dt_col] >= (now - timedelta(days=7))][rr_col].sum() if rr_col else 0
-            
+            # Helper to get value or 0
+            def get_val(row, col):
+                if not col: return 0
+                val = row.get(col, 0)
+                try: return float(val) if pd.notna(val) else 0
+                except: return 0
+
+            # Safe totals calculation
+            def get_rain_sum(since_delta):
+                if not rr_col: return 0
+                mask = df[dt_col] >= (now - since_delta)
+                subset = df[mask][rr_col]
+                return pd.to_numeric(subset, errors='coerce').fillna(0).sum()
+
             return {
-                "temp": current.get(t_col, 0) if t_col else 0,
-                "hum": current.get(u_col, 0) if u_col else 0,
-                "rain_24h": rain_24h,
-                "rain_3j": rain_3j,
-                "rain_7j": rain_7j,
+                "temp": get_val(current, t_col),
+                "hum": get_val(current, u_col),
+                "rain_24h": get_rain_sum(timedelta(hours=24)),
+                "rain_3j": get_rain_sum(timedelta(days=3)),
+                "rain_7j": get_rain_sum(timedelta(days=7)),
                 "last_update": df[dt_col].iloc[0].strftime("%H:%M")
             }
             
         except Exception as e:
             st.error(f"Erreur technique Météus : {e}")
+            import traceback
+            print(traceback.format_exc())
             return None
 
 def display_meteo_module():
