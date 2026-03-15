@@ -166,14 +166,54 @@ def display_meteo_module():
     summary = client.get_weather_summary(station_id)
     
     if summary:
-        st.markdown(f"### 🌡️ Météo Station : {stations[0]['Name']} (MàJ {summary['last_update']})")
-        col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1.2])
+        st.markdown(f"**🌡️ Station {stations[0]['Name']}** (MàJ {summary['last_update']})")
         
-        col1.metric("Température", f"{summary['temp']:.1f} °C")
-        col2.metric("Hygrométrie", f"{summary['hum']:.0f} %")
-        col3.metric("Pluie 24h", f"{summary['rain_24h']:.1f} mm")
-        col4.metric("Pluie 3 jours", f"{summary['rain_3j']:.1f} mm")
-        col5.metric("Pluie 7 jours", f"{summary['rain_7j']:.1f} mm")
+        # Custom CSS for compact, responsive grid
+        st.markdown("""
+        <style>
+            .meteo-grid {
+                display: grid;
+                grid-template-columns: repeat(5, 1fr);
+                gap: 10px;
+                text-align: center;
+                background-color: #f0f2f6;
+                padding: 10px;
+                border-radius: 10px;
+                margin-bottom: 10px;
+            }
+            .meteo-item {
+                display: flex;
+                flex-direction: column;
+            }
+            .meteo-label {
+                font-size: 0.75rem;
+                color: #555;
+                margin-bottom: 2px;
+                white-space: nowrap;
+            }
+            .meteo-value {
+                font-size: 1.1rem;
+                font-weight: bold;
+                color: #1f77b4;
+            }
+            @media (max-width: 600px) {
+                .meteo-grid {
+                    grid-template-columns: repeat(3, 1fr);
+                }
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Render HTML grid
+        st.markdown(f"""
+        <div class="meteo-grid">
+            <div class="meteo-item"><span class="meteo-label">Temp</span><span class="meteo-value">{summary['temp']:.1f}°</span></div>
+            <div class="meteo-item"><span class="meteo-label">Hum</span><span class="meteo-value">{summary['hum']:.0f}%</span></div>
+            <div class="meteo-item"><span class="meteo-label">Pluie 24h</span><span class="meteo-value">{summary['rain_24h']:.1f}</span></div>
+            <div class="meteo-item"><span class="meteo-label">3 Jours</span><span class="meteo-value">{summary['rain_3j']:.1f}</span></div>
+            <div class="meteo-item"><span class="meteo-label">7 Jours</span><span class="meteo-value">{summary['rain_7j']:.1f}</span></div>
+        </div>
+        """, unsafe_allow_html=True)
         
         st.divider()
     else:
