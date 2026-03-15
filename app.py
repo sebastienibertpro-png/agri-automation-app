@@ -2,8 +2,9 @@ import streamlit as st
 import os
 import pandas as pd
 from shared import init_campaign_selector
+from meteus_utils import display_meteo_module
 
-st.set_page_config(page_title="Agri Automation - Accueil", page_icon="🚜", layout="centered")
+st.set_page_config(page_title="Tableau de Bord", page_icon="🚜", layout="centered")
 
 st.markdown("""
 <style>
@@ -28,8 +29,15 @@ try:
 except Exception as e:
     st.warning(f"Erreur d'image: {e}")
 
-st.title("🚜 Tableau de Bord - Agri Automation")
-st.markdown("Bienvenue ! Utilisez le menu à gauche pour naviguer entre les différents outils de l'exploitation.")
+st.title("🚜 Tableau de Bord")
+
+# --- Météus Weather Module ---
+try:
+    display_meteo_module()
+except Exception as e:
+    st.error(f"Erreur module météo: {e}")
+
+st.markdown("Utilisez le menu à gauche pour naviguer entre les différents outils de l'exploitation.")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
