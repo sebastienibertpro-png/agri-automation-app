@@ -95,14 +95,16 @@ if view_mode == "Vue visuelle (Lecture seule)":
     # Render with HTML for real line breaks
     df_html = df_display.copy()
     
-    # Clean up column values: replace None/NaN with empty string and handle <br>
+    # Drop internal/functional columns first to avoid issues with non-scalar types (like lists in ID_Intervention)
+    cols_to_drop = [c for c in ['Sélect. ✅', 'ID_Intervention'] if c in df_html.columns]
+    df_html = df_html.drop(columns=cols_to_drop)
+    
+    # Clean up column values: replace None/NaN with empty string
     for col in df_html.columns:
+        # Use a safer check for strings and scalars
         df_html[col] = df_html[col].apply(lambda x: "" if pd.isna(x) or str(x).lower() == "none" else str(x))
         if col in ['Nom_Produit', 'Dose_Ha', 'Unité_Dose', 'Type_Intervention', 'Cible']:
             df_html[col] = df_html[col].str.replace('\n', '<br>', regex=False)
-    
-    # Drop internal column
-    df_html = df_html.drop(columns=['Sélect. ✅', 'ID_Intervention'])
     
     # Extra CSS for the HTML table
     st.markdown("""
