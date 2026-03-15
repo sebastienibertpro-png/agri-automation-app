@@ -44,7 +44,7 @@ class MeteusClient:
         st.error(f"Erreur de connexion Météus (Timeout) : {last_error}")
         return []
 
-    @st.cache_data(ttl=300) # Cache for 5 minutes during debug
+    @st.cache_data(ttl=1800) 
     def get_weather_summary(_self, station_id):
         """
         Fetches current weather and rain totals.
@@ -145,8 +145,7 @@ class MeteusClient:
                 "rain_24h": rain_24h,
                 "rain_3j": rain_3j,
                 "rain_7j": rain_7j,
-                "last_update": current_row[dt_col].strftime("%H:%M"),
-                "raw_data": df.head(10)
+                "last_update": current_row[dt_col].strftime("%H:%M")
             }
             
         except Exception as e:
@@ -168,17 +167,13 @@ def display_meteo_module():
     
     if summary:
         st.markdown(f"### 🌡️ Météo Station : {stations[0]['Name']} (MàJ {summary['last_update']})")
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1.2])
         
         col1.metric("Température", f"{summary['temp']:.1f} °C")
         col2.metric("Hygrométrie", f"{summary['hum']:.0f} %")
         col3.metric("Pluie 24h", f"{summary['rain_24h']:.1f} mm")
         col4.metric("Pluie 3 jours", f"{summary['rain_3j']:.1f} mm")
         col5.metric("Pluie 7 jours", f"{summary['rain_7j']:.1f} mm")
-        
-        with st.expander("🔍 Debug Météus (Derniers relevés)"):
-            if "raw_data" in summary:
-                st.dataframe(summary["raw_data"])
         
         st.divider()
     else:
