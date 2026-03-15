@@ -105,7 +105,10 @@ else:
             if manage_mode == "👁️ Visualisation & Liens":
                 df_viz = df_manage.copy()
                 if 'Date_facture' in df_viz.columns:
-                    df_viz['Date_facture'] = pd.to_datetime(df_viz['Date_facture']).dt.strftime('%d/%m/%Y')
+                    # Safe conversion to datetime
+                    df_viz['Date_facture'] = pd.to_datetime(df_viz['Date_facture'], errors='coerce', dayfirst=True)
+                    # Format while handling NaT
+                    df_viz['Date_facture'] = df_viz['Date_facture'].dt.strftime('%d/%m/%Y').fillna("")
                 
                 # Render Drive Links
                 link_col = 'Lien_facture' if 'Lien_facture' in df_viz.columns else 'Lien_Facture_Drive' if 'Lien_Facture_Drive' in df_viz.columns else 'Lien_Drive' if 'Lien_Drive' in df_viz.columns else None
