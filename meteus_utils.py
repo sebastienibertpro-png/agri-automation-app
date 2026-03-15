@@ -35,18 +35,14 @@ class MeteusClient:
     def get_weather_summary(_self, station_id):
         """
         Fetches current weather and rain totals for 24h, 3d, 7j.
-        Returns a dict with the summary.
         """
         try:
-            # We fetch history for the last 7 days to calculate everything
+            # We fetch 7 days of history
             today = datetime.now()
-            start_date = (today - timedelta(days=7)).strftime("%m-%d-%Y")
+            start_date = (today - timedelta(days=8)).strftime("%m-%d-%Y") # 8 to be safe for 7 full days
             
-            # GET api/export/history/get?id={id}&cols=T,U,RR,DATETIME&scale=hour&p=7d
-            # Note: doc says p=1d, 3m, 1y. For 7 days, we use dates.
             params = {
                 "id": station_id,
-                "cols": "T,U,RR,DATETIME",
                 "from": start_date,
                 "scale": "hour",
                 "type": "json"
@@ -57,42 +53,54 @@ class MeteusClient:
                 auth=_self.auth, 
                 params=params,
                 headers=_self.headers,
-                timeout=15
+                timeout=30
             )
-            response.raise_for_status()
-            data = response.json()
             
+            if response.status_code != 200:
+                st.error(f"Erreur API Météus ({response.status_code})")
+                return None
+                
+            data = response.json()
             if not data:
                 return None
             
             df = pd.DataFrame(data)
             if df.empty:
                 return None
-                
-            # Convert DATETIME
-            df['DATETIME'] = pd.to_datetime(df['DATETIME'])
-            df = df.sort_values('DATETIME', ascending=False)
             
-            # Current values (last record)
+            # Identify columns
+            cols_map = {c.upper(): c for c in df.columns}
+            dt_col = cols_map.get('DATETIME') or cols_map.get('DATE')
+            
+            if not dt_col:
+                return None
+
+            df[dt_col] = pd.to_datetime(df[dt_col])
+            df = df.sort_values(dt_col, ascending=False)
+            
+            now = datetime.now()
             current = df.iloc[0]
             
+            t_col = cols_map.get('T')
+            u_col = cols_map.get('U')
+            rr_col = cols_map.get('RR')
+            
             # Totals
-            now = datetime.now()
-            rain_24h = df[df['DATETIME'] >= (now - timedelta(hours=24))]['RR'].sum()
-            rain_3j = df[df['DATETIME'] >= (now - timedelta(days=3))]['RR'].sum()
-            rain_7j = df['RR'].sum()
+            rain_24h = df[df[dt_col] >= (now - timedelta(hours=24))][rr_col].sum() if rr_col else 0
+            rain_3j = df[df[dt_col] >= (now - timedelta(days=3))][rr_col].sum() if rr_col else 0
+            rain_7j = df[df[dt_col] >= (now - timedelta(days=7))][rr_col].sum() if rr_col else 0
             
             return {
-                "temp": current.get('T', 0),
-                "hum": current.get('U', 0),
+                "temp": current.get(t_col, 0) if t_col else 0,
+                "hum": current.get(u_col, 0) if u_col else 0,
                 "rain_24h": rain_24h,
                 "rain_3j": rain_3j,
                 "rain_7j": rain_7j,
-                "last_update": current['DATETIME'].strftime("%H:%M")
+                "last_update": df[dt_col].iloc[0].strftime("%H:%M")
             }
             
         except Exception as e:
-            print(f"Meteus Error: {e}")
+            st.error(f"Erreur technique Météus : {e}")
             return None
 
 def display_meteo_module():
