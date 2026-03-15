@@ -865,6 +865,57 @@ class DataLoader:
             st.error(f"Erreur append_achat_master : {e}")
             return False
 
+    def delete_achats(self, purchase_ids: list) -> bool:
+        """Deletes purchase lines from ACHAT_MASTER by ID."""
+        if not self.conn:
+            st.error("Suppression impossible en local.")
+            return False
+        try:
+            df = self.conn.read(worksheet="ACHAT_MASTER", ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            if 'ID_Achat' not in df.columns:
+                st.error("Colonne 'ID_Achat' introuvable.")
+                return False
+            
+            purchase_ids = [str(i) for i in purchase_ids]
+            df = df[~df['ID_Achat'].astype(str).isin(purchase_ids)]
+            
+            self.conn.update(worksheet="ACHAT_MASTER", data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop("ACHAT_MASTER", None)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Erreur delete_achats : {e}")
+            return False
+
+    def update_achat(self, purchase_id: str, new_data_dict: dict) -> bool:
+        """Updates a purchase line in ACHAT_MASTER."""
+        if not self.conn:
+            st.error("Mise à jour impossible en local.")
+            return False
+        try:
+            df = self.conn.read(worksheet="ACHAT_MASTER", ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            if 'ID_Achat' not in df.columns:
+                st.error("Colonne 'ID_Achat' introuvable.")
+                return False
+                
+            mask = df['ID_Achat'].astype(str) == str(purchase_id)
+            if not mask.any():
+                st.warning("Ligne d'achat non trouvée.")
+                return False
+            
+            idx = df[mask].index[0]
+            for col, val in new_data_dict.items():
+                if col in df.columns:
+                    df.at[idx, col] = val
+                    
+            self.conn.update(worksheet="ACHAT_MASTER", data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop("ACHAT_MASTER", None)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Erreur update_achat : {e}")
+            return False
+
     def get_etat_stocks(self, campaign):
         """Calcule l'état des stocks (Achats - Consommations) pour une campagne donnée."""
         df_achats = self.get_achats(campaign)
