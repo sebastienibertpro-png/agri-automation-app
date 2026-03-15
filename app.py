@@ -31,13 +31,13 @@ except Exception as e:
 
 st.title("🚜 Tableau de Bord")
 
+st.markdown("Utilisez le menu à gauche pour naviguer entre les différents outils de l'exploitation.")
+
 # --- Météus Weather Module ---
 try:
     display_meteo_module()
 except Exception as e:
     st.error(f"Erreur module météo: {e}")
-
-st.markdown("Utilisez le menu à gauche pour naviguer entre les différents outils de l'exploitation.")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
