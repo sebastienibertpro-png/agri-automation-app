@@ -122,6 +122,10 @@ def generate_and_download(report_type):
     return None, None, None
 
 def handle_pdf_action(report_type, btn_label):
+    # Persist the download button even after interaction
+    if f"last_files_{report_type}" not in st.session_state:
+        st.session_state[f"last_files_{report_type}"] = None
+
     if st.button(btn_label):
         with st.spinner(f"Génération {report_type}..."):
             data, method_name, prefix = generate_and_download(report_type)
@@ -130,47 +134,68 @@ def handle_pdf_action(report_type, btn_label):
                 st.warning("Aucune donnée pour cette sélection.")
                 return
 
+            # Robust handling of ITK metadata key
+            p_prices = data.pop('product_prices', None)
+
             with tempfile.TemporaryDirectory() as tmpdirname:
-                files = []
+                files_data = []
                 for p_id, p_payload in data.items():
                     safe_pid = str(p_id).replace(" ", "_").replace("/", "-")
                     fname = f"{prefix}_{selected_campaign}_{safe_pid}.pdf"
-                    fpath = os.path.join(tmpdirname, fname)
                     
+                    # Create a persistent path in temp (Simulated by reading bits)
+                    fpath = os.path.join(tmpdirname, fname)
                     gen = ReportGenerator(fpath)
                     method = getattr(gen, method_name)
-                    method(selected_campaign, {p_id: p_payload})
-                    files.append(fpath)
+                    
+                    # Pass prices back if needed (for ITK)
+                    payload_final = {p_id: p_payload}
+                    if p_prices and method_name == "generate_itk":
+                         payload_final['product_prices'] = p_prices
+                         
+                    method(selected_campaign, payload_final)
+                    
+                    with open(fpath, "rb") as f:
+                        files_data.append({"name": fname, "content": f.read()})
                 
-                if not files:
+                if not files_data:
                      st.warning("Rien à générer.")
                      return
 
-                if len(files) == 1:
-                    with open(files[0], "rb") as f:
-                        st.download_button(
-                            label=f"⬇️ Télécharger PDF ({report_type})",
-                            data=f,
-                            file_name=os.path.basename(files[0]),
-                            mime="application/pdf",
-                            key=f"dl_{report_type}"
-                        )
+                # Choose between PDF or ZIP
+                if len(files_data) == 1:
+                    st.session_state[f"last_files_{report_type}"] = {
+                        "type": "PDF",
+                        "data": files_data[0]["content"],
+                        "name": files_data[0]["name"]
+                    }
                 else:
                     zip_name = f"{prefix}_Campagne_{selected_campaign}.zip"
-                    zip_path = os.path.join(tmpdirname, zip_name)
-                    with zipfile.ZipFile(zip_path, 'w') as zipf:
-                        for file in files:
-                            zipf.write(file, os.path.basename(file))
+                    # We need a new temp file or buffer for the zip
+                    import io
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w') as zipf:
+                        for file_item in files_data:
+                            zipf.writestr(file_item["name"], file_item["content"])
                     
-                    with open(zip_path, "rb") as f:
-                        st.download_button(
-                            label=f"⬇️ Télécharger ZIP ({report_type})",
-                            data=f,
-                            file_name=zip_name,
-                            mime="application/zip",
-                             key=f"dl_{report_type}_zip"
-                        )
-        st.success("Génération terminée ! Cliquez ci-dessus pour télécharger.")
+                    st.session_state[f"last_files_{report_type}"] = {
+                        "type": "ZIP",
+                        "data": zip_buffer.getvalue(),
+                        "name": zip_name
+                    }
+
+    # Display the result if it exists in session state
+    result = st.session_state.get(f"last_files_{report_type}")
+    if result:
+        st.success(f"Document prêt : {result['name']}")
+        st.download_button(
+            label=f"⬇️ Télécharger {result['type']} ({report_type})",
+            data=result['data'],
+            file_name=result['name'],
+            mime="application/pdf" if result['type'] == "PDF" else "application/zip",
+            key=f"dl_button_{report_type}_{len(result['data'])}", # unique key to avoid stay-active issues
+            use_container_width=True
+        )
 
 st.markdown("""
 <style>
