@@ -166,7 +166,7 @@ def display_meteo_module():
     summary = client.get_weather_summary(station_id)
     
     if summary:
-        st.markdown(f"**🌡️ Station {stations[0]['Name']}** (MàJ {summary['last_update']})")
+        st.markdown(f"### 🌡️ Station {stations[0]['Name']} (MàJ {summary['last_update']})")
         
         # Custom CSS for compact, responsive grid
         st.markdown("""
