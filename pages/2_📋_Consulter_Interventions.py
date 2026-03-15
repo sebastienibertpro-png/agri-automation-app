@@ -95,14 +95,17 @@ if view_mode == "Vue visuelle (Lecture seule)":
     # Render with HTML for real line breaks
     df_html = df_display.copy()
     
-    # Drop internal/functional columns first to avoid issues with non-scalar types (like lists in ID_Intervention)
+    # Drop internal/functional columns first
     cols_to_drop = [c for c in ['Sélect. ✅', 'ID_Intervention'] if c in df_html.columns]
     df_html = df_html.drop(columns=cols_to_drop)
     
-    # Clean up column values: replace None/NaN with empty string
+    # Clean up column values: replace None/NaN and format dates
     for col in df_html.columns:
-        # Use a safer check for strings and scalars
-        df_html[col] = df_html[col].apply(lambda x: "" if pd.isna(x) or str(x).lower() == "none" else str(x))
+        if col == 'Date':
+            df_html[col] = pd.to_datetime(df_html[col]).dt.strftime('%d/%m/%Y')
+        else:
+            df_html[col] = df_html[col].apply(lambda x: "" if pd.isna(x) or str(x).lower() == "none" else str(x))
+            
         if col in ['Nom_Produit', 'Dose_Ha', 'Unité_Dose', 'Type_Intervention', 'Cible']:
             df_html[col] = df_html[col].str.replace('\n', '<br>', regex=False)
     
@@ -111,12 +114,12 @@ if view_mode == "Vue visuelle (Lecture seule)":
     <style>
         .styled-table {
             border-collapse: collapse;
-            margin: 25px 0;
-            font-size: 0.95em;
+            margin: 10px 0;
+            font-size: 0.82em; /* Smaller font */
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-width: 100%;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
             overflow: hidden;
             background-color: white;
         }
@@ -128,31 +131,28 @@ if view_mode == "Vue visuelle (Lecture seule)":
         }
         .styled-table th,
         .styled-table td {
-            padding: 14px 18px;
+            padding: 6px 10px; /* Much smaller padding */
             text-align: center;
             vertical-align: middle;
             border: 1px solid #f0f0f0;
         }
         .styled-table td {
-            color: #444;
+            color: #333;
+            line-height: 1.2;
         }
         .styled-table th {
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: 0.85em;
+            letter-spacing: 0.3px;
+            font-size: 0.8em;
         }
         .styled-table tbody tr {
             border-bottom: 1px solid #eeeeee;
-            transition: background-color 0.2s ease;
         }
         .styled-table tbody tr:hover {
-            background-color: #f9f9f9;
+            background-color: #fcfcfc;
         }
         .styled-table tbody tr:nth-of-type(even) {
             background-color: #fafafa;
-        }
-        .styled-table tbody tr:last-of-type {
-            border-bottom: 3px solid #4CAF50;
         }
     </style>
     """, unsafe_allow_html=True)
