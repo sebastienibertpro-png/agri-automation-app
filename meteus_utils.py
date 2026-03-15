@@ -50,29 +50,25 @@ class MeteusClient:
         Fetches current weather and rain totals.
         """
         try:
-            # 1. Fetch LAST 24H for Live metrics (T, U, Rain 24h)
-            # Using p='1d' is safer to get the most recent data
-            params_live = {
-                "id": station_id,
-                "p": "1d",
-                "scale": "hour",
-                "type": "json"
-            }
-            
-            # Simple helper for requests
+            # Simple helper for requests with HTTP fallback
             def fetch(params):
-                urls = [
-                    "https://api.meteus.fr/api/export/history/get",
-                    "http://api.meteus.fr/api/export/history/get"
-                ]
-                for url in urls:
+                for proto in ["https", "http"]:
                     try:
+                        url = f"{proto}://api.meteus.fr/api/export/history/get"
                         resp = requests.get(url, auth=_self.auth, params=params, headers=_self.headers, timeout=15)
-                        if resp.status_code == 200: return resp.json()
+                        if resp.status_code == 200:
+                            raw_json = resp.json()
+                            # Handle wrapping dicts like {"data": [...]}
+                            if isinstance(raw_json, dict):
+                                for v in raw_json.values():
+                                    if isinstance(v, list): return v
+                                return [raw_json] # Wrap single dict in list
+                            return raw_json
                     except: continue
                 return None
 
-            data_live = fetch(params_live)
+            # 1. Fetch LIVE data
+            data_live = fetch({"id": station_id, "p": "1d", "scale": "hour", "type": "json"})
             if not data_live: return None
             
             df = pd.DataFrame.from_records(data_live)
@@ -92,51 +88,52 @@ class MeteusClient:
             
             if not dt_col: return None
             
+            # Prepare DataFrame
             df[dt_col] = pd.to_datetime(df[dt_col], errors='coerce')
-            df = df.dropna(subset=[dt_col])
+            df = df.dropna(subset=[dt_col]).copy() # Use copy() to avoid view issues
             
-            # Filter rows with data
-            if t_col: df = df[df[t_col].notna()]
+            if t_col:
+                # Ensure T is numeric before filtering
+                df[t_col] = pd.to_numeric(df[t_col], errors='coerce')
+                df = df[df[t_col].notna()].copy()
+                
             df = df.sort_values(dt_col, ascending=False)
-            
             if df.empty: return None
             
             now = datetime.now()
-            current = df.iloc[0]
+            current_row = df.iloc[0]
             
             # Rain 24h
-            rain_24h = pd.to_numeric(df[df[dt_col] >= (now - timedelta(hours=24))][rr_col], errors='coerce').sum() if rr_col else 0
+            def safe_sum(dataframe, time_col, rain_col, delta):
+                if not rain_col: return 0.0
+                cutoff = now - delta
+                mask = dataframe[time_col] >= cutoff
+                # explicit conversion to avoid the "Mixing dicts" warning/error
+                subset = pd.to_numeric(dataframe.loc[mask, rain_col], errors='coerce').fillna(0.0)
+                return float(subset.sum())
+
+            rain_24h = safe_sum(df, dt_col, rr_col, timedelta(hours=24))
             
-            # 2. Fetch for 3j and 7j (larger range)
-            # Since p='1d' worked, let's try p='3m' for the rest and filter locally
-            # or try fixed dates but with 'to' as well
-            tomorrow = (now + timedelta(days=1)).strftime("%m-%d-%Y")
+            # 2. Fetch HISTORICAL for 3j and 7j
             start_7j = (now - timedelta(days=8)).strftime("%m-%d-%Y")
-            params_hist = {
-                "id": station_id,
-                "from": start_7j,
-                "to": tomorrow,
-                "scale": "hour",
-                "type": "json"
-            }
-            data_hist = fetch(params_hist)
-            rain_3j, rain_7j = 0, 0
+            data_hist = fetch({"id": station_id, "from": start_7j, "scale": "hour", "type": "json"})
             
+            rain_3j, rain_7j = 0.0, 0.0
             if data_hist:
                 df_h = pd.DataFrame.from_records(data_hist)
                 if not df_h.empty:
                     df_h[dt_col] = pd.to_datetime(df_h[dt_col], errors='coerce')
-                    df_h = df_h.dropna(subset=[dt_col])
-                    rain_3j = pd.to_numeric(df_h[df_h[dt_col] >= (now - timedelta(days=3))][rr_col], errors='coerce').sum() if rr_col else 0
-                    rain_7j = pd.to_numeric(df_h[df_h[dt_col] >= (now - timedelta(days=7))][rr_col], errors='coerce').sum() if rr_col else 0
+                    df_h = df_h.dropna(subset=[dt_col]).copy()
+                    rain_3j = safe_sum(df_h, dt_col, rr_col, timedelta(days=3))
+                    rain_7j = safe_sum(df_h, dt_col, rr_col, timedelta(days=7))
 
             return {
-                "temp": float(current.get(t_col, 0)) if t_col else 0,
-                "hum": float(current.get(u_col, 0)) if u_col else 0,
+                "temp": float(current_row.get(t_col, 0)) if t_col else 0.0,
+                "hum": float(current_row.get(u_col, 0)) if u_col else 0.0,
                 "rain_24h": rain_24h,
                 "rain_3j": rain_3j,
                 "rain_7j": rain_7j,
-                "last_update": current[dt_col].strftime("%H:%M"),
+                "last_update": current_row[dt_col].strftime("%H:%M"),
                 "raw_data": df.head(10)
             }
             
