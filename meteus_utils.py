@@ -115,17 +115,38 @@ class MeteusClient:
             rain_24h = safe_sum(df, dt_col, rr_col, timedelta(hours=24))
             
             # 2. Fetch HISTORICAL for 3j and 7j
-            start_7j = (now - timedelta(days=8)).strftime("%m-%d-%Y")
-            data_hist = fetch({"id": station_id, "from": start_7j, "scale": "hour", "type": "json"})
+            # Use scale='day' for historical to be sure we get full daily totals reliably
+            params_hist = {
+                "id": station_id,
+                "p": "1y", # Large period to ensure we have everything
+                "scale": "day",
+                "type": "json"
+            }
+            data_hist = fetch(params_hist)
             
             rain_3j, rain_7j = 0.0, 0.0
             if data_hist:
                 df_h = pd.DataFrame.from_records(data_hist)
                 if not df_h.empty:
-                    df_h[dt_col] = pd.to_datetime(df_h[dt_col], errors='coerce')
-                    df_h = df_h.dropna(subset=[dt_col]).copy()
-                    rain_3j = safe_sum(df_h, dt_col, rr_col, timedelta(days=3))
-                    rain_7j = safe_sum(df_h, dt_col, rr_col, timedelta(days=7))
+                    # Clean historical dataframe
+                    dt_h_col = find_col('DATETIME') or find_col('DATE')
+                    if dt_h_col:
+                        df_h[dt_h_col] = pd.to_datetime(df_h[dt_h_col], errors='coerce')
+                        df_h = df_h.dropna(subset=[dt_h_col]).copy()
+                        
+                        # Calculate rain sums relative to the last record's day or 'now'
+                        # To be consistent with Météus app, we use 'today' as base
+                        # Note: In 'day' scale, DATETIME is often just the date
+                        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                        
+                        def get_daily_rain(days_back):
+                            cutoff = today_start - timedelta(days=days_back-1) # Current day + X previous
+                            mask = df_h[dt_h_col] >= cutoff
+                            subset = pd.to_numeric(df_h.loc[mask, rr_col], errors='coerce').fillna(0.0)
+                            return float(subset.sum())
+
+                        rain_3j = get_daily_rain(3)
+                        rain_7j = get_daily_rain(7)
 
             return {
                 "temp": float(current_row.get(t_col, 0)) if t_col else 0.0,
