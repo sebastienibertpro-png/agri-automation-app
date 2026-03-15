@@ -44,115 +44,100 @@ class MeteusClient:
         st.error(f"Erreur de connexion Météus (Timeout) : {last_error}")
         return []
 
-    @st.cache_data(ttl=1800) # Cache for 30 minutes
+    @st.cache_data(ttl=300) # Cache for 5 minutes during debug
     def get_weather_summary(_self, station_id):
         """
-        Fetches current weather and rain totals for 24h, 3d, 7j.
+        Fetches current weather and rain totals.
         """
         try:
-            # We fetch 7 days of history
-            today = datetime.now()
-            start_date = (today - timedelta(days=8)).strftime("%m-%d-%Y")
-            
-            params = {
+            # 1. Fetch LAST 24H for Live metrics (T, U, Rain 24h)
+            # Using p='1d' is safer to get the most recent data
+            params_live = {
                 "id": station_id,
-                "from": start_date,
+                "p": "1d",
                 "scale": "hour",
                 "type": "json"
             }
             
-            # Try HTTPS then HTTP
-            url_https = f"https://api.meteus.fr/api/export/history/get"
-            url_http = f"http://api.meteus.fr/api/export/history/get"
-            
-            response = None
-            try:
-                response = requests.get(url_https, auth=_self.auth, params=params, headers=_self.headers, timeout=20)
-                response.raise_for_status()
-            except:
-                response = requests.get(url_http, auth=_self.auth, params=params, headers=_self.headers, timeout=20)
-                response.raise_for_status()
-            
-            data = response.json()
-            
-            # Robust extraction: some APIs wrap the list in a dict (e.g. {"data": [...]})
-            if isinstance(data, dict):
-                # Try to find the list inside the dict
-                for key in data:
-                    if isinstance(data[key], list):
-                        data = data[key]
-                        break
-            
-            if not isinstance(data, list) or not data:
+            # Simple helper for requests
+            def fetch(params):
+                urls = [
+                    "https://api.meteus.fr/api/export/history/get",
+                    "http://api.meteus.fr/api/export/history/get"
+                ]
+                for url in urls:
+                    try:
+                        resp = requests.get(url, auth=_self.auth, params=params, headers=_self.headers, timeout=15)
+                        if resp.status_code == 200: return resp.json()
+                    except: continue
                 return None
+
+            data_live = fetch(params_live)
+            if not data_live: return None
             
-            # Create DataFrame from records list explicitly
-            df = pd.DataFrame.from_records(data)
+            df = pd.DataFrame.from_records(data_live)
+            if df.empty: return None
             
-            if df.empty:
-                return None
-            
-            # Identify columns with case-insensitive search
+            # Identify columns
             actual_cols = df.columns.tolist()
             def find_col(target):
                 for c in actual_cols:
-                    if str(c).upper() == target.upper():
-                        return c
+                    if str(c).upper() == target.upper(): return c
                 return None
 
             dt_col = find_col('DATETIME') or find_col('DATE')
-            if not dt_col:
-                return None
-
-            # Convert to datetime and sort
-            df[dt_col] = pd.to_datetime(df[dt_col], errors='coerce')
-            df = df.dropna(subset=[dt_col])
-            
-            # Filter out future records (some APIs return placeholders for the whole day)
-            # Use a threshold: allow up to 1 hour in the future to account for slight clock drifts
-            now_ref = datetime.now()
-            # If the server is in UTC and data is in Local (e.g. +1h), we need to be careful.
-            # Best approach: only keep records that have a non-null temperature or similar
             t_col = find_col('T')
-            if t_col:
-                df = df[df[t_col].notna()]
-            
-            df = df.sort_values(dt_col, ascending=False)
-            
-            if df.empty:
-                return None
-
-            # IMPORTANT: Use the station's last record time as the reference for "Now" 
-            # to avoid timezone mismatches between API and Streamlit server.
-            last_record_time = df[dt_col].iloc[0]
-            
             u_col = find_col('U')
             rr_col = find_col('RR')
             
-            # Helper to get value or 0
-            def get_val(row, col):
-                if not col: return 0
-                val = row.get(col, 0)
-                try: return float(val) if pd.notna(val) else 0
-                except: return 0
-
-            # Safe totals calculation based on last_record_time
-            def get_rain_sum(since_delta):
-                if not rr_col: return 0
-                # We calculate from the last known record backwards
-                start_time = last_record_time - since_delta
-                mask = (df[dt_col] > start_time) & (df[dt_col] <= last_record_time)
-                subset = df[mask][rr_col]
-                return pd.to_numeric(subset, errors='coerce').fillna(0).sum()
+            if not dt_col: return None
+            
+            df[dt_col] = pd.to_datetime(df[dt_col], errors='coerce')
+            df = df.dropna(subset=[dt_col])
+            
+            # Filter rows with data
+            if t_col: df = df[df[t_col].notna()]
+            df = df.sort_values(dt_col, ascending=False)
+            
+            if df.empty: return None
+            
+            now = datetime.now()
+            current = df.iloc[0]
+            
+            # Rain 24h
+            rain_24h = pd.to_numeric(df[df[dt_col] >= (now - timedelta(hours=24))][rr_col], errors='coerce').sum() if rr_col else 0
+            
+            # 2. Fetch for 3j and 7j (larger range)
+            # Since p='1d' worked, let's try p='3m' for the rest and filter locally
+            # or try fixed dates but with 'to' as well
+            tomorrow = (now + timedelta(days=1)).strftime("%m-%d-%Y")
+            start_7j = (now - timedelta(days=8)).strftime("%m-%d-%Y")
+            params_hist = {
+                "id": station_id,
+                "from": start_7j,
+                "to": tomorrow,
+                "scale": "hour",
+                "type": "json"
+            }
+            data_hist = fetch(params_hist)
+            rain_3j, rain_7j = 0, 0
+            
+            if data_hist:
+                df_h = pd.DataFrame.from_records(data_hist)
+                if not df_h.empty:
+                    df_h[dt_col] = pd.to_datetime(df_h[dt_col], errors='coerce')
+                    df_h = df_h.dropna(subset=[dt_col])
+                    rain_3j = pd.to_numeric(df_h[df_h[dt_col] >= (now - timedelta(days=3))][rr_col], errors='coerce').sum() if rr_col else 0
+                    rain_7j = pd.to_numeric(df_h[df_h[dt_col] >= (now - timedelta(days=7))][rr_col], errors='coerce').sum() if rr_col else 0
 
             return {
-                "temp": get_val(df.iloc[0], t_col),
-                "hum": get_val(df.iloc[0], u_col),
-                "rain_24h": get_rain_sum(timedelta(hours=24)),
-                "rain_3j": get_rain_sum(timedelta(days=3)),
-                "rain_7j": get_rain_sum(timedelta(days=7)),
-                "last_update": last_record_time.strftime("%H:%M"),
-                "raw_data": df.head(5) # For debug if needed below
+                "temp": float(current.get(t_col, 0)) if t_col else 0,
+                "hum": float(current.get(u_col, 0)) if u_col else 0,
+                "rain_24h": rain_24h,
+                "rain_3j": rain_3j,
+                "rain_7j": rain_7j,
+                "last_update": current[dt_col].strftime("%H:%M"),
+                "raw_data": df.head(10)
             }
             
         except Exception as e:
