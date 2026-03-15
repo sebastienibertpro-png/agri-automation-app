@@ -107,15 +107,25 @@ class MeteusClient:
             # Convert to datetime and sort
             df[dt_col] = pd.to_datetime(df[dt_col], errors='coerce')
             df = df.dropna(subset=[dt_col])
+            
+            # Filter out future records (some APIs return placeholders for the whole day)
+            # Use a threshold: allow up to 1 hour in the future to account for slight clock drifts
+            now_ref = datetime.now()
+            # If the server is in UTC and data is in Local (e.g. +1h), we need to be careful.
+            # Best approach: only keep records that have a non-null temperature or similar
+            t_col = find_col('T')
+            if t_col:
+                df = df[df[t_col].notna()]
+            
             df = df.sort_values(dt_col, ascending=False)
             
             if df.empty:
                 return None
 
-            now = datetime.now()
-            current = df.iloc[0]
+            # IMPORTANT: Use the station's last record time as the reference for "Now" 
+            # to avoid timezone mismatches between API and Streamlit server.
+            last_record_time = df[dt_col].iloc[0]
             
-            t_col = find_col('T')
             u_col = find_col('U')
             rr_col = find_col('RR')
             
@@ -126,20 +136,23 @@ class MeteusClient:
                 try: return float(val) if pd.notna(val) else 0
                 except: return 0
 
-            # Safe totals calculation
+            # Safe totals calculation based on last_record_time
             def get_rain_sum(since_delta):
                 if not rr_col: return 0
-                mask = df[dt_col] >= (now - since_delta)
+                # We calculate from the last known record backwards
+                start_time = last_record_time - since_delta
+                mask = (df[dt_col] > start_time) & (df[dt_col] <= last_record_time)
                 subset = df[mask][rr_col]
                 return pd.to_numeric(subset, errors='coerce').fillna(0).sum()
 
             return {
-                "temp": get_val(current, t_col),
-                "hum": get_val(current, u_col),
+                "temp": get_val(df.iloc[0], t_col),
+                "hum": get_val(df.iloc[0], u_col),
                 "rain_24h": get_rain_sum(timedelta(hours=24)),
                 "rain_3j": get_rain_sum(timedelta(days=3)),
                 "rain_7j": get_rain_sum(timedelta(days=7)),
-                "last_update": df[dt_col].iloc[0].strftime("%H:%M")
+                "last_update": last_record_time.strftime("%H:%M"),
+                "raw_data": df.head(5) # For debug if needed below
             }
             
         except Exception as e:
@@ -168,6 +181,11 @@ def display_meteo_module():
         col3.metric("Pluie 24h", f"{summary['rain_24h']:.1f} mm")
         col4.metric("Pluie 3 jours", f"{summary['rain_3j']:.1f} mm")
         col5.metric("Pluie 7 jours", f"{summary['rain_7j']:.1f} mm")
+        
+        with st.expander("🔍 Debug Météus (Derniers relevés)"):
+            if "raw_data" in summary:
+                st.dataframe(summary["raw_data"])
+        
         st.divider()
     else:
         st.warning("Impossible de récupérer les données météo en direct.")
