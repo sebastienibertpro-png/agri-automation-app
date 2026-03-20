@@ -132,5 +132,5 @@ def render_premium_table(df, color="green"):
     </style>
     """
     html += df.to_html(escape=False, index=False, classes="p-table")
-    st.write(html, unsafe_allow_html=True)
+    st.markdown(html, unsafe_allow_html=True)
 
