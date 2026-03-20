@@ -62,17 +62,27 @@ else:
         df_disp = df_subset[['Nom_Produit', 'Prix_Moyen_Unitaire', 'Quantité_Achetée', 'Quantité_Consommée', 'Reste_en_Stock', 'Unité_Achat', 'Valeur_Stock_Estimee']].copy()
         df_disp.columns = ['Produit', 'Prix Moyen Unit. (€)', 'Acheté', 'Consommé', 'Reste', 'Unité', 'Valeur Estimée (€)']
         
+        # Sort by Value FIRST, so Total remains at the absolute bottom
+        df_disp = df_disp.sort_values(by="Valeur Estimée (€)", ascending=False)
+        
         # Add total row
         total_valeur_cat = df_disp['Valeur Estimée (€)'].sum()
         total_row = pd.DataFrame([['TOTAL', None, None, None, None, '', total_valeur_cat]], columns=df_disp.columns)
         df_disp = pd.concat([df_disp, total_row], ignore_index=True)
         
-        # Sort by Value
-        df_disp = df_disp.sort_values(by="Valeur Estimée (€)", ascending=False)
-        
-        # Highlight negative stocks
-        def highlight_neg(s):
-            return ['color: red;' if type(v) in [int, float] and v < 0 else '' for v in s]
+        # Styling function for Dataframe
+        def style_rows(row):
+            styles = [''] * len(row)
+            if row['Produit'] == 'TOTAL':
+                styles = ['font-weight: bold; color: #000000; background-color: #e6e6e6;'] * len(row)
+            else:
+                # Highlight negative stock in red
+                try:
+                    if float(row['Reste']) < 0:
+                        idx_reste = list(row.index).index('Reste')
+                        styles[idx_reste] = 'color: red; font-weight: bold;'
+                except: pass
+            return styles
             
         st.dataframe(
             df_disp.style.format({
@@ -81,7 +91,7 @@ else:
                 "Consommé": "{:.2f}",
                 "Reste": "{:.2f}",
                 "Valeur Estimée (€)": "{:,.2f} €"
-            }, na_rep="").apply(highlight_neg, subset=['Reste']),
+            }, na_rep="").apply(style_rows, axis=1),
             use_container_width=True,
             hide_index=True
         )
