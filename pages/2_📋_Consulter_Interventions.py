@@ -1,46 +1,20 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from shared import init_campaign_selector
+from shared import init_campaign_selector, inject_premium_css
 
 st.set_page_config(page_title="Consulter mes interventions", page_icon="📋", layout="wide")
+inject_premium_css()
 
-st.title("📋 Consulter mes Interventions")
-
-# --- Custom UI Styling ---
+# Additional CSS to bridge the header and the table
 st.markdown("""
 <style>
-    /* Styling the container of the data editor */
-    [data-testid="stDataEditor"] {
-        border-radius: 12px;
-        border: 1px solid #1f77b4;
-        box-shadow: 0 4px 15px rgba(31, 119, 180, 0.15);
-        padding: 4px;
-        background-color: white;
-    }
-    /* Visual Header for the table */
-    .table-header {
-        background-color: #1f77b4;
-        color: white;
-        padding: 10px 15px;
-        border-radius: 10px 10px 0 0;
-        font-weight: bold;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: -5px;
-        position: relative;
-        z-index: 10;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .table-header .table-title {
-        font-size: 1.1em;
-        display: flex ;
-        align-items: center;
-        gap: 10px;
-    }
+    .table-header { margin-bottom: -1px; border-radius: 12px 12px 0 0; }
+    [data-testid="stDataEditor"] { border-top-left-radius: 0; border-top-right-radius: 0; }
 </style>
 """, unsafe_allow_html=True)
+
+st.title("📋 Consulter mes Interventions")
 
 # 1. Utilisation du sélecteur de campagne partagé
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
