@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import tempfile
 import os
+import uuid
 from report_gen import ReportGenerator
 from shared import get_dataloader, init_campaign_selector
 
@@ -50,25 +51,47 @@ with tab_maint:
         st.warning("Aucun matériel trouvé dans REF_MATERIELS.")
     else:
         with st.form("form_saisie_maint"):
-            col1, col2 = st.columns(2)
-            with col1:
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
                 m_date = st.date_input("Date de l'entretien")
                 m_id_label = st.selectbox("Sélectionnez le matériel", sorted(materiel_options))
-            with col2:
+            with col_m2:
                 m_type = st.selectbox("Type d'Intervention", ["Vidange", "Filtres", "Pneumatiques", "Réparation", "Révision", "Autre"])
-                m_cout = st.number_input("Coût HT (€)", min_value=0.0, step=10.0)
+                m_heures = st.number_input("Heures Moteur", min_value=0.0, step=10.0)
+            with col_m3:
+                m_intervenant = st.text_input("Intervenant")
+                m_cout = st.number_input("Montant Réel HT (€)", min_value=0.0, step=10.0)
                 
-            m_obs = st.text_input("Observations / Détails (Facture, etc.)")
+            m_desc = st.text_input("Description courte")
+            
+            c_cons1, c_cons2, c_cons3, c_cons4 = st.columns(4)
+            with c_cons1: m_cons1 = st.text_input("Consommable 1")
+            with c_cons2: m_qte1 = st.number_input("Qtité 1", min_value=0.0, step=1.0)
+            with c_cons3: m_cons2 = st.text_input("Consommable 2")
+            with c_cons4: m_qte2 = st.number_input("Qtité 2", min_value=0.0, step=1.0)
+            
+            c_fact1, c_fact2 = st.columns(2)
+            with c_fact1: m_facture = st.text_input("ID Facture Associée")
+            with c_fact2: m_commentaires = st.text_input("Commentaires supplémentaires")
             
             submit_maint = st.form_submit_button("Enregistrer l'Entretien 🛠️")
             if submit_maint:
                 selected_row = materiel_map[m_id_label]
                 row_dict = {
+                    "ID_Entretien": str(uuid.uuid4())[:8].upper(),
                     "Date": m_date.strftime("%d/%m/%Y"),
                     "ID_Materiel": selected_row.get("ID_Materiel", ""),
                     "Type_Intervention": m_type,
-                    "Cout_HT": m_cout,
-                    "Observations": m_obs
+                    "Description": m_desc,
+                    "Heures_Moteur": m_heures if m_heures > 0 else "",
+                    "Intervenant": m_intervenant,
+                    "Consommables_1": m_cons1,
+                    "Qtité_1": m_qte1 if m_qte1 > 0 else "",
+                    "Consommable_2": m_cons2,
+                    "Qtité_2": m_qte2 if m_qte2 > 0 else "",
+                    "Montant_Reel_HT": m_cout if m_cout > 0 else "",
+                    "ID_Facture_Associee": m_facture,
+                    "Commentaires": m_commentaires
                 }
                 with st.spinner("Enregistrement en cours..."):
                     if active_loader.insert_row("JOURNAL_MAINTENANCE", row_dict):
@@ -82,14 +105,13 @@ with tab_fuel:
         st.warning("Aucun matériel trouvé dans REF_MATERIELS.")
     else:
         with st.form("form_saisie_fuel"):
-            col1, col2 = st.columns(2)
-            with col1:
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
                 f_date = st.date_input("Date du plein")
                 f_id_label = st.selectbox("Matériel concerné", sorted(materiel_options))
-                f_cuve = st.selectbox("Cuve utilisée", ["Cuve Principale", "Cuve Mobile"])
-            with col2:
+            with col_f2:
                 f_qte = st.number_input("Quantité Fuel (Litres)", min_value=0.0, step=10.0)
-                f_compteur = st.number_input("Heures Compteur (Optionnel)", min_value=0.0, step=10.0)
+                f_tache = st.text_input("Tâche réalisée")
             
             submit_fuel = st.form_submit_button("Enregistrer la Consommation ⛽")
             if submit_fuel:
@@ -98,11 +120,12 @@ with tab_fuel:
                 else:
                     selected_row = materiel_map[f_id_label]
                     row_dict = {
+                        "ID_Conso_Fuel": str(uuid.uuid4())[:8].upper(),
                         "Date": f_date.strftime("%d/%m/%Y"),
+                        "Campagne": selected_campaign,
                         "ID_Materiel": selected_row.get("ID_Materiel", ""),
-                        "Type_Cuve": f_cuve,
-                        "Compteur_h": f_compteur if f_compteur > 0 else "",
-                        "FUEL_quantité_L": f_qte
+                        "FUEL_quantité_L": f_qte,
+                        "Tache_réalisée": f_tache
                     }
                     with st.spinner("Enregistrement en cours..."):
                         if active_loader.insert_row("CONSO_FUEL", row_dict):
