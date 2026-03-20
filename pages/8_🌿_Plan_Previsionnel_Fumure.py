@@ -55,7 +55,6 @@ if not df_ppf_all.empty:
     mask = df_ppf_all['ID_Parcelle'].astype(str).str.strip() == str(selected_parcelle).strip()
     match = df_ppf_all[mask]
     if not match.empty:
-        # Get the first match as dict
         existing_ppf = match.iloc[0].to_dict()
 
 # Helper to provide default value (Existing > Assolment Defaults)
@@ -65,223 +64,138 @@ def get_val(col_name, default):
         return default
     return val
 
-# 4. Formulaire Paramètres Agronomiques
-st.subheader("⚙️ Paramètres Agronomiques (GREN)")
+# NEW TABS STRUCTURE
+tab_saisie, tab_consult = st.tabs(["✍️ Saisie du PPF", "📊 Consultation & Édition"])
 
-col_a, col_b, col_c = st.columns(3)
+with tab_saisie:
+    st.subheader("🌱 1. Détermination des Besoins (Pf)")
+    
+    col_n1, col_n2 = st.columns(2)
+    
+    with col_n1:
+        # Culture
+        culture_options = []
+        if not df_coef.empty and 'Culture' in df_coef.columns:
+            culture_options = df_coef['Culture'].dropna().unique().tolist()
+        
+        def_cult = get_val('Culture', culture_asso)
+        if def_cult not in culture_options and culture_options:
+            culture_options.append(def_cult)
+        
+        sel_culture = st.selectbox("Culture", culture_options, index=culture_options.index(def_cult) if def_cult in culture_options else 0)
+        sel_variete = st.text_input("Variété", value=get_val('Variété', variete_asso))
+        obj_rendement = st.number_input("Objectif Rendement (Qx/Ha)", value=float(get_val('Objectif_Rendement_Qx_Ha', 100.0)), step=1.0)
+        
+    with col_n2:
+        # Besoin Unitaire
+        b_unit = 0.0
+        if not df_coef.empty:
+            match_b = df_coef[df_coef['Culture'] == sel_culture]
+            if not match_b.empty:
+                col_b_name = 'Besoin__Culture_Unitaire '
+                if col_b_name not in match_b.columns:
+                    for c in match_b.columns:
+                        if 'Besoin' in c and 'Unitaire' in c:
+                            col_b_name = c; break
+                try: b_unit = float(match_b[col_b_name].iloc[0])
+                except: b_unit = 0.0
+                    
+        b_unit_input = st.number_input("Besoin Unitaire (b)", value=float(get_val('Besoin__Culture_Unitaire ', b_unit)), format="%.3f")
+        rf_input = st.number_input("Azote Fermeture Bilan (Rf)", value=float(get_val('Azote_Fermeture_Bilan(Rf)', 30.0)))
 
-with col_a:
-    # 4.1 Besoin Culture
-    culture_options = []
-    if not df_coef.empty and 'Culture' in df_coef.columns:
-        culture_options = df_coef['Culture'].dropna().unique().tolist()
+        besoin_culture_pf = obj_rendement * b_unit_input
+        st.info(f"**👉 Besoin Culture (Pf) = {besoin_culture_pf:.1f} kg N/ha**")
+
+    st.markdown("---")
+    st.subheader("🌍 2. Évaluation des Fournitures")
     
-    # Try to pre-select based on existing or assolement
-    def_cult = get_val('Culture', culture_asso)
-    if def_cult not in culture_options and culture_options:
-        culture_options.append(def_cult)
+    col_f1, col_f2 = st.columns(2)
     
-    sel_culture = st.selectbox("Culture", culture_options, index=culture_options.index(def_cult) if def_cult in culture_options else 0)
-    
-    sel_variete = st.text_input("Variété", value=get_val('Variété', variete_asso))
-    obj_rendement = st.number_input("Objectif Rendement (Qx/Ha)", value=float(get_val('Objectif_Rendement_Qx_Ha', 100.0)), step=1.0)
-    
-    # Récupérer Besoin Unitaire b
-    b_unit = 0.0
-    if not df_coef.empty:
-        match_b = df_coef[df_coef['Culture'] == sel_culture]
-        if not match_b.empty:
-            # Assuming column is EXACTLY "Besoin__Culture_Unitaire " as per user prompt, let's clean spaces just in case
-            col_b_name = 'Besoin__Culture_Unitaire '
-            if col_b_name not in match_b.columns:
-                # Find closest
-                for c in match_b.columns:
-                    if 'Besoin' in c and 'Unitaire' in c:
-                        col_b_name = c; break
+    with col_f1:
+        st.markdown("**Reliquats et Sol**")
+        ri_input = st.number_input("Reliquat Sortie Hiver (Ri)", value=float(get_val('Reliquat_Sortie_Hiver(Ri)', 40.0)))
+        
+        sol_options = []
+        if not df_humus.empty and 'Type_sol' in df_humus.columns:
+            sol_options = df_humus['Type_sol'].dropna().unique().tolist()
             
-            try:
-                b_unit = float(match_b[col_b_name].iloc[0])
-            except:
-                b_unit = 0.0
+        def_sol = get_val('Type_sol', sol_options[0] if sol_options else "")
+        sel_sol = st.selectbox("Type de sol", sol_options, index=sol_options.index(def_sol) if def_sol in sol_options else 0)
+        
+        mh_val = 0.0
+        if not df_humus.empty:
+            match_mh = df_humus[df_humus['Type_sol'] == sel_sol]
+            if not match_mh.empty and 'Minéralisation_Humus(Mh)' in match_mh.columns:
+                try: mh_val = float(match_mh['Minéralisation_Humus(Mh)'].iloc[0])
+                except: pass
                 
-    b_unit_input = st.number_input("Besoin Unitaire (b)", value=float(get_val('Besoin__Culture_Unitaire ', b_unit)), format="%.3f")
-    
-    besoin_culture_pf = obj_rendement * b_unit_input
-    st.markdown(f"**👉 Besoin Culture (Pf) : {besoin_culture_pf:.1f} kg N/ha**")
+        mh_input = st.number_input("Minéralisation Humus (Mh)", value=float(get_val('Minéralisation_Humus(Mh)', mh_val)))
 
-with col_b:
-    # 4.2 Précédent
-    prec_options = []
-    if not df_prec.empty and 'Precedent_cultural' in df_prec.columns:
-         prec_options = df_prec['Precedent_cultural'].dropna().unique().tolist()
-         
-    def_prec = get_val('Precedent_Cultural', p_data.get('Precedent', ''))
-    if def_prec not in prec_options and prec_options:
-        if def_prec: prec_options.append(def_prec)
-        else: prec_options.append("Inconnu")
-        
-    sel_prec = st.selectbox("Précédent Cultural", prec_options, index=prec_options.index(def_prec) if def_prec in prec_options else 0)
-    gestion_residus = st.selectbox("Gestion des Résidus", ["Enfouis", "Exportés", "Brûlés"], index=["Enfouis", "Exportés", "Brûlés"].index(get_val('Gestion_Résidus', "Enfouis")) if get_val('Gestion_Résidus', "Enfouis") in ["Enfouis", "Exportés", "Brûlés"] else 0)
-    
-    # Récupérer Mr
-    mr_val = 0.0
-    if not df_prec.empty:
-        match_mr = df_prec[df_prec['Precedent_cultural'] == sel_prec]
-        if not match_mr.empty and 'Effet_précédent(Mr)' in match_mr.columns:
-            try: mr_val = float(match_mr['Effet_précédent(Mr)'].iloc[0])
-            except: pass
-            
-    mr_input = st.number_input("Effet Précédent (Mr)", value=float(get_val('Effet_précédent(Mr)', mr_val)))
-    
-    # 4.3 Humus
-    sol_options = []
-    if not df_humus.empty and 'Type_sol' in df_humus.columns:
-        sol_options = df_humus['Type_sol'].dropna().unique().tolist()
-        
-    def_sol = get_val('Type_sol', sol_options[0] if sol_options else "")
-    sel_sol = st.selectbox("Type de sol", sol_options, index=sol_options.index(def_sol) if def_sol in sol_options else 0)
-    
-    # Récupérer Mh
-    mh_val = 0.0
-    if not df_humus.empty:
-        match_mh = df_humus[df_humus['Type_sol'] == sel_sol]
-        if not match_mh.empty and 'Minéralisation_Humus(Mh)' in match_mh.columns:
-            try: mh_val = float(match_mh['Minéralisation_Humus(Mh)'].iloc[0])
-            except: pass
-            
-    mh_input = st.number_input("Minéralisation Humus (Mh)", value=float(get_val('Minéralisation_Humus(Mh)', mh_val)))
+        st.markdown("**Autres apports**")
+        nirr_input = st.number_input("Fourniture Irrigation (Nirr)", value=float(get_val('Fourniture_Irrigation(Nirr)', 0.0)))
+        pi_input = st.number_input("Azote déjà absorbé (Pi)", value=float(get_val('Azote_deja_aborbé(Pi)', 0.0)))
 
-with col_c:
-    # 4.4 CIPAN
-    cipan_types = []
-    if not df_cipan.empty and 'CIPAN_Type' in df_cipan.columns:
-         cipan_types = ["Aucun"] + df_cipan['CIPAN_Type'].dropna().unique().tolist()
-         
-    def_cipan = get_val('CIPAN_Type', "Aucun")
-    sel_cipan = st.selectbox("Type CIPAN", cipan_types, index=cipan_types.index(def_cipan) if def_cipan in cipan_types else 0)
-    
-    dev_cipan_options = []
-    if sel_cipan != "Aucun" and not df_cipan.empty:
-         match_c = df_cipan[df_cipan['CIPAN_Type'] == sel_cipan]
-         if 'Développement_CIPAN' in match_c.columns:
-              dev_cipan_options = match_c['Développement_CIPAN'].dropna().unique().tolist()
-              
-    def_dev = get_val('Développement_CIPAN', dev_cipan_options[0] if dev_cipan_options else "")
-    if def_dev not in dev_cipan_options and dev_cipan_options:
-        def_dev = dev_cipan_options[0]
-        
-    sel_dev_cipan = st.selectbox("Développement CIPAN", dev_cipan_options if dev_cipan_options else ["N/A"], index=dev_cipan_options.index(def_dev) if def_dev in dev_cipan_options else 0)
-    
-    # Récupérer MrCi
-    mrci_val = 0.0
-    if sel_cipan != "Aucun" and not df_cipan.empty:
-         match_mrci = df_cipan[(df_cipan['CIPAN_Type'] == sel_cipan) & (df_cipan['Développement_CIPAN'] == sel_dev_cipan)]
-         if not match_mrci.empty and 'Effet_CIPAN(MrCi)' in match_mrci.columns:
-             try: mrci_val = float(match_mrci['Effet_CIPAN(MrCi)'].iloc[0])
-             except: pass
+    with col_f2:
+        st.markdown("**Précédent Cultural**")
+        prec_options = []
+        if not df_prec.empty and 'Precedent_cultural' in df_prec.columns:
+             prec_options = df_prec['Precedent_cultural'].dropna().unique().tolist()
              
-    mrci_input = st.number_input("Effet CIPAN (MrCi)", value=float(get_val('Effet_CIPAN(MrCi)', mrci_val)))
-
-
-# 5. Autres éléments du Bilan
-st.markdown("---")
-st.subheader("📊 Autres postes du Bilan (Reliquats, Irrigation...)")
-
-# Mettre en session temporairement pour forcer la maj si besoin
-col_r1, col_r2, col_r3, col_r4 = st.columns(4)
-
-with col_r1:
-    rf_input = st.number_input("Azote Fermeture Bilan (Rf)", value=float(get_val('Azote_Fermeture_Bilan(Rf)', 30.0)))
-with col_r2:    
-    pi_input = st.number_input("Azote déjà absorbé (Pi)", value=float(get_val('Azote_deja_aborbé(Pi)', 0.0)))
-with col_r3:
-    ri_input = st.number_input("Reliquat Sortie Hiver (Ri)", value=float(get_val('Reliquat_Sortie_Hiver(Ri)', 40.0)))
-with col_r4:
-    nirr_input = st.number_input("Fourniture Irrigation (Nirr)", value=float(get_val('Fourniture_Irrigation(Nirr)', 0.0)))
-
-# 6. CALCUL DOSE X
-besoins_totaux = besoin_culture_pf + rf_input
-fournitures_totales = pi_input + ri_input + mh_input + mr_input + mrci_input + nirr_input
-
-dose_x = besoins_totaux - fournitures_totales
-# Ne pas avoir de dose négative
-dose_x = max(0, dose_x)
-
-st.markdown("---")
-col_dx, col_save = st.columns([2,1])
-
-with col_dx:
-    st.markdown(f"### 🎯 Dose X à apporter : **{dose_x:.1f} kg N/ha**")
-    st.caption(f"Calcul : Besoin ({besoins_totaux:.1f}) - Fourniture ({fournitures_totales:.1f})")
-
-# Calcul de la fertilisation Prévue
-df_fert_prevue = dl.get_planned_fertilization(campagne_input)
-total_n_prevu = 0.0
-interv_list = []
-
-if not df_fert_prevue.empty:
-    # Filter by Parcelle
-    mask_p = df_fert_prevue['ID_Parcelle'].astype(str).str.strip().str.contains(selected_parcelle, case=False, na=False)
-    my_fert = df_fert_prevue[mask_p]
-    
-    if not my_fert.empty:
-        # Assuming N contribution is calculated. Let's see how NPK is stored.
-        # N, P, K columns are usually present in interventions for Fertilisation
-        for idx, row in my_fert.iterrows():
-            date_str = pd.to_datetime(row.get('Date', pd.Timestamp.now()), errors='coerce').strftime('%d/%m/%Y')
-            produit = row.get('Nom_Produit', 'Engrais inconnu')
-            qte = pd.to_numeric(row.get('Quantité_Totale_Produit', 0), errors='coerce')
-            n_tot = pd.to_numeric(row.get('N_Total', 0), errors='coerce') # or similar column
+        def_prec = get_val('Precedent_Cultural', p_data.get('Precedent', ''))
+        if def_prec not in prec_options and prec_options:
+            if def_prec: prec_options.append(def_prec)
+            else: prec_options.append("Inconnu")
             
-            # If N_Total is not direct, check if we need to calculate it from Unit
-            if pd.isna(n_tot) or n_tot == 0:
-                 # Try to guess or fallback
-                 # In a real scenario, we might merge with REF_INTRANTS to get NPK concentration.
-                 # Let's hope N_Total is populated by the Saisie Intervention page.
-                 n_tot = pd.to_numeric(row.get('N_Total_apporté', 0), errors='coerce')
-                 if pd.isna(n_tot): n_tot = 0.0
+        sel_prec = st.selectbox("Précédent Cultural", prec_options, index=prec_options.index(def_prec) if def_prec in prec_options else 0)
+        gestion_residus = st.selectbox("Gestion des Résidus", ["Enfouis", "Exportés", "Brûlés"], index=["Enfouis", "Exportés", "Brûlés"].index(get_val('Gestion_Résidus', "Enfouis")) if get_val('Gestion_Résidus', "Enfouis") in ["Enfouis", "Exportés", "Brûlés"] else 0)
+        
+        mr_val = 0.0
+        if not df_prec.empty:
+            match_mr = df_prec[df_prec['Precedent_cultural'] == sel_prec]
+            if not match_mr.empty and 'Effet_précédent(Mr)' in match_mr.columns:
+                try: mr_val = float(match_mr['Effet_précédent(Mr)'].iloc[0])
+                except: pass
+                
+        mr_input = st.number_input("Effet Précédent (Mr)", value=float(get_val('Effet_précédent(Mr)', mr_val)))
+        
+        st.markdown("**CIPAN / Couverts**")
+        cipan_types = []
+        if not df_cipan.empty and 'CIPAN_Type' in df_cipan.columns:
+             cipan_types = ["Aucun"] + df_cipan['CIPAN_Type'].dropna().unique().tolist()
+             
+        def_cipan = get_val('CIPAN_Type', "Aucun")
+        sel_cipan = st.selectbox("Type CIPAN", cipan_types, index=cipan_types.index(def_cipan) if def_cipan in cipan_types else 0)
+        
+        dev_cipan_options = []
+        if sel_cipan != "Aucun" and not df_cipan.empty:
+             match_c = df_cipan[df_cipan['CIPAN_Type'] == sel_cipan]
+             if 'Développement_CIPAN' in match_c.columns:
+                  dev_cipan_options = match_c['Développement_CIPAN'].dropna().unique().tolist()
+                  
+        def_dev = get_val('Développement_CIPAN', dev_cipan_options[0] if dev_cipan_options else "")
+        if def_dev not in dev_cipan_options and dev_cipan_options:
+            def_dev = dev_cipan_options[0]
+            
+        sel_dev_cipan = st.selectbox("Développement CIPAN", dev_cipan_options if dev_cipan_options else ["N/A"], index=dev_cipan_options.index(def_dev) if def_dev in dev_cipan_options else 0)
+        
+        mrci_val = 0.0
+        if sel_cipan != "Aucun" and not df_cipan.empty:
+             match_mrci = df_cipan[(df_cipan['CIPAN_Type'] == sel_cipan) & (df_cipan['Développement_CIPAN'] == sel_dev_cipan)]
+             if not match_mrci.empty and 'Effet_CIPAN(MrCi)' in match_mrci.columns:
+                 try: mrci_val = float(match_mrci['Effet_CIPAN(MrCi)'].iloc[0])
+                 except: pass
                  
-            # Convert total N applied on the parcel to N per hectare
-            # Actually N_Total is usually PER HECTARE in standard ITK forms.
-            # Let's assume the column is Dose/Ha or N/Ha. If row has N_Total, is it total or /ha? 
-            # In general, doses in agri are expressed in kg/ha. Let's assume n_app= N/Ha
-            
-            # Look for N_Unitaire or N_Ha
-            n_ha = pd.to_numeric(row.get('N_ha', pd.to_numeric(row.get('Dose_Unitaire_N', pd.to_numeric(row.get('N', 0), errors='coerce')), errors='coerce')), errors='coerce')
-            
-            if pd.isna(n_ha): n_ha = 0.0
-            
-            total_n_prevu += n_ha
-            interv_list.append({
-                'Date': date_str,
-                'Produit': produit,
-                'Dose_Ha': f"{n_ha:.1f} Unités"
-            })
+        mrci_input = st.number_input("Effet CIPAN (MrCi)", value=float(get_val('Effet_CIPAN(MrCi)', mrci_val)))
 
+    st.markdown("---")
+    
+    # 3. CALCULS INTERMÉDIAIRES
+    besoins_totaux = besoin_culture_pf + rf_input
+    fournitures_totales = pi_input + ri_input + mh_input + mr_input + mrci_input + nirr_input
 
-# VISUALISATION FRACTIONNEMENT
-st.markdown("### 🚜 Interventions Prévues (Journal)")
-
-if interv_list:
-    df_show = pd.DataFrame(interv_list)
-    st.table(df_show)
-else:
-    st.info("Aucune fertilisation prévue trouvée pour cette parcelle dans le journal.")
-
-# Jauge / Alerte de dépassement
-delta = total_n_prevu - dose_x
-
-if dose_x > 0:
-    progress_val = min(total_n_prevu / dose_x, 1.0)
-    st.progress(progress_val)
-
-if total_n_prevu > dose_x:
-    st.error(f"⚠️ **ATTENTION :** La dose prévue totale ({total_n_prevu:.1f} U) dépasse la Dose X calculée ({dose_x:.1f} U) d'un écart de +{delta:.1f} Unités !")
-elif total_n_prevu > 0:
-    st.success(f"Dose prévue couverte à **{(total_n_prevu / dose_x * 100):.1f}%** ({total_n_prevu:.1f} U / {dose_x:.1f} U)")
-
-with col_save:
-    # Build dictionary to save
+    dose_x = besoins_totaux - fournitures_totales
+    dose_x = max(0, dose_x)
+    
     ppf_dict = {
         'Campagne': str(campagne_input),
         'ID_Parcelle': str(selected_parcelle),
@@ -306,13 +220,82 @@ with col_save:
         'Fourniture_Irrigation(Nirr)': float(nirr_input),
         'Dose_X': float(dose_x)
     }
-    
-    if st.button("💾 Sauvegarder ce PPF", use_container_width=True, type="primary"):
+
+    if st.button("💾 Sauvegarder les Paramètres du PPF", use_container_width=True, type="primary"):
         with st.spinner("Sauvegarde..."):
             if dl.update_ppf(ppf_dict):
-                st.success("PPF Sauvegardé !")
+                st.success("PPF Sauvegardé avec succès ! Pensez à vérifier l'onglet de Consultation.")
+
+
+with tab_consult:
+    st.subheader("📊 Bilan du Plan de Fumure")
+    
+    # Recalculate context safely inside this block
+    besoins_totaux = ppf_dict["Besoin_Culture(Pf)"] + ppf_dict["Azote_Fermeture_Bilan(Rf)"]
+    fournitures_totales = ppf_dict["Azote_deja_aborbé(Pi)"] + ppf_dict["Reliquat_Sortie_Hiver(Ri)"] + ppf_dict["Minéralisation_Humus(Mh)"] + ppf_dict["Effet_précédent(Mr)"] + ppf_dict["Effet_CIPAN(MrCi)"] + ppf_dict["Fourniture_Irrigation(Nirr)"]
+    dose_x = ppf_dict["Dose_X"]
+
+    col_bilan1, col_bilan2, col_bilan3 = st.columns(3)
+    with col_bilan1:
+        st.metric("Total Besoins", f"{besoins_totaux:.1f} kg")
+    with col_bilan2:
+        st.metric("Total Fournitures", f"{fournitures_totales:.1f} kg")
+    with col_bilan3:
+        st.metric("🎯 Dose X (Objectif)", f"{dose_x:.1f} kg N/ha")
+        
+
+    st.markdown("---")
+    st.subheader("🚜 Interventionsfertilisantes prévues")
+    
+    # Calcul de la fertilisation Prévue
+    df_fert_prevue = dl.get_planned_fertilization(campagne_input)
+    total_n_prevu = 0.0
+    interv_list = []
+
+    if not df_fert_prevue.empty:
+        mask_p = df_fert_prevue['ID_Parcelle'].astype(str).str.strip().str.contains(selected_parcelle, case=False, na=False)
+        my_fert = df_fert_prevue[mask_p]
+        
+        if not my_fert.empty:
+            for idx, row in my_fert.iterrows():
+                date_str = pd.to_datetime(row.get('Date', pd.Timestamp.now()), errors='coerce').strftime('%d/%m/%Y')
+                produit = row.get('Nom_Produit', 'Engrais inconnu')
                 
-    if st.button("📄 Éditer le PDF PPF", use_container_width=True):
+                n_ha = pd.to_numeric(row.get('N_ha', pd.to_numeric(row.get('Dose_Unitaire_N', pd.to_numeric(row.get('N', 0), errors='coerce')), errors='coerce')), errors='coerce')
+                if pd.isna(n_ha): n_ha = 0.0
+                
+                total_n_prevu += n_ha
+                interv_list.append({
+                    'Date': date_str,
+                    'Produit': produit,
+                    'Dose_Ha': f"{n_ha:.1f} Unités"
+                })
+
+    if interv_list:
+        df_show = pd.DataFrame(interv_list)
+        st.table(df_show)
+        
+        # Jauge / Alerte de dépassement
+        delta = total_n_prevu - dose_x
+
+        if dose_x > 0:
+            progress_val = min(total_n_prevu / dose_x, 1.0)
+            st.progress(progress_val)
+
+        if total_n_prevu > dose_x:
+            st.error(f"⚠️ **ATTENTION :** La dose prévue totale ({total_n_prevu:.1f} U) dépasse la Dose X calculée ({dose_x:.1f} U) d'un écart de +{delta:.1f} Unités !")
+        elif total_n_prevu > 0:
+            st.success(f"Dose prévue couverte à **{(total_n_prevu / dose_x * 100):.1f}%** ({total_n_prevu:.1f} U / {dose_x:.1f} U)")
+            
+    else:
+        st.info("Aucune intervention de type 'Fertilisation Prévue' n'a été saisie dans le journal pour cette parcelle.")
+        
+
+    st.markdown("---")
+    st.subheader("📄 Édition Réglementaire")
+    st.caption("Génère le document PDF du Plan Prévisionnel de Fumure (PPF) pour cette parcelle, incluant le bilan GREN et la stratégie de fractionnement des apports.")
+    
+    if st.button("🖨️ Éditer le PDF PPF", use_container_width=True, type="primary"):
         with st.spinner("Génération du document..."):
             pdf_data = generate_ppf_pdf(ppf_dict, interv_list)
             if pdf_data:
