@@ -7,6 +7,41 @@ st.set_page_config(page_title="Consulter mes interventions", page_icon="📋", l
 
 st.title("📋 Consulter mes Interventions")
 
+# --- Custom UI Styling ---
+st.markdown("""
+<style>
+    /* Styling the container of the data editor */
+    [data-testid="stDataEditor"] {
+        border-radius: 12px;
+        border: 1px solid #1f77b4;
+        box-shadow: 0 4px 15px rgba(31, 119, 180, 0.15);
+        padding: 4px;
+        background-color: white;
+    }
+    /* Visual Header for the table */
+    .table-header {
+        background-color: #1f77b4;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 10px 10px 0 0;
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: -5px;
+        position: relative;
+        z-index: 10;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .table-header .table-title {
+        font-size: 1.1em;
+        display: flex ;
+        align-items: center;
+        gap: 10px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # 1. Utilisation du sélecteur de campagne partagé
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
@@ -69,7 +104,7 @@ def group_interventions(df):
 df_display = group_interventions(df_filtered)
 
 # 4. Affichage
-st.markdown("### Journal Détaillé")
+st.markdown('<div class="table-header"><div class="table-title">📖 Journal Détaillé</div><div style="font-size: 0.8em; opacity: 0.8;">Cochez une ligne pour agir ✍️🔥</div></div>', unsafe_allow_html=True)
 
 column_config = {
     "Select": st.column_config.CheckboxColumn("Sélect.", default=False),
