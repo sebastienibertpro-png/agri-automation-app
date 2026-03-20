@@ -2,40 +2,20 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import datetime
-from shared import init_campaign_selector
+from shared import init_campaign_selector, inject_premium_css
 
 st.set_page_config(page_title="Assolement & Parcelles", page_icon="🌾", layout="wide")
+inject_premium_css()
 
-st.title("🌾 Gestion de l'Assolement & Parcelles")
-st.markdown("---")
-
-# --- Custom UI Styling ---
+# Additional CSS to bridge the header and the table
 st.markdown("""
 <style>
-    [data-testid="stDataEditor"] {
-        border-radius: 12px;
-        border: 1px solid #2e7d32;
-        box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
-        padding: 4px;
-        background-color: white;
-    }
-    .table-header {
-        background-color: #2e7d32;
-        color: white;
-        padding: 10px 15px;
-        border-radius: 10px 10px 0 0;
-        font-weight: bold;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: -5px;
-        position: relative;
-        z-index: 10;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .table-header.blue { background-color: #1f77b4; }
+    .table-header { margin-bottom: -1px; border-radius: 12px 12px 0 0; }
+    [data-testid="stDataEditor"] { border-top-left-radius: 0; border-top-right-radius: 0; }
 </style>
 """, unsafe_allow_html=True)
+
+st.title("🌾 Gestion de l'Assolement & Parcelles")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 dl = active_loader
