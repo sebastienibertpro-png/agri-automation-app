@@ -87,6 +87,38 @@ def load_farm_context():
     except Exception:
         pass
 
+    # 6. RECOLTE ET STOCKAGE
+    try:
+        df_recolte = active_loader._get_data("RECOLTE_STOCKAGE")
+        if not df_recolte.empty:
+            context_parts.append("### RECOLTE ET STOCKAGE\n" + df_recolte.to_csv(index=False))
+    except Exception:
+        pass
+
+    # 7. CONTRATS DE VENTES
+    try:
+        df_contrats = active_loader._get_data("CONTRATS_VENTES")
+        if not df_contrats.empty:
+            context_parts.append("### CONTRATS DE VENTES\n" + df_contrats.to_csv(index=False))
+    except Exception:
+        pass
+
+    # 8. PPF
+    try:
+        df_ppf = active_loader._get_data("PPF")
+        if not df_ppf.empty:
+            context_parts.append("### PLAN PREVISIONNEL DE FUMURE (PPF)\n" + df_ppf.to_csv(index=False))
+    except Exception:
+        pass
+
+    # 9. JOURNAL DE MAINTENANCE
+    try:
+        df_maint = active_loader._get_data("JOURNAL_MAINTENANCE")
+        if not df_maint.empty:
+            context_parts.append("### JOURNAL DE MAINTENANCE\n" + df_maint.to_csv(index=False))
+    except Exception:
+        pass
+
     return "\n\n".join(context_parts)
 
 with st.spinner("Chargement des données de l'exploitation pour l'IA..."):
