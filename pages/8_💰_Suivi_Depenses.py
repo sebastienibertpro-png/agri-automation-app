@@ -35,6 +35,20 @@ else:
         # Convert amount to numeric just in case
         df_achats[mnt_col] = pd.to_numeric(df_achats[mnt_col], errors='coerce').fillna(0.0)
 
+        # Normalisation des catégories (fusionner "Matériel" et "MATERIEL")
+        def clean_category(val):
+            if pd.isna(val) or str(val).strip() == "": return "INCONNU"
+            s = str(val).strip().upper()
+            s = s.replace("É", "E").replace("È", "E").replace("Ê", "E").replace("Ë", "E")
+            s = s.replace("À", "A").replace("Â", "A").replace("Ä", "A")
+            s = s.replace("Î", "I").replace("Ï", "I")
+            s = s.replace("Ô", "O").replace("Ö", "O")
+            s = s.replace("Û", "U").replace("Ü", "U")
+            s = s.replace("Ç", "C")
+            return s
+            
+        df_achats[cat_col] = df_achats[cat_col].apply(clean_category)
+
         # Filters
         st.sidebar.markdown("### 🔍 Filtres Dépenses")
         
