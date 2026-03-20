@@ -66,8 +66,9 @@ else:
         df_disp = df_disp.sort_values(by="Valeur Estimée (€)", ascending=False)
         
         # Add total row
+        import math
         total_valeur_cat = df_disp['Valeur Estimée (€)'].sum()
-        total_row = pd.DataFrame([['TOTAL', pd.NA, pd.NA, pd.NA, pd.NA, '', total_valeur_cat]], columns=df_disp.columns)
+        total_row = pd.DataFrame([['TOTAL', float('nan'), float('nan'), float('nan'), float('nan'), '', total_valeur_cat]], columns=df_disp.columns)
         df_disp = pd.concat([df_disp, total_row], ignore_index=True)
         
         # Styling function for Dataframe
