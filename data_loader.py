@@ -496,6 +496,34 @@ class DataLoader:
             st.error(f"Erreur lors de l'insertion en masse : {e}")
             return False
 
+    def insert_row(self, sheet_name: str, row_dict: dict) -> bool:
+        if not self.conn:
+            st.error("Insertion impossible en local (Lecture seule).")
+            return False
+            
+        try:
+            # Relecture à chaud pour éviter les écrasements
+            try:
+                df = self.conn.read(worksheet=sheet_name, ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            except Exception:
+                # L'onglet peut être vide ou nouveau
+                df = pd.DataFrame()
+            
+            for col in row_dict:
+                if col not in df.columns:
+                    df[col] = "" # fallback creation
+            
+            new_row = pd.DataFrame([row_dict])
+            df = pd.concat([df, new_row], ignore_index=True)
+            self.conn.update(worksheet=sheet_name, data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop(sheet_name, None)
+            st.cache_data.clear()
+            return True
+            
+        except Exception as e:
+            st.error(f"Erreur d'insertion dans {sheet_name} : {e}")
+            return False
+
     def delete_interventions(self, intervention_ids: list) -> bool:
         """
         Deletes interventions from the JOURNAL_INTERVENTION sheet by ID.
