@@ -116,21 +116,24 @@ def render_premium_header(title, subtitle="", color="green"):
     cls = "p-header p-green" if color == "green" else "p-header p-blue"
     st.markdown(f'<div class="{cls}"><span>{title}</span><span style="font-size: 0.7em; opacity: 0.8; font-weight: normal;">{subtitle}</span></div>', unsafe_allow_html=True)
 
-def render_premium_table(df, color="green"):
+def render_premium_table(df, color="green", compact=False):
     """Render a DataFrame as a styled HTML table using fully inline CSS (no style tags).
     This is necessary because Streamlit Cloud sanitizes <style> tags in st.markdown.
     """
     header_bg = "linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%)" if color == "green" else "linear-gradient(135deg, #0d47a1 0%, #1976d2 100%)"
     border_color = "#2e7d32" if color == "green" else "#1976d2"
-    hover_bg = "#f1f8e9" if color == "green" else "#e3f2fd"
 
-    th_style = f'style="padding:12px 15px; border:1px solid #eee; background:{header_bg}; color:#ffffff; font-weight:bold; text-align:left;"'
-    td_style = 'style="padding:10px 15px; border:1px solid #eee; text-align:left;"'
-    td_even_style = 'style="padding:10px 15px; border:1px solid #eee; text-align:left; background-color:#f8f9fb;"'
-    td_last_style = f'style="padding:10px 15px; border:1px solid #eee; text-align:left; border-bottom:3px solid {border_color};"'
-    td_last_even_style = f'style="padding:10px 15px; border:1px solid #eee; text-align:left; background-color:#f8f9fb; border-bottom:3px solid {border_color};"'
+    pad = "6px 10px" if compact else "12px 15px"
+    font_size = "0.8em" if compact else "0.9em"
+    nowrap = "white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;" if compact else ""
 
-    table_style = f'style="border-collapse:collapse; width:100%; border-radius:8px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.1); font-size:0.9em; font-family: inherit; margin:4px 0;"'
+    th_style = f'style="padding:{pad}; border:1px solid #eee; background:{header_bg}; color:#ffffff; font-weight:bold; text-align:left; white-space:nowrap;"'
+    td_style = f'style="padding:{pad}; border:1px solid #eee; text-align:left; {nowrap}"'
+    td_even_style = f'style="padding:{pad}; border:1px solid #eee; text-align:left; background-color:#f8f9fb; {nowrap}"'
+    td_last_style = f'style="padding:{pad}; border:1px solid #eee; text-align:left; border-bottom:3px solid {border_color}; {nowrap}"'
+    td_last_even_style = f'style="padding:{pad}; border:1px solid #eee; text-align:left; background-color:#f8f9fb; border-bottom:3px solid {border_color}; {nowrap}"'
+
+    table_style = f'style="border-collapse:collapse; width:100%; border-radius:8px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.1); font-size:{font_size}; font-family:inherit; margin:4px 0;"'
 
     rows = list(df.itertuples(index=False, name=None))
     n = len(rows)
