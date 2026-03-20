@@ -117,10 +117,25 @@ else:
             if manage_mode == "👁️ Visualisation & Liens":
                 df_viz = df_manage.copy()
                 if 'Date_facture' in df_viz.columns:
-                    # Safe conversion to datetime
                     df_viz['Date_facture'] = pd.to_datetime(df_viz['Date_facture'], errors='coerce', dayfirst=True)
-                    # Format while handling NaT
                     df_viz['Date_facture'] = df_viz['Date_facture'].dt.strftime('%d/%m/%Y').fillna("")
+                
+                # Drop unwanted columns
+                cols_to_drop = ['ID_Parcelle_liée', 'Affectation_type', 'Montant', id_col]
+                for c in cols_to_drop:
+                    if c in df_viz.columns:
+                        df_viz = df_viz.drop(columns=[c])
+                
+                # Rename columns for compact display
+                rename_map = {
+                    'Date_facture': 'Date',
+                    'Nom_Produit': 'Produit',
+                    'Quantité_Achetée': 'Quantité',
+                    'Montant_Total_Produit_HT': 'Total Produit HT',
+                    'Montant_Total_Facture_HT': 'Total Facture HT',
+                    'Montant_Total_Facture_TTC': 'Total Facture TTC',
+                }
+                df_viz = df_viz.rename(columns={k: v for k, v in rename_map.items() if k in df_viz.columns})
                 
                 # Render Drive Links
                 link_col = 'Lien_facture' if 'Lien_facture' in df_viz.columns else 'Lien_Facture_Drive' if 'Lien_Facture_Drive' in df_viz.columns else 'Lien_Drive' if 'Lien_Drive' in df_viz.columns else None
@@ -129,10 +144,10 @@ else:
                         if pd.isna(url) or str(url).strip() == "": return ""
                         return f'<a href="{url}" target="_blank">📄 Voir</a>'
                     df_viz['Lien'] = df_viz[link_col].apply(make_link)
-                    cols = ['Lien'] + [c for c in df_viz.columns if c not in ['Lien', link_col, id_col]]
+                    cols = ['Lien'] + [c for c in df_viz.columns if c not in ['Lien', link_col]]
                     df_viz = df_viz[cols]
                 
-                render_premium_table(df_viz, color="blue")
+                render_premium_table(df_viz, color="blue", compact=True)
                 
             elif manage_mode == "📝 Mode Édition":
                 st.info("💡 Modifiez les valeurs directement dans le tableau ci-dessous, puis cliquez sur Sauvegarder.")
