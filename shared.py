@@ -83,67 +83,54 @@ def init_campaign_selector():
 def inject_premium_css():
     st.markdown("""
 <style>
-    /* Styling for st.data_editor and st.dataframe containers */
+    /* Global Overrides for Streamlit Widgets */
     [data-testid="stDataEditor"], [data-testid="stDataFrame"] {
-        border-radius: 12px;
-        border: 1px solid #e0e0e0;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-        padding: 5px;
-        background-color: white;
+        border-radius: 12px !important;
+        border: 1px solid #e0e0e0 !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
+        padding: 4px !important;
+        background-color: white !important;
+        margin-top: -1px !important; /* To glue with the header */
     }
     
-    /* Premium HTML Table Style */
-    .premium-table { 
-        border-collapse: collapse; 
-        margin: 10px 0; 
-        font-size: 0.9em; 
-        font-family: inherit; 
-        width: 100%; 
-        border-radius: 12px; 
-        overflow: hidden; 
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); 
+    /* Dedicated Header Styling */
+    .p-header {
+        color: white !important;
+        padding: 12px 18px !important;
+        font-weight: bold !important;
+        font-size: 1.1em !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        border-radius: 12px 12px 0 0 !important;
+        margin-bottom: 0 !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     }
-    .premium-table thead tr { 
-        background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%); 
-        color: #ffffff !important; 
-        text-align: left; 
-        font-weight: bold; 
-    }
-    .premium-table.blue thead tr { 
-        background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%); 
-    }
-    .premium-table th, .premium-table td { 
-        padding: 12px 15px; 
-        border: 1px solid #f2f2f2; 
-        text-align: left;
-    }
-    .premium-table tbody tr { 
-        border-bottom: 1px solid #dddddd; 
-    }
-    .premium-table tbody tr:nth-of-type(even) { 
-        background-color: #f8f9fb; 
-    }
-    .premium-table tbody tr:last-of-type { 
-        border-bottom: 3px solid #2e7d32; 
-    }
-    .premium-table.blue tbody tr:last-of-type { 
-        border-bottom: 3px solid #1976d2; 
-    }
-    .premium-table tbody tr:hover { 
-        background-color: #f1f8e9; 
-    }
-    .premium-table.blue tbody tr:hover { 
-        background-color: #e3f2fd; 
-    }
-    .premium-table a {
-        color: inherit;
-        text-decoration: underline;
-        font-weight: bold;
-    }
+    .p-green { background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%) !important; }
+    .p-blue { background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%) !important; }
 </style>
 """, unsafe_allow_html=True)
 
+def render_premium_header(title, subtitle="", color="green"):
+    cls = "p-header p-green" if color == "green" else "p-header p-blue"
+    st.markdown(f'<div class="{cls}"><span>{title}</span><span style="font-size: 0.7em; opacity: 0.8; font-weight: normal;">{subtitle}</span></div>', unsafe_allow_html=True)
+
 def render_premium_table(df, color="green"):
-    cls = "premium-table" if color == "green" else "premium-table blue"
-    st.write(df.to_html(escape=False, index=False, classes=cls), unsafe_allow_html=True)
+    bg = "linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%)" if color == "green" else "linear-gradient(135deg, #0d47a1 0%, #1976d2 100%)"
+    border = "#2e7d32" if color == "green" else "#1976d2"
+    
+    html = f"""
+    <style>
+        .p-table {{ border-collapse: collapse; margin: 0; font-size: 0.9em; width: 100%; border-radius: 0 0 12px 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; }}
+        .p-table thead tr {{ background: {bg}; color: #ffffff !important; text-align: left; font-weight: bold; }}
+        .p-table th, .p-table td {{ padding: 12px 15px; border: 1px solid #eee; }}
+        .p-table tbody tr {{ border-bottom: 1px solid #ddd; }}
+        .p-table tbody tr:nth-of-type(even) {{ background-color: #f8f9fb; }}
+        .p-table tbody tr:last-of-type {{ border-bottom: 3px solid {border}; }}
+        .p-table tbody tr:hover {{ background-color: #f1f8e9; }}
+    </style>
+    """
+    html += df.to_html(escape=False, index=False, classes="p-table")
+    st.write(html, unsafe_allow_html=True)
 
