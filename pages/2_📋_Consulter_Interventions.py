@@ -6,14 +6,6 @@ from shared import init_campaign_selector, inject_premium_css
 st.set_page_config(page_title="Consulter mes interventions", page_icon="📋", layout="wide")
 inject_premium_css()
 
-# Additional CSS to bridge the header and the table
-st.markdown("""
-<style>
-    .table-header { margin-bottom: -1px; border-radius: 12px 12px 0 0; }
-    [data-testid="stDataEditor"] { border-top-left-radius: 0; border-top-right-radius: 0; }
-</style>
-""", unsafe_allow_html=True)
-
 st.title("📋 Consulter mes Interventions")
 
 # 1. Utilisation du sélecteur de campagne partagé
@@ -77,8 +69,12 @@ def group_interventions(df):
 
 df_display = group_interventions(df_filtered)
 
+from shared import init_campaign_selector, inject_premium_css, render_premium_header
+
+# ... (rest of imports)
+
 # 4. Affichage
-st.markdown('<div class="table-header"><div class="table-title">📖 Journal Détaillé</div><div style="font-size: 0.8em; opacity: 0.8;">Cochez une ligne pour agir ✍️🔥</div></div>', unsafe_allow_html=True)
+render_premium_header("📖 Journal Détaillé", "Cochez une ligne pour agir ✍️🔥", color="blue")
 
 column_config = {
     "Select": st.column_config.CheckboxColumn("Sélect.", default=False),
