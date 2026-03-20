@@ -62,7 +62,7 @@ def group_interventions(df):
     df_grouped = df.groupby(group_cols, as_index=False).agg(agg_cols)
     
     # Ajout du coût à l'ha
-    df_grouped['Coût à l\'ha'] = df_grouped.apply(calculate_cost, axis=1).round(1)
+    df_grouped['€/ha'] = df_grouped.apply(calculate_cost, axis=1).round(1)
     
     return df_grouped
 
@@ -70,8 +70,6 @@ df_display = group_interventions(df_filtered)
 
 # 4. Affichage
 st.markdown("### Journal Détaillé")
-
-view_mode = st.radio("👀 Mode d'affichage", ["Tableau dynamique (Édition/Suppression)", "Vue visuelle (Lecture seule)"], horizontal=True)
 
 column_config = {
     "Select": st.column_config.CheckboxColumn("Sélect.", default=False),
@@ -83,7 +81,7 @@ column_config = {
     "Dose_Ha": st.column_config.TextColumn("Dose/ha"),
     "Unité_Dose": st.column_config.TextColumn("Unité"),
     "Surface_Travaillée_Ha": "Surf. (ha)",
-    "Coût à l'ha": st.column_config.NumberColumn("Coût à l'ha", format="%.1f €"),
+    "€/ha": st.column_config.NumberColumn("€/ha", format="%.1f €"),
     "Statut_Intervention": "Statut",
     "ID_Intervention": None,
     "Sélect. ✅": "Sélect."
@@ -91,87 +89,17 @@ column_config = {
 
 df_display.insert(0, "Sélect. ✅", False)
 
-if view_mode == "Vue visuelle (Lecture seule)":
-    # Render with HTML for real line breaks
-    df_html = df_display.copy()
-    
-    # Drop internal/functional columns first
-    cols_to_drop = [c for c in ['Sélect. ✅', 'ID_Intervention'] if c in df_html.columns]
-    df_html = df_html.drop(columns=cols_to_drop)
-    
-    # Clean up column values: replace None/NaN and format dates
-    for col in df_html.columns:
-        if col == 'Date':
-            df_html[col] = pd.to_datetime(df_html[col]).dt.strftime('%d/%m/%Y')
-        else:
-            df_html[col] = df_html[col].apply(lambda x: "" if pd.isna(x) or str(x).lower() == "none" else str(x))
-            
-        if col in ['Nom_Produit', 'Dose_Ha', 'Unité_Dose', 'Type_Intervention', 'Cible']:
-            df_html[col] = df_html[col].str.replace('\n', '<br>', regex=False)
-    
-    # Extra CSS for the HTML table
-    st.markdown("""
-    <style>
-        .styled-table {
-            border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 0.82em; /* Smaller font */
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-width: 100%;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-            border-radius: 8px;
-            overflow: hidden;
-            background-color: white;
-        }
-        .styled-table thead tr {
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-            color: #ffffff;
-            text-align: center;
-            font-weight: 600;
-        }
-        .styled-table th,
-        .styled-table td {
-            padding: 6px 10px; /* Much smaller padding */
-            text-align: center;
-            vertical-align: middle;
-            border: 1px solid #f0f0f0;
-        }
-        .styled-table td {
-            color: #333;
-            line-height: 1.2;
-        }
-        .styled-table th {
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-size: 0.8em;
-        }
-        .styled-table tbody tr {
-            border-bottom: 1px solid #eeeeee;
-        }
-        .styled-table tbody tr:hover {
-            background-color: #fcfcfc;
-        }
-        .styled-table tbody tr:nth-of-type(even) {
-            background-color: #fafafa;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.write(df_html.to_html(escape=False, index=False, classes="styled-table"), unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
-    edited_df = df_display # for total calculation
-else:
-    edited_df = st.data_editor(
-        df_display,
-        column_config=column_config,
-        disabled=[c for c in df_display.columns if c != "Sélect. ✅"],
-        hide_index=True,
-        use_container_width=True,
-        key="interventions_editor"
-    )
+edited_df = st.data_editor(
+    df_display,
+    column_config=column_config,
+    disabled=[c for c in df_display.columns if c != "Sélect. ✅"],
+    hide_index=True,
+    use_container_width=True,
+    key="interventions_editor"
+)
 
 # Affichage du total
-total_cost_ha = edited_df['Coût à l\'ha'].sum()
+total_cost_ha = edited_df['€/ha'].sum()
 st.metric("💰 Coût Total à l'ha pour la sélection", f"{total_cost_ha:.1f} €")
 
 # 5. Actions : Suppression et Modification
