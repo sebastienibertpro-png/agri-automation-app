@@ -41,33 +41,34 @@ with tab_phyto:
 
     fetcher = st.session_state.get("ephy_fetcher")
 
+    # --- Auto-chargement depuis Drive au démarrage si le fetcher est vide ---
     if not fetcher or fetcher.nb_produits == 0:
-        st.info("La base de recherche E-Phy n'est pas chargée en mémoire actuellement. Si vous souhaitez chercher un nouveau produit, veuillez la charger.")
-        col1, col2 = st.columns(2)
-        with col1:
-             if st.button("☁️ Charger la base (Rapide) depuis le Cloud"):
-                  f = EphyFetcher(auto_refresh=False)
-                  uploader = get_drive_uploader()
-                  if uploader:
-                      with st.spinner("Téléchargement depuis le Cloud..."):
-                          f.download_from_drive(uploader, EPHY_DRIVE_FOLDER_ID)
-                          st.session_state["ephy_fetcher"] = f
-                          st.rerun()
-                  else:
-                      st.error("Échec de connexion au Drive.")
-        with col2:
-             if st.button("🔄 Mettre à jour depuis ANSES (Lent - 2min)"):
-                  f = EphyFetcher(auto_refresh=False)
-                  with st.spinner("Téléchargement ANSES... (~1-2 min)"):
-                      if f.refresh(force=True):
-                          uploader = get_drive_uploader()
-                          if uploader:
-                              f.upload_to_drive(uploader, EPHY_DRIVE_FOLDER_ID)
-                          st.session_state["ephy_fetcher"] = f
-                          st.rerun()
-                      else:
-                          st.error("Échec ANSES.")
-                          
+        uploader = get_drive_uploader()
+        if uploader:
+            with st.spinner("⏳ Chargement automatique de la base E-Phy depuis votre Drive..."):
+                f = EphyFetcher(auto_refresh=False)
+                ok = f.download_from_drive(uploader, EPHY_DRIVE_FOLDER_ID)
+                if ok and f.nb_produits > 0:
+                    st.session_state["ephy_fetcher"] = f
+                    fetcher = f
+                    st.success(f"✅ Base E-Phy chargée automatiquement ({f.nb_produits} produits)")
+                    st.rerun()
+
+    if not fetcher or fetcher.nb_produits == 0:
+        st.info("La base de recherche E-Phy n'est pas disponible sur votre Drive. Veuillez la charger depuis ANSES.")
+        if st.button("🔄 Charger depuis ANSES (Lent - 2min)"):
+            f = EphyFetcher(auto_refresh=False)
+            with st.spinner("Téléchargement ANSES... (~1-2 min)"):
+                if f.refresh(force=True):
+                    uploader = get_drive_uploader()
+                    if uploader:
+                        f.upload_to_drive(uploader, EPHY_DRIVE_FOLDER_ID)
+                        st.success("✅ Base uploadée sur votre Drive pour les prochaines sessions !")
+                    st.session_state["ephy_fetcher"] = f
+                    st.rerun()
+                else:
+                    st.error("Échec ANSES.")
+                           
     if fetcher and fetcher.nb_produits > 0:
         col_info1, col_info2, col_info3 = st.columns(3)
         with col_info1:
@@ -154,45 +155,45 @@ with tab_phyto:
 
                 st.markdown("---")
 
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    if st.button("➕ Ajouter/MAJ dans REF_INTRANTS", key="btn_add_intrant", type="primary"):
-                        intrant_to_write = {
-                            "Nom_Produit":       intrant.get("Nom_Produit", ""),
-                            "Type":              intrant.get("Type", "Phytosanitaire"),
-                            "N_AMM":             intrant.get("N_AMM", ""),
-                            "Matieres_Actives":  intrant.get("Matieres_Actives", ""),
-                            "Concentration":     intrant.get("Concentration", ""),
-                            "Culture":           intrant.get("Culture", ""),
-                            "Nb_Applications_Max_An": intrant.get("Nb_Applications_Max_An", ""),
-                            "ZNT_Aqua":          intrant.get("ZNT_Aqua", ""),
-                            "ZNT_Riverains":     intrant.get("ZNT_Riverains", ""),
-                            "DVP":               intrant.get("DVP", ""),
-                            "DAR":               intrant.get("DAR", ""),
-                            "Dose_Max_Homologuee": intrant.get("Dose_Max_Homologuee", ""),
-                            "Mentions_Danger":   intrant.get("Mentions_Danger", ""),
-                            "Unité_utilisation": intrant.get("Unité_utilisation", ""),
-                            "Formulation":       intrant.get("Formulation", ""),
-                            "Etat_AMM":          intrant.get("Etat_AMM", ""),
-                            "Date_Fin_AMM":      intrant.get("Date_Fin_AMM", ""),
-                            "Classement_CMR":    intrant.get("Classement_CMR", ""),
-                            "Titulaire_AMM":     intrant.get("Titulaire_AMM", ""),
-                            "Lien_Ephy":         intrant.get("Lien_Ephy", ""),
-                            "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
-                        }
-                        with st.spinner("Enregistrement dans REF_INTRANTS..."):
-                            orig_search = st.session_state.get("search_phyto", "")
-                            ok = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
-                        if ok:
-                            st.success(f"✅ '{intrant_to_write['Nom_Produit']}' enregistré dans REF_INTRANTS !")
-
-                with col_btn2:
-                    if usages and st.button("🌱 Enregistrer usages dans REF_USAGES_PHYTO", key="btn_add_usages"):
+                # ─── BOUTON COMBINÉ : REF_INTRANTS + REF_USAGES_PHYTO ───────────────
+                if st.button("💾 Enregistrer dans REF_INTRANTS + REF_USAGES_PHYTO", key="btn_add_all", type="primary", use_container_width=True):
+                    intrant_to_write = {
+                        "Nom_Produit":       intrant.get("Nom_Produit", ""),
+                        "Type":              intrant.get("Type", "Phytosanitaire"),
+                        "N_AMM":             intrant.get("N_AMM", ""),
+                        "Matieres_Actives":  intrant.get("Matieres_Actives", ""),
+                        "Concentration":     intrant.get("Concentration", ""),
+                        "Culture":           intrant.get("Culture", ""),
+                        "Nb_Applications_Max_An": intrant.get("Nb_Applications_Max_An", ""),
+                        "ZNT_Aqua":          intrant.get("ZNT_Aqua", ""),
+                        "ZNT_Riverains":     intrant.get("ZNT_Riverains", ""),
+                        "DVP":               intrant.get("DVP", ""),
+                        "DAR":               intrant.get("DAR", ""),
+                        "Dose_Max_Homologuee": intrant.get("Dose_Max_Homologuee", ""),
+                        "Mentions_Danger":   intrant.get("Mentions_Danger", ""),
+                        "Unité_utilisation": intrant.get("Unité_utilisation", ""),
+                        "Formulation":       intrant.get("Formulation", ""),
+                        "Etat_AMM":          intrant.get("Etat_AMM", ""),
+                        "Date_Fin_AMM":      intrant.get("Date_Fin_AMM", ""),
+                        "Classement_CMR":    intrant.get("Classement_CMR", ""),
+                        "Titulaire_AMM":     intrant.get("Titulaire_AMM", ""),
+                        "Lien_Ephy":         intrant.get("Lien_Ephy", ""),
+                        "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
+                    }
+                    # FIX: use the correct session_state key to avoid duplicates
+                    orig_search = st.session_state.get("ephy_search_query", "")
+                    
+                    with st.spinner("Enregistrement dans REF_INTRANTS..."):
+                        ok1 = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
+                    
+                    ok2 = True
+                    if usages:
                         n_amm = intrant.get("N_AMM", "")
                         with st.spinner(f"Enregistrement de {len(usages)} usage(s) dans REF_USAGES_PHYTO..."):
-                            ok = active_loader.update_usages_phyto(n_amm, usages)
-                        if ok:
-                            st.success(f"✅ {len(usages)} usages enregistrés dans REF_USAGES_PHYTO !")
+                            ok2 = active_loader.update_usages_phyto(n_amm, usages)
+                    
+                    if ok1 and ok2:
+                        st.success(f"✅ '{intrant_to_write['Nom_Produit']}' enregistré dans REF_INTRANTS + {len(usages)} usages dans REF_USAGES_PHYTO !")
 
 with tab_ferti:
     st.subheader("➕ Ajouter un Engrais / Amendement")
