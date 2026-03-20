@@ -29,122 +29,171 @@ active_loader = get_dataloader()
 with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGES_PHYTO", expanded=False):
 
     if "ephy_fetcher" not in st.session_state:
-        # Initialisation silencieuse (sans téléchargement ANSES)
-        try:
-            fetcher = EphyFetcher(auto_refresh=False)
-            st.session_state["ephy_fetcher"] = fetcher
-            
-            # Si le cache local est vide, on tente une synchro Drive immédiate
-            if fetcher.nb_produits == 0:
-                uploader = get_drive_uploader()
-                if uploader:
-                    with st.spinner("☁️ Synchronisation du référentiel depuis le Cloud..."):
-                        fetcher.download_from_drive(uploader, EPHY_DRIVE_FOLDER_ID)
-        except Exception as e_init:
-            st.error(f"❌ Erreur initialisation E-Phy : {e_init}")
-            st.session_state["ephy_fetcher"] = None
+        st.session_state["ephy_fetcher"] = None
 
-    fetcher: EphyFetcher | None = st.session_state.get("ephy_fetcher")
+    fetcher = st.session_state.get("ephy_fetcher")
 
-    col_info1, col_info2, col_info3 = st.columns(3)
-    with col_info1:
-        st.metric("📂 Produits E-Phy indexés", fetcher.nb_produits if fetcher else 0)
-    with col_info2:
-        st.metric("📅 Dernière MAJ", fetcher.last_update if fetcher else "N/A")
-    with col_info3:
-        if st.button("🔄 Mettre à jour (ANSES → Drive)", key="btn_refresh_ephy"):
-            with st.spinner("📥 Téléchargement ANSES... (~1-2 min)"):
-                # 1. Refresh depuis ANSES
-                ok = fetcher.refresh(force=True) if fetcher else False
-                
-                if ok:
-                    # 2. Upload vers Drive pour les autres appareils
-                    st.toast("✅ Téléchargement réussi ! Envoi vers le Cloud Drive...")
-                    uploader = get_drive_uploader()
-                    if uploader:
-                        fetcher.upload_to_drive(uploader, EPHY_DRIVE_FOLDER_ID)
-                    
-                    st.success("✅ Référentiel E-Phy mis à jour et synchronisé !")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("❌ Échec du téléchargement ANSES.")
+    if not fetcher or fetcher.nb_produits == 0:
+        st.info("La base de recherche E-Phy n'est pas chargée en mémoire actuellement. Vous n'avez pas besoin de la charger si vous souhaitez juste consulter vos produits existants en bas.")
+        col1, col2 = st.columns(2)
+        with col1:
+             if st.button("☁️ Charger la base (Rapide) depuis le Cloud"):
+                  f = EphyFetcher(auto_refresh=False)
+                  uploader = get_drive_uploader()
+                  if uploader:
+                      with st.spinner("Téléchargement depuis le Cloud..."):
+                          f.download_from_drive(uploader, EPHY_DRIVE_FOLDER_ID)
+                          st.session_state["ephy_fetcher"] = f
+                          st.rerun()
+                  else:
+                      st.error("Échec de connexion au Drive.")
+        with col2:
+             if st.button("🔄 Mettre à jour depuis ANSES (Lent - 2min)"):
+                  f = EphyFetcher(auto_refresh=False)
+                  with st.spinner("Téléchargement ANSES... (~1-2 min)"):
+                      if f.refresh(force=True):
+                          uploader = get_drive_uploader()
+                          if uploader:
+                              f.upload_to_drive(uploader, EPHY_DRIVE_FOLDER_ID)
+                          st.session_state["ephy_fetcher"] = f
+                          st.rerun()
+                      else:
+                          st.error("Échec ANSES.")
+                          
+    if fetcher and fetcher.nb_produits > 0:
+        col_info1, col_info2, col_info3 = st.columns(3)
+        with col_info1:
+            st.metric("📂 Produits E-Phy indexés", fetcher.nb_produits)
+        with col_info2:
+            st.metric("📅 Dernière MAJ", fetcher.last_update)
+        with col_info3:
+            if st.button("🔄 Forcer MAJ ANSES", key="btn_refresh_ephy"):
+                  with st.spinner("Téléchargement ANSES... (~1-2 min)"):
+                      if fetcher.refresh(force=True):
+                          uploader = get_drive_uploader()
+                          if uploader:
+                              fetcher.upload_to_drive(uploader, EPHY_DRIVE_FOLDER_ID)
+                          st.rerun()
+                      else:
+                          st.error("Échec ANSES.")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    st.markdown("#### 🔍 Recherche par nom commercial")
-    search_query = st.text_input(
-        "Nom commercial du produit",
-        placeholder="Ex: TOPSIN M 70 WG, ROUNDUP FLEX, COMET PRO...",
-        key="ephy_search_query"
-    )
+        st.markdown("#### 🔍 Recherche par nom commercial")
+        search_query = st.text_input(
+            "Nom commercial du produit",
+            placeholder="Ex: TOPSIN M 70 WG, ROUNDUP FLEX, COMET PRO...",
+            key="ephy_search_query"
+        )
 
-    if search_query and fetcher:
-        with st.spinner(f"Recherche de '{search_query}' dans E-Phy..."):
-            results = fetcher.search(search_query, top_n=8)
+        if search_query and fetcher:
+            with st.spinner(f"Recherche de '{search_query}' dans E-Phy..."):
+                results = fetcher.search(search_query, top_n=8)
 
-        if not results:
-            st.warning("⚠️ Aucun produit trouvé. Vérifiez l'orthographe ou essayez un nom partiel.")
-        else:
-            options_labels = []
-            for r in results:
-                nom = r['intrant'].get('Nom_Produit', '?')
-                amm = r['intrant'].get('N_AMM', '')
-                score = r['score']
-                etat = r['intrant'].get('Etat_AMM', '')
-                badge = "✅" if "autoris" in str(etat).lower() else ("🔴" if "retir" in str(etat).lower() else "🟡")
-                label = f"{badge} {nom} | AMM: {amm} | Score: {score}%"
-                options_labels.append(label)
-
-            selected_label = st.radio(
-                "Sélectionnez le produit correspondant :",
-                options_labels,
-                key="ephy_select_result"
-            )
-            selected_idx = options_labels.index(selected_label)
-            selected_result = results[selected_idx]
-            intrant = selected_result['intrant']
-            usages  = selected_result['usages']
-
-            st.markdown("#### 📄 Fiche réglementaire E-Phy")
-            col_f1, col_f2 = st.columns(2)
-            with col_f1:
-                st.markdown(f"**Nom** : {intrant.get('Nom_Produit', '')}")
-                st.markdown(f"**N° AMM** : `{intrant.get('N_AMM', '')}`")
-                st.markdown(f"**Type** : {intrant.get('Type', '')}")
-                st.markdown(f"**Formulation** : {intrant.get('Formulation', '')}")
-                st.markdown(f"**Titulaire** : {intrant.get('Titulaire_AMM', '')}")
-                st.markdown(f"**État AMM** : {intrant.get('Etat_AMM', '')}")
-                st.markdown(f"**Date fin AMM** : {intrant.get('Date_Fin_AMM', '')}")
-            with col_f2:
-                st.markdown(f"**Matières actives** : {intrant.get('Matieres_Actives', '')}")
-                st.markdown(f"**Concentration** : {intrant.get('Concentration', '')}")
-                st.markdown(f"**Classement CMR** : {intrant.get('Classement_CMR', '')}")
-                st.markdown(f"**Mentions danger** : {intrant.get('Mentions_Danger', '')}")
-                st.markdown(f"**ZNT Aquatique** : {intrant.get('ZNT_Aqua', '')} m")
-                st.markdown(f"**ZNT Riverains** : {intrant.get('ZNT_Riverains', '')} m")
-                st.markdown(f"**DVP** : {intrant.get('DVP', '')}")
-                if intrant.get('Lien_Ephy'):
-                    st.markdown(f"[🔗 Fiche officielle E-Phy]({intrant['Lien_Ephy']})")
-
-            if usages:
-                st.markdown(f"#### 🌱 Usages homologués ({len(usages)} usage(s))")
-                df_usages_display = pd.DataFrame(usages)
-                cols_display = [c for c in ["Culture", "Cible", "Type_Cible", "Dose_Max", "Unite_Dose",
-                                             "Nb_Applications_Max", "Stades_Application", "Condition_Emploi", "DAR", "DVP", "ZNT_Aqua", "Etat_Usage"]
-                                if c in df_usages_display.columns]
-                st.dataframe(df_usages_display[cols_display], use_container_width=True, hide_index=True)
+            if not results:
+                st.warning("⚠️ Aucun produit trouvé. Vérifiez l'orthographe ou essayez un nom partiel.")
             else:
-                st.info("ℹ️ Aucun usage détaillé disponible pour ce N°AMM dans E-Phy.")
+                options_labels = []
+                for r in results:
+                    nom = r['intrant'].get('Nom_Produit', '?')
+                    amm = r['intrant'].get('N_AMM', '')
+                    score = r['score']
+                    etat = r['intrant'].get('Etat_AMM', '')
+                    badge = "✅" if "autoris" in str(etat).lower() else ("🔴" if "retir" in str(etat).lower() else "🟡")
+                    label = f"{badge} {nom} | AMM: {amm} | Score: {score}%"
+                    options_labels.append(label)
 
-            st.markdown("---")
+                selected_label = st.radio(
+                    "Sélectionnez le produit correspondant :",
+                    options_labels,
+                    key="ephy_select_result"
+                )
+                selected_idx = options_labels.index(selected_label)
+                selected_result = results[selected_idx]
+                intrant = selected_result['intrant']
+                usages  = selected_result['usages']
 
-            st.markdown("#### ✍️ Enregistrer dans MASTER_EXPLOITATION")
-            st.caption("⚠️ Les colonnes `Element_N/P/K`, `Espèce_Semence`, `Unite_Achat`, `Prix_Unitaire_Moyen`, `STOCK_ACTUEL`, `Valeur_Stock` ne sont pas modifiées si le produit existe déjà.")
+                st.markdown("#### 📄 Fiche réglementaire E-Phy")
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    st.markdown(f"**Nom** : {intrant.get('Nom_Produit', '')}")
+                    st.markdown(f"**N° AMM** : `{intrant.get('N_AMM', '')}`")
+                    st.markdown(f"**Type** : {intrant.get('Type', '')}")
+                    st.markdown(f"**Formulation** : {intrant.get('Formulation', '')}")
+                    st.markdown(f"**Titulaire** : {intrant.get('Titulaire_AMM', '')}")
+                    st.markdown(f"**État AMM** : {intrant.get('Etat_AMM', '')}")
+                    st.markdown(f"**Date fin AMM** : {intrant.get('Date_Fin_AMM', '')}")
+                with col_f2:
+                    st.markdown(f"**Matières actives** : {intrant.get('Matieres_Actives', '')}")
+                    st.markdown(f"**Concentration** : {intrant.get('Concentration', '')}")
+                    st.markdown(f"**Classement CMR** : {intrant.get('Classement_CMR', '')}")
+                    st.markdown(f"**Mentions danger** : {intrant.get('Mentions_Danger', '')}")
+                    st.markdown(f"**ZNT Aquatique** : {intrant.get('ZNT_Aqua', '')} m")
+                    st.markdown(f"**ZNT Riverains** : {intrant.get('ZNT_Riverains', '')} m")
+                    st.markdown(f"**DVP** : {intrant.get('DVP', '')}")
+                    if intrant.get('Lien_Ephy'):
+                        st.markdown(f"[🔗 Fiche officielle E-Phy]({intrant['Lien_Ephy']})")
 
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                if st.button("➕ Ajouter/MAJ dans REF_INTRANTS", key="btn_add_intrant", type="primary"):
+                if usages:
+                    st.markdown(f"#### 🌱 Usages homologués ({len(usages)} usage(s))")
+                    df_usages_display = pd.DataFrame(usages)
+                    cols_display = [c for c in ["Culture", "Cible", "Type_Cible", "Dose_Max", "Unite_Dose",
+                                                 "Nb_Applications_Max", "Stades_Application", "Condition_Emploi", "DAR", "DVP", "ZNT_Aqua", "Etat_Usage"]
+                                    if c in df_usages_display.columns]
+                    st.dataframe(df_usages_display[cols_display], use_container_width=True, hide_index=True)
+                else:
+                    st.info("ℹ️ Aucun usage détaillé disponible pour ce N°AMM dans E-Phy.")
+
+                st.markdown("---")
+
+                st.markdown("#### ✍️ Enregistrer dans MASTER_EXPLOITATION")
+                st.caption("⚠️ Les colonnes `Element_N/P/K`, `Espèce_Semence`, `Unite_Achat`, `Prix_Unitaire_Moyen`, `STOCK_ACTUEL`, `Valeur_Stock` ne sont pas modifiées si le produit existe déjà.")
+
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("➕ Ajouter/MAJ dans REF_INTRANTS", key="btn_add_intrant", type="primary"):
+                        intrant_to_write = {
+                            "Nom_Produit":       intrant.get("Nom_Produit", ""),
+                            "Type":              intrant.get("Type", ""),
+                            "N_AMM":             intrant.get("N_AMM", ""),
+                            "Matieres_Actives":  intrant.get("Matieres_Actives", ""),
+                            "Concentration":     intrant.get("Concentration", ""),
+                            "Culture":           intrant.get("Culture", ""),
+                            "Nb_Applications_Max_An": intrant.get("Nb_Applications_Max_An", ""),
+                            "ZNT_Aqua":          intrant.get("ZNT_Aqua", ""),
+                            "ZNT_Riverains":     intrant.get("ZNT_Riverains", ""),
+                            "DVP":               intrant.get("DVP", ""),
+                            "DAR":               intrant.get("DAR", ""),
+                            "Dose_Max_Homologuee": intrant.get("Dose_Max_Homologuee", ""),
+                            "Mentions_Danger":   intrant.get("Mentions_Danger", ""),
+                            "Unité_utilisation": intrant.get("Unité_utilisation", ""),
+                            "Formulation":       intrant.get("Formulation", ""),
+                            "Etat_AMM":          intrant.get("Etat_AMM", ""),
+                            "Date_Fin_AMM":      intrant.get("Date_Fin_AMM", ""),
+                            "Classement_CMR":    intrant.get("Classement_CMR", ""),
+                            "Titulaire_AMM":     intrant.get("Titulaire_AMM", ""),
+                            "Lien_Ephy":         intrant.get("Lien_Ephy", ""),
+                            "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
+                        }
+                        with st.spinner("Enregistrement dans REF_INTRANTS..."):
+                            orig_search = st.session_state.get("search_phyto", "")
+                            ok = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
+                        if ok:
+                            active_loader.clear_cache()  
+                            st.success(f"✅ '{intrant_to_write['Nom_Produit']}' enregistré dans REF_INTRANTS !")
+                            st.rerun()  
+
+                with col_btn2:
+                    if usages and st.button("🌱 Enregistrer usages dans REF_USAGES_PHYTO", key="btn_add_usages"):
+                        n_amm = intrant.get("N_AMM", "")
+                        with st.spinner(f"Enregistrement de {len(usages)} usage(s) dans REF_USAGES_PHYTO..."):
+                            ok = active_loader.update_usages_phyto(n_amm, usages)
+                        if ok:
+                            st.success(f"✅ {len(usages)} usages enregistrés dans REF_USAGES_PHYTO !")
+
+                st.markdown(" ")
+                if st.button("🚀 Tout enregistrer (REF_INTRANTS + REF_USAGES_PHYTO)",
+                             key="btn_add_all", type="primary"):
                     intrant_to_write = {
                         "Nom_Produit":       intrant.get("Nom_Produit", ""),
                         "Type":              intrant.get("Type", ""),
@@ -168,61 +217,19 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
                         "Lien_Ephy":         intrant.get("Lien_Ephy", ""),
                         "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
                     }
-                    with st.spinner("Enregistrement dans REF_INTRANTS..."):
+                    with st.spinner("Enregistrement en cours..."):
                         orig_search = st.session_state.get("search_phyto", "")
-                        ok = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
-                    if ok:
+                        ok1 = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
+                        n_amm = intrant.get("N_AMM", "")
+                        ok2 = active_loader.update_usages_phyto(n_amm, usages) if usages else True
+                    if ok1 and ok2:
                         active_loader.clear_cache()  
-                        st.success(f"✅ '{intrant_to_write['Nom_Produit']}' enregistré dans REF_INTRANTS !")
+                        st.success("✅ Produit enregistré dans REF_INTRANTS et REF_USAGES_PHYTO !")
+                        st.balloons()
                         st.rerun()  
 
-            with col_btn2:
-                if usages and st.button("🌱 Enregistrer usages dans REF_USAGES_PHYTO", key="btn_add_usages"):
-                    n_amm = intrant.get("N_AMM", "")
-                    with st.spinner(f"Enregistrement de {len(usages)} usage(s) dans REF_USAGES_PHYTO..."):
-                        ok = active_loader.update_usages_phyto(n_amm, usages)
-                    if ok:
-                        st.success(f"✅ {len(usages)} usages enregistrés dans REF_USAGES_PHYTO !")
-
-            st.markdown(" ")
-            if st.button("🚀 Tout enregistrer (REF_INTRANTS + REF_USAGES_PHYTO)",
-                         key="btn_add_all", type="primary"):
-                intrant_to_write = {
-                    "Nom_Produit":       intrant.get("Nom_Produit", ""),
-                    "Type":              intrant.get("Type", ""),
-                    "N_AMM":             intrant.get("N_AMM", ""),
-                    "Matieres_Actives":  intrant.get("Matieres_Actives", ""),
-                    "Concentration":     intrant.get("Concentration", ""),
-                    "Culture":           intrant.get("Culture", ""),
-                    "Nb_Applications_Max_An": intrant.get("Nb_Applications_Max_An", ""),
-                    "ZNT_Aqua":          intrant.get("ZNT_Aqua", ""),
-                    "ZNT_Riverains":     intrant.get("ZNT_Riverains", ""),
-                    "DVP":               intrant.get("DVP", ""),
-                    "DAR":               intrant.get("DAR", ""),
-                    "Dose_Max_Homologuee": intrant.get("Dose_Max_Homologuee", ""),
-                    "Mentions_Danger":   intrant.get("Mentions_Danger", ""),
-                    "Unité_utilisation": intrant.get("Unité_utilisation", ""),
-                    "Formulation":       intrant.get("Formulation", ""),
-                    "Etat_AMM":          intrant.get("Etat_AMM", ""),
-                    "Date_Fin_AMM":      intrant.get("Date_Fin_AMM", ""),
-                    "Classement_CMR":    intrant.get("Classement_CMR", ""),
-                    "Titulaire_AMM":     intrant.get("Titulaire_AMM", ""),
-                    "Lien_Ephy":         intrant.get("Lien_Ephy", ""),
-                    "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
-                }
-                with st.spinner("Enregistrement en cours..."):
-                    orig_search = st.session_state.get("search_phyto", "")
-                    ok1 = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
-                    n_amm = intrant.get("N_AMM", "")
-                    ok2 = active_loader.update_usages_phyto(n_amm, usages) if usages else True
-                if ok1 and ok2:
-                    active_loader.clear_cache()  
-                    st.success("✅ Produit enregistré dans REF_INTRANTS et REF_USAGES_PHYTO !")
-                    st.balloons()
-                    st.rerun()  
-
     elif not fetcher:
-        st.error("❌ Le module E-Phy n'a pas pu être initialisé. Vérifiez la connexion internet.")
+        pass # removed the explicit error
 
 st.markdown("---")
 st.markdown("#### 📊 REF_INTRANTS actuel (produits phytosanitaires)")
@@ -256,4 +263,3 @@ try:
         st.info("ℹ️ REF_INTRANTS est vide.")
 except Exception as e:
     st.error(f"Erreur chargement REF_INTRANTS : {e}")
-
