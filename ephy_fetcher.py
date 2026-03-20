@@ -539,10 +539,32 @@ class EphyFetcher:
             return False
         files_to_upload = [CACHE_PRODUITS, CACHE_USAGES, CACHE_DATE_FILE]
         success = True
+        
+        # Partager d'abord le dossier lui-même
+        if uploader.service:
+            try:
+                uploader.service.permissions().create(
+                    fileId=folder_id,
+                    body={'type': 'user', 'role': 'writer', 'emailAddress': 'sebastienibert.pro@gmail.com'},
+                    fields='id'
+                ).execute()
+            except Exception:
+                pass
+
         for f in files_to_upload:
             if os.path.exists(f):
                 try:
-                    uploader.upload_file(f, folder_id)
+                    file_id = uploader.upload_file(f, folder_id)
+                    # Partage silencieux du fichier à l'utilisateur principal
+                    if file_id and uploader.service:
+                        try:
+                            uploader.service.permissions().create(
+                                fileId=file_id,
+                                body={'type': 'user', 'role': 'writer', 'emailAddress': 'sebastienibert.pro@gmail.com'},
+                                fields='id'
+                            ).execute()
+                        except Exception as perm_e:
+                            logger.error(f"Erreur de partage du fichier EPhy: {perm_e}")
                 except Exception as e:
                     logger.error(f"Erreur upload {f} vers Drive: {e}")
                     success = False
