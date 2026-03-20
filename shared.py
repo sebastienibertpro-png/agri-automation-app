@@ -5,7 +5,7 @@ import os
 
 # Helper for E-Phy cloud storage
 APP_BASE_URL = "https://agri-automation-app-kwz7hjkyb8hjxwhe9w7rsv.streamlit.app"
-EPHY_DRIVE_FOLDER_ID = "1YDTwRXHFTxPmM4QD84nTnQYmMZqz60dc"
+EPHY_DRIVE_FOLDER_ID = "1fMnmAMoGWVTIFaR2yOTbD7EMdBNuyH3Z"
 OBSERVATION_DRIVE_FOLDER_ID = "1_oaKK3W_YfgAQ9UPS9AkcmmIH-eZEfci"
 
 @st.cache_resource
