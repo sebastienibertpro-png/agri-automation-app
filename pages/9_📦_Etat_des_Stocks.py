@@ -9,7 +9,7 @@ st.title("📦 État des Stocks")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
-st.markdown(f"### Stocks pour la campagne {selected_campaign}")
+render_premium_header(f"Stocks pour la campagne {selected_campaign}", "Situation consolidée des achats et consommations 📦", color="green")
 
 # Fetch the stock data
 df_stocks = active_loader.get_etat_stocks(selected_campaign)
