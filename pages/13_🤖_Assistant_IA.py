@@ -119,6 +119,22 @@ def load_farm_context():
     except Exception:
         pass
 
+    # 10. REFERENTIEL INTRANTS
+    try:
+        df_intrants = active_loader.get_intrants()
+        if not df_intrants.empty:
+            context_parts.append("### REFERENTIEL INTRANTS\n" + df_intrants.to_csv(index=False))
+    except Exception:
+        pass
+
+    # 11. REFERENTIEL USAGES PHYTO
+    try:
+        df_usages = active_loader.get_usages_phyto()
+        if not df_usages.empty:
+            context_parts.append("### REFERENTIEL USAGES PHYTO\n" + df_usages.to_csv(index=False))
+    except Exception:
+        pass
+
     return "\n\n".join(context_parts)
 
 with st.spinner("Chargement des données de l'exploitation pour l'IA..."):
