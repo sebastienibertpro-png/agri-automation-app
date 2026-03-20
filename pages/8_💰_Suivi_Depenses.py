@@ -120,11 +120,14 @@ else:
                     df_viz['Date_facture'] = pd.to_datetime(df_viz['Date_facture'], errors='coerce', dayfirst=True)
                     df_viz['Date_facture'] = df_viz['Date_facture'].dt.strftime('%d/%m/%Y').fillna("")
                 
-                # Drop unwanted columns
-                cols_to_drop = ['ID_Parcelle_liée', 'Affectation_type', 'Montant', id_col]
-                for c in cols_to_drop:
-                    if c in df_viz.columns:
-                        df_viz = df_viz.drop(columns=[c])
+                # Drop unwanted columns (case-insensitive match)
+                cols_to_drop_keywords = ['id_parcelle_li', 'affectation_type', 'montant']
+                cols_to_drop_exact = [id_col]
+                for c in df_viz.columns.tolist():
+                    c_lower = c.lower().replace('é', 'e').replace('è', 'e')
+                    if any(kw in c_lower for kw in cols_to_drop_keywords):
+                        cols_to_drop_exact.append(c)
+                df_viz = df_viz.drop(columns=[c for c in cols_to_drop_exact if c in df_viz.columns])
                 
                 # Rename columns for compact display
                 rename_map = {
@@ -136,6 +139,9 @@ else:
                     'Montant_Total_Facture_TTC': 'Total Facture TTC',
                 }
                 df_viz = df_viz.rename(columns={k: v for k, v in rename_map.items() if k in df_viz.columns})
+                
+                # Replace NaN / None / 'nan' with empty string
+                df_viz = df_viz.astype(str).replace({'nan': '', 'None': '', '<NA>': '', 'NaT': ''})
                 
                 # Render Drive Links
                 link_col = 'Lien_facture' if 'Lien_facture' in df_viz.columns else 'Lien_Facture_Drive' if 'Lien_Facture_Drive' in df_viz.columns else 'Lien_Drive' if 'Lien_Drive' in df_viz.columns else None
