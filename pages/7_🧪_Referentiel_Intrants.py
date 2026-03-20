@@ -6,9 +6,9 @@ from ephy_fetcher import EphyFetcher
 from shared import get_dataloader, get_drive_uploader, EPHY_DRIVE_FOLDER_ID
 import time
 
-st.set_page_config(page_title="Référentiel E-Phy", page_icon="🌿", layout="wide")
+st.set_page_config(page_title="Référentiel Intrants", page_icon="🧪", layout="wide")
 
-st.title("🌿 Référentiel Phytosanitaire (E-Phy)")
+st.title("🧪 Référentiel des Intrants")
 
 st.markdown("""
 <style>
@@ -26,15 +26,23 @@ st.markdown("""
 
 active_loader = get_dataloader()
 
-with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGES_PHYTO", expanded=False):
+tab_phyto, tab_ferti, tab_semences, tab_all = st.tabs([
+    "🌿 Phytosanitaires (E-Phy)", 
+    "🚜 Engrais & Amendements", 
+    "🌱 Semences", 
+    "📊 Tableau Complet"
+])
 
+with tab_phyto:
+    st.subheader("Recherche et Ajout de Produits Phytosanitaires")
+    
     if "ephy_fetcher" not in st.session_state:
         st.session_state["ephy_fetcher"] = None
 
     fetcher = st.session_state.get("ephy_fetcher")
 
     if not fetcher or fetcher.nb_produits == 0:
-        st.info("La base de recherche E-Phy n'est pas chargée en mémoire actuellement. Vous n'avez pas besoin de la charger si vous souhaitez juste consulter vos produits existants en bas.")
+        st.info("La base de recherche E-Phy n'est pas chargée en mémoire actuellement. Si vous souhaitez chercher un nouveau produit, veuillez la charger.")
         col1, col2 = st.columns(2)
         with col1:
              if st.button("☁️ Charger la base (Rapide) depuis le Cloud"):
@@ -146,15 +154,12 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
 
                 st.markdown("---")
 
-                st.markdown("#### ✍️ Enregistrer dans MASTER_EXPLOITATION")
-                st.caption("⚠️ Les colonnes `Element_N/P/K`, `Espèce_Semence`, `Unite_Achat`, `Prix_Unitaire_Moyen`, `STOCK_ACTUEL`, `Valeur_Stock` ne sont pas modifiées si le produit existe déjà.")
-
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
                     if st.button("➕ Ajouter/MAJ dans REF_INTRANTS", key="btn_add_intrant", type="primary"):
                         intrant_to_write = {
                             "Nom_Produit":       intrant.get("Nom_Produit", ""),
-                            "Type":              intrant.get("Type", ""),
+                            "Type":              intrant.get("Type", "Phytosanitaire"),
                             "N_AMM":             intrant.get("N_AMM", ""),
                             "Matieres_Actives":  intrant.get("Matieres_Actives", ""),
                             "Concentration":     intrant.get("Concentration", ""),
@@ -179,9 +184,7 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
                             orig_search = st.session_state.get("search_phyto", "")
                             ok = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
                         if ok:
-                            active_loader.clear_cache()  
                             st.success(f"✅ '{intrant_to_write['Nom_Produit']}' enregistré dans REF_INTRANTS !")
-                            st.rerun()  
 
                 with col_btn2:
                     if usages and st.button("🌱 Enregistrer usages dans REF_USAGES_PHYTO", key="btn_add_usages"):
@@ -191,75 +194,101 @@ with st.expander("🔍 Rechercher un produit et remplir REF_INTRANTS + REF_USAGE
                         if ok:
                             st.success(f"✅ {len(usages)} usages enregistrés dans REF_USAGES_PHYTO !")
 
-                st.markdown(" ")
-                if st.button("🚀 Tout enregistrer (REF_INTRANTS + REF_USAGES_PHYTO)",
-                             key="btn_add_all", type="primary"):
-                    intrant_to_write = {
-                        "Nom_Produit":       intrant.get("Nom_Produit", ""),
-                        "Type":              intrant.get("Type", ""),
-                        "N_AMM":             intrant.get("N_AMM", ""),
-                        "Matieres_Actives":  intrant.get("Matieres_Actives", ""),
-                        "Concentration":     intrant.get("Concentration", ""),
-                        "Culture":           intrant.get("Culture", ""),
-                        "Nb_Applications_Max_An": intrant.get("Nb_Applications_Max_An", ""),
-                        "ZNT_Aqua":          intrant.get("ZNT_Aqua", ""),
-                        "ZNT_Riverains":     intrant.get("ZNT_Riverains", ""),
-                        "DVP":               intrant.get("DVP", ""),
-                        "DAR":               intrant.get("DAR", ""),
-                        "Dose_Max_Homologuee": intrant.get("Dose_Max_Homologuee", ""),
-                        "Mentions_Danger":   intrant.get("Mentions_Danger", ""),
-                        "Unité_utilisation": intrant.get("Unité_utilisation", ""),
-                        "Formulation":       intrant.get("Formulation", ""),
-                        "Etat_AMM":          intrant.get("Etat_AMM", ""),
-                        "Date_Fin_AMM":      intrant.get("Date_Fin_AMM", ""),
-                        "Classement_CMR":    intrant.get("Classement_CMR", ""),
-                        "Titulaire_AMM":     intrant.get("Titulaire_AMM", ""),
-                        "Lien_Ephy":         intrant.get("Lien_Ephy", ""),
-                        "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
-                    }
-                    with st.spinner("Enregistrement en cours..."):
-                        orig_search = st.session_state.get("search_phyto", "")
-                        ok1 = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
-                        n_amm = intrant.get("N_AMM", "")
-                        ok2 = active_loader.update_usages_phyto(n_amm, usages) if usages else True
-                    if ok1 and ok2:
-                        active_loader.clear_cache()  
-                        st.success("✅ Produit enregistré dans REF_INTRANTS et REF_USAGES_PHYTO !")
-                        st.balloons()
-                        st.rerun()  
+with tab_ferti:
+    st.subheader("➕ Ajouter un Engrais / Amendement")
+    st.info("Renseignez les informations de base de l'engrais. Les éléments sont en unités standard (ex: N en unités, P en P2O5, K en K2O).")
+    
+    with st.form("form_add_ferti"):
+        f_nom = st.text_input("Nom de l'engrais (ex: Ammonitrate 33, DAP 18-46)")
+        f_type = st.selectbox("Type d'Engrais", ["Engrais Minéral", "Engrais Organique", "Amendement Calcique", "Amendement Organique", "Autre Fertilisant"])
+        f_formulation = st.selectbox("Formulation", ["Solide (Granulés)", "Liquide", "Poudre", "Bouchon", "Vrac"])
+        
+        st.markdown("##### Composition")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        with c1: f_n = st.number_input("Azote (N)", min_value=0.0, step=1.0)
+        with c2: f_p = st.number_input("Phosphore (P2O5)", min_value=0.0, step=1.0)
+        with c3: f_k = st.number_input("Potasse (K2O)", min_value=0.0, step=1.0)
+        with c4: f_s = st.number_input("Soufre (SO3)", min_value=0.0, step=1.0)
+        with c5: f_cao = st.number_input("Calcium (CaO)", min_value=0.0, step=1.0)
+        
+        st.markdown("##### Stock et Achat")
+        c6, c7, c8 = st.columns(3)
+        with c6: f_unite = st.selectbox("Unité d'achat / gestion", ["Tonne", "kg", "L", "BigBag"])
+        with c7: f_prix = st.number_input("Prix Unitaire Moyen (€/Ut)", min_value=0.0, step=10.0)
+        with c8: f_stock = st.number_input("Stock Initial", min_value=0.0, step=1.0)
+        
+        if st.form_submit_button("Enregistrer l'Engrais 🚜"):
+            if not f_nom:
+                st.error("Le nom de l'engrais est obligatoire.")
+            else:
+                row_dict = {
+                    "Nom_Produit": f_nom,
+                    "Type": "Fertilisant", # Catégorie mère
+                    "Formulation": f_formulation,
+                    "Element_N": f_n if f_n > 0 else "",
+                    "Element_P": f_p if f_p > 0 else "",
+                    "Element_K": f_k if f_k > 0 else "",
+                    "Element_S": f_s if f_s > 0 else "",
+                    "Element_Ca0": f_cao if f_cao > 0 else "", # Correct column name matching sheet
+                    "Unite_Achat": f_unite,
+                    "Prix_Unitaire_Moyen": f_prix if f_prix > 0 else "",
+                    "STOCK_ACTUEL": f_stock if f_stock > 0 else "0",
+                    "Date_MAJ_Ephy": datetime.now().strftime("%d/%m/%Y") # Utilisé comme date de création
+                }
+                with st.spinner("Enregistrement..."):
+                    if active_loader.update_intrant(row_dict):
+                        st.success(f"Engrais '{f_nom}' enregistré avec succès !")
 
-    elif not fetcher:
-        pass # removed the explicit error
+with tab_semences:
+    st.subheader("➕ Ajouter une Semence / Plant")
+    
+    with st.form("form_add_semence"):
+        s_nom = st.text_input("Nom de la Variété (ex: P9234, LG 30.215)")
+        s_espece = st.selectbox("Espèce de Semence", ["Maïs", "Blé Tendre", "Tournesol", "Orge", "Soja", "Colza", "Sorgho", "Pois", "COUVERTS/CIPAN", "Autre Semence"])
+        
+        st.markdown("##### Stock et Achat")
+        c1, c2, c3 = st.columns(3)
+        with c1: s_unite = st.selectbox("Unité d'achat", ["Dose", "kg", "Sac (25kg)", "Quintal"])
+        with c2: s_prix = st.number_input("Prix Unitaire Moyen (€/Ut)", min_value=0.0, step=5.0)
+        with c3: s_stock = st.number_input("Stock Initial", min_value=0.0, step=1.0)
+        
+        if st.form_submit_button("Enregistrer la Semence 🌱"):
+            if not s_nom:
+                st.error("Le nom de la variété est obligatoire.")
+            else:
+                row_dict = {
+                    "Nom_Produit": s_nom,
+                    "Type": "Semence",
+                    "Culture": s_espece, # Peut aussi servir pour le filtrage
+                    "Espèce_Semence": s_espece,
+                    "Unite_Achat": s_unite,
+                    "Prix_Unitaire_Moyen": s_prix if s_prix > 0 else "",
+                    "STOCK_ACTUEL": s_stock if s_stock > 0 else "0",
+                    "Date_MAJ_Ephy": datetime.now().strftime("%d/%m/%Y")
+                }
+                with st.spinner("Enregistrement..."):
+                    if active_loader.update_intrant(row_dict):
+                        st.success(f"Semence '{s_nom}' enregistrée avec succès !")
 
-st.markdown("---")
-st.markdown("#### 📊 REF_INTRANTS actuel (produits phytosanitaires)")
-try:
-    df_ref_current = active_loader.get_intrants()
-    if not df_ref_current.empty:
-        phyto_types = ["Herbicide", "Fongicide", "Insecticide", "Molluscicide",
-                       "Régulateur de croissance", "Nématicide", "Acaricide"]
-        if "Type" in df_ref_current.columns:
-            df_phyto_only = df_ref_current[
-                df_ref_current["Type"].astype(str).str.strip().isin(phyto_types)
-            ]
-        else:
-            df_phyto_only = df_ref_current
-
-        if not df_phyto_only.empty:
-            cols_prio = ["Nom_Produit", "Type", "N_AMM", "Etat_AMM", "Date_Fin_AMM",
-                         "Matieres_Actives", "Formulation", "DAR", "ZNT_Aqua", "DVP",
-                         "Classement_CMR", "Date_MAJ_Ephy"]
+with tab_all:
+    st.subheader("📊 Contenu complet de REF_INTRANTS")
+    try:
+        df_ref_current = active_loader.get_intrants()
+        if not df_ref_current.empty:
+            type_filter = st.multiselect(
+                "Filtrer par Type :", 
+                options=df_ref_current["Type"].dropna().unique().tolist(),
+                default=df_ref_current["Type"].dropna().unique().tolist()
+            )
             
-            for c in cols_prio:
-                if c not in df_phyto_only.columns:
-                    df_phyto_only[c] = ""
-            
-            cols_show = cols_prio
-            st.dataframe(df_phyto_only[cols_show], use_container_width=True, hide_index=True)
-            st.caption(f"{len(df_phyto_only)} produit(s) phytosanitaire(s) dans REF_INTRANTS")
+            if type_filter:
+                df_display = df_ref_current[df_ref_current["Type"].isin(type_filter)]
+            else:
+                df_display = df_ref_current
+                
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            st.caption(f"{len(df_display)} intrants affichés sur un total de {len(df_ref_current)}.")
         else:
-            st.info("ℹ️ Aucun produit phytosanitaire trouvé dans REF_INTRANTS (Type non reconnu).")
-    else:
-        st.info("ℹ️ REF_INTRANTS est vide.")
-except Exception as e:
-    st.error(f"Erreur chargement REF_INTRANTS : {e}")
+            st.info("ℹ️ REF_INTRANTS est vide.")
+    except Exception as e:
+        st.error(f"Erreur de chargement : {e}")
