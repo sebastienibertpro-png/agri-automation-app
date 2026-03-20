@@ -79,3 +79,71 @@ def init_campaign_selector():
     except Exception as e:
         st.error(f"Erreur lecture campagnes: {e}")
         st.stop()
+
+def inject_premium_css():
+    st.markdown("""
+<style>
+    /* Styling for st.data_editor and st.dataframe containers */
+    [data-testid="stDataEditor"], [data-testid="stDataFrame"] {
+        border-radius: 12px;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        padding: 5px;
+        background-color: white;
+    }
+    
+    /* Premium HTML Table Style */
+    .premium-table { 
+        border-collapse: collapse; 
+        margin: 10px 0; 
+        font-size: 0.9em; 
+        font-family: inherit; 
+        width: 100%; 
+        border-radius: 12px; 
+        overflow: hidden; 
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); 
+    }
+    .premium-table thead tr { 
+        background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%); 
+        color: #ffffff !important; 
+        text-align: left; 
+        font-weight: bold; 
+    }
+    .premium-table.blue thead tr { 
+        background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%); 
+    }
+    .premium-table th, .premium-table td { 
+        padding: 12px 15px; 
+        border: 1px solid #f2f2f2; 
+        text-align: left;
+    }
+    .premium-table tbody tr { 
+        border-bottom: 1px solid #dddddd; 
+    }
+    .premium-table tbody tr:nth-of-type(even) { 
+        background-color: #f8f9fb; 
+    }
+    .premium-table tbody tr:last-of-type { 
+        border-bottom: 3px solid #2e7d32; 
+    }
+    .premium-table.blue tbody tr:last-of-type { 
+        border-bottom: 3px solid #1976d2; 
+    }
+    .premium-table tbody tr:hover { 
+        background-color: #f1f8e9; 
+    }
+    .premium-table.blue tbody tr:hover { 
+        background-color: #e3f2fd; 
+    }
+    .premium-table a {
+        color: inherit;
+        text-decoration: underline;
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+def render_premium_table(df, color="green"):
+    cls = "premium-table" if color == "green" else "premium-table blue"
+    st.write(df.to_html(escape=False, index=False, classes=cls), unsafe_allow_html=True)
+
