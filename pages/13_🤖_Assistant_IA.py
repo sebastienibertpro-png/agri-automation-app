@@ -31,9 +31,8 @@ Sois professionnel, clair, et utilise des listes ou des tableaux dans tes répon
 
 @st.cache_resource
 def get_model():
-    # gemini-1.5-pro is best for complex task and large context
     return genai.GenerativeModel(
-        model_name="gemini-1.5-pro",
+        model_name="gemini-2.5-flash",
         system_instruction=system_instruction
     )
 
