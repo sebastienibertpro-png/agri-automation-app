@@ -120,9 +120,9 @@ else:
                     df_viz['Date_facture'] = pd.to_datetime(df_viz['Date_facture'], errors='coerce', dayfirst=True)
                     df_viz['Date_facture'] = df_viz['Date_facture'].dt.strftime('%d/%m/%Y').fillna("")
                 
-                # Drop unwanted columns (case-insensitive match)
-                cols_to_drop_keywords = ['id_parcelle_li', 'affectation_type', 'montant']
-                cols_to_drop_exact = [id_col]
+                # Drop unwanted columns (case-insensitive match for known problematic cols)
+                cols_to_drop_keywords = ['id_parcelle_li', 'affectation_type']
+                cols_to_drop_exact = [id_col, 'Montant']  # drop only standalone 'Montant', not Montant_Total_*
                 for c in df_viz.columns.tolist():
                     c_lower = c.lower().replace('é', 'e').replace('è', 'e')
                     if any(kw in c_lower for kw in cols_to_drop_keywords):
