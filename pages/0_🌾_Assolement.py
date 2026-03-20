@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import datetime
-from shared import init_campaign_selector, inject_premium_css
+from shared import init_campaign_selector, inject_premium_css, render_premium_header
 
 st.set_page_config(page_title="Assolement & Parcelles", page_icon="🌾", layout="wide")
 inject_premium_css()
