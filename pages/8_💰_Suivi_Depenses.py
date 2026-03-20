@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from shared import init_campaign_selector
+from shared import init_campaign_selector, inject_premium_css, render_premium_table
 
 st.set_page_config(page_title="Suivi Dépenses", page_icon="💰", layout="wide")
 
@@ -134,17 +134,7 @@ else:
                     cols = ['Lien'] + [c for c in df_viz.columns if c not in ['Lien', link_col, id_col]]
                     df_viz = df_viz[cols]
                 
-                st.markdown("""
-                <style>
-                    .invoice-table { border-collapse: collapse; font-size: 0.85em; width: 100%; border-radius: 8px; overflow: hidden; }
-                    .invoice-table thead tr { background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%); color: white; text-align: center; }
-                    .invoice-table th, .invoice-table td { padding: 8px 12px; border: 1px solid #eee; text-align: center; }
-                    .invoice-table tbody tr:nth-of-type(even) { background-color: #f8f9fa; }
-                    .invoice-table tbody tr:hover { background-color: #f1f8e9; }
-                    .invoice-table a { color: #2E7D32; font-weight: bold; text-decoration: none; }
-                </style>
-                """, unsafe_allow_html=True)
-                st.write(df_viz.to_html(escape=False, index=False, classes="invoice-table"), unsafe_allow_html=True)
+                render_premium_table(df_viz, color="blue")
                 
             elif manage_mode == "📝 Mode Édition":
                 st.info("💡 Modifiez les valeurs directement dans le tableau ci-dessous, puis cliquez sur Sauvegarder.")
