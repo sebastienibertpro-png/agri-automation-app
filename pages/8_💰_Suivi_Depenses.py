@@ -9,7 +9,7 @@ st.title("💰 Suivi des Dépenses par Poste")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
-st.markdown(f"### Dépenses pour la campagne {selected_campaign}")
+render_premium_header(f"Dépenses pour la campagne {selected_campaign}", "Suivi analytique par poste de dépense 💰", color="blue")
 
 # Fetch the data
 df_achats = active_loader.get_achats(selected_campaign)
@@ -78,12 +78,10 @@ else:
         col1, col2 = st.columns([1, 1])
 
         with col1:
-            st.subheader("📑 Récapitulatif par Catégorie")
-            st.dataframe(
-                df_summary.style.format({"Montant Total HT (€)": "{:,.2f} €"}),
-                use_container_width=True,
-                hide_index=True
-            )
+            render_premium_header("📑 Récapitulatif par Catégorie", color="blue")
+            df_recap = df_summary.copy()
+            df_recap['Montant Total HT (€)'] = df_recap['Montant Total HT (€)'].apply(lambda x: f"{float(x):,.2f} €".replace(',', ' '))
+            render_premium_table(df_recap, color="blue")
 
         with col2:
             st.subheader("📊 Répartition Graphique")
