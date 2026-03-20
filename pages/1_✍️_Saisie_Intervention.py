@@ -83,8 +83,8 @@ with col_m3:
     default_outil = get_index(outil_options, edit_data.get('Outil', '- Aucun -'))
     outil = st.selectbox("Outil", outil_options, index=default_outil)
     
-stade_options = ["Pré-levée", "Levée", "2F", "4-6F", "8-10F", "12F", "Floraison", "Tallage", "Epis 1cm", "Montaison", "Maturité", "Récolte"]
-default_stade = get_index(stade_options, edit_data.get('Stade_Culture', 'Tallage'))
+stade_options = ["", "Pré-levée", "Levée", "2F", "4-6F", "8-10F", "12F", "Floraison", "Tallage", "Epis 1cm", "Montaison", "Maturité", "Récolte"]
+default_stade = get_index(stade_options, edit_data.get('Stade_Culture', ''))
 stade = st.selectbox("Stade Culture", stade_options, index=default_stade)
 
 if nature_interv == "Traitement":
