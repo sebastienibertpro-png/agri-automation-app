@@ -65,10 +65,18 @@ else:
         # Sort by Value FIRST, so Total remains at the absolute bottom
         df_disp = df_disp.sort_values(by="Valeur Estimée (€)", ascending=False)
         
-        # Add total row
-        import math
+        # Calculate total before casting to strings
         total_valeur_cat = df_disp['Valeur Estimée (€)'].sum()
-        total_row = pd.DataFrame([['TOTAL', float('nan'), float('nan'), float('nan'), float('nan'), '', total_valeur_cat]], columns=df_disp.columns)
+        
+        # Pre-format columns to string to guarantee empty cells later
+        df_disp['Prix Moyen Unit. (€)'] = df_disp['Prix Moyen Unit. (€)'].apply(lambda x: f"{float(x):.2f} €" if pd.notna(x) and str(x).strip() != "" else "")
+        df_disp['Acheté'] = df_disp['Acheté'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) and str(x).strip() != "" else "")
+        df_disp['Consommé'] = df_disp['Consommé'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) and str(x).strip() != "" else "")
+        df_disp['Reste'] = df_disp['Reste'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) and str(x).strip() != "" else "")
+        df_disp['Valeur Estimée (€)'] = df_disp['Valeur Estimée (€)'].apply(lambda x: f"{float(x):,.2f} €".replace(',', ' ') if pd.notna(x) and str(x).strip() != "" else "")
+        
+        # Add total row using ONLY empty strings
+        total_row = pd.DataFrame([['TOTAL', '', '', '', '', '', f"{total_valeur_cat:,.2f} €".replace(',', ' ')]], columns=df_disp.columns)
         df_disp = pd.concat([df_disp, total_row], ignore_index=True)
         
         # Styling function for Dataframe
@@ -79,20 +87,15 @@ else:
             else:
                 # Highlight negative stock in red
                 try:
-                    if float(row['Reste']) < 0:
+                    reste_val = str(row['Reste']).replace(' ', '')
+                    if reste_val and float(reste_val) < 0:
                         idx_reste = list(row.index).index('Reste')
                         styles[idx_reste] = 'color: red; font-weight: bold;'
                 except: pass
             return styles
             
         st.dataframe(
-            df_disp.style.format({
-                "Prix Moyen Unit. (€)": "{:.2f} €",
-                "Acheté": "{:.2f}",
-                "Consommé": "{:.2f}",
-                "Reste": "{:.2f}",
-                "Valeur Estimée (€)": "{:,.2f} €"
-            }, na_rep="").apply(style_rows, axis=1),
+            df_disp.style.apply(style_rows, axis=1),
             use_container_width=True,
             hide_index=True
         )
