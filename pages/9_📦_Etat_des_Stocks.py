@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from shared import init_campaign_selector
+from shared import init_campaign_selector, inject_premium_css, render_premium_table
 import io
 
 st.set_page_config(page_title="État des Stocks", page_icon="📦", layout="wide")
@@ -60,45 +60,24 @@ else:
             return
             
         df_disp = df_subset[['Nom_Produit', 'Prix_Moyen_Unitaire', 'Quantité_Achetée', 'Quantité_Consommée', 'Reste_en_Stock', 'Unité_Achat', 'Valeur_Stock_Estimee']].copy()
-        df_disp.columns = ['Produit', 'Prix Moyen Unit. (€)', 'Acheté', 'Consommé', 'Reste', 'Unité', 'Valeur Estimée (€)']
+        df_disp.columns = ['Produit', 'Prix (€)', 'Acheté', 'Consommé', 'Reste', 'Unité', 'Valeur (€)']
         
-        # Sort by Value FIRST, so Total remains at the absolute bottom
-        df_disp = df_disp.sort_values(by="Valeur Estimée (€)", ascending=False)
+        # Sort by Value
+        df_disp = df_disp.sort_values(by="Valeur (€)", ascending=False)
+        total_valeur_cat = df_disp['Valeur (€)'].sum()
         
-        # Calculate total before casting to strings
-        total_valeur_cat = df_disp['Valeur Estimée (€)'].sum()
+        # Formatting for HTML display
+        df_disp['Prix (€)'] = df_disp['Prix (€)'].apply(lambda x: f"{float(x):.2f} €" if pd.notna(x) else "")
+        df_disp['Acheté'] = df_disp['Acheté'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) else "")
+        df_disp['Consommé'] = df_disp['Consommé'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) else "")
+        df_disp['Reste'] = df_disp['Reste'].apply(lambda x: f"<b>{float(x):.2f}</b>" if pd.notna(x) and float(x) < 0 else f"{float(x):.2f}" if pd.notna(x) else "")
+        df_disp['Valeur (€)'] = df_disp['Valeur (€)'].apply(lambda x: f"{float(x):,.2f} €".replace(',', ' ') if pd.notna(x) else "")
         
-        # Pre-format columns to string to guarantee empty cells later
-        df_disp['Prix Moyen Unit. (€)'] = df_disp['Prix Moyen Unit. (€)'].apply(lambda x: f"{float(x):.2f} €" if pd.notna(x) and str(x).strip() != "" else "")
-        df_disp['Acheté'] = df_disp['Acheté'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) and str(x).strip() != "" else "")
-        df_disp['Consommé'] = df_disp['Consommé'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) and str(x).strip() != "" else "")
-        df_disp['Reste'] = df_disp['Reste'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) and str(x).strip() != "" else "")
-        df_disp['Valeur Estimée (€)'] = df_disp['Valeur Estimée (€)'].apply(lambda x: f"{float(x):,.2f} €".replace(',', ' ') if pd.notna(x) and str(x).strip() != "" else "")
-        
-        # Add total row using ONLY empty strings
-        total_row = pd.DataFrame([['TOTAL', '', '', '', '', '', f"{total_valeur_cat:,.2f} €".replace(',', ' ')]], columns=df_disp.columns)
+        # Add total row
+        total_row = pd.DataFrame([['<b>TOTAL</b>', '', '', '', '', '', f"<b>{total_valeur_cat:,.2f} €".replace(',', ' ') + "</b>"]], columns=df_disp.columns)
         df_disp = pd.concat([df_disp, total_row], ignore_index=True)
         
-        # Styling function for Dataframe
-        def style_rows(row):
-            styles = [''] * len(row)
-            if row['Produit'] == 'TOTAL':
-                styles = ['font-weight: bold; color: #000000; background-color: #e6e6e6;'] * len(row)
-            else:
-                # Highlight negative stock in red
-                try:
-                    reste_val = str(row['Reste']).replace(' ', '')
-                    if reste_val and float(reste_val) < 0:
-                        idx_reste = list(row.index).index('Reste')
-                        styles[idx_reste] = 'color: red; font-weight: bold;'
-                except: pass
-            return styles
-            
-        st.dataframe(
-            df_disp.style.apply(style_rows, axis=1),
-            use_container_width=True,
-            hide_index=True
-        )
+        render_premium_table(df_disp, color="green")
 
     # Note: Using generic keywords 'SEMENCE', 'ENGRAIS', 'PHYTO' to catch categories.
     with tab_semences:
