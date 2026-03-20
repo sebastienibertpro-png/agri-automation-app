@@ -79,7 +79,7 @@ with tab_asso:
     # Ensure all current parcel IDs are in options to avoid mismatch errors
     current_parcel_ids = df_curr_asso_clean['ID_Parcelle'].unique().tolist()
     parcelle_options = sorted(list(set(parcelle_options) | set(current_parcel_ids)))
-    if '' in parcels_options: parcelle_options.remove('')
+    if '' in parcelle_options: parcelle_options.remove('')
 
     col_config = {
         "Campagne": st.column_config.NumberColumn("Camp.", disabled=True, format="%d"),
