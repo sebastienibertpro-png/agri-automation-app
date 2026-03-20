@@ -613,6 +613,67 @@ class DataLoader:
             st.error(f"Erreur écriture PPF : {e}")
             return False
 
+    def update_assolement(self, asso_dict: dict) -> bool:
+        """
+        Inserts or updates an Assolement entry for a given Campaign and Parcel.
+        Requires Cloud Connection.
+        """
+        if not self.conn:
+            st.error("Écriture impossible en local (Lecture seule).")
+            return False
+            
+        try:
+            # 1. Read fresh data
+            df = self.conn.read(worksheet="ASSOLEMENT", ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            
+            campagne = str(asso_dict.get("Campagne", "")).strip()
+            parcelle = str(asso_dict.get("ID_Parcelle", "")).strip()
+            
+            if not campagne or not parcelle:
+                st.error("Campagne et ID_Parcelle sont requis.")
+                return False
+                
+            # Ensure columns exist in the DataFrame
+            for col in asso_dict:
+                if col not in df.columns:
+                    df[col] = ""
+
+            # Standardize campaign as numeric for matching
+            df['Camp_Int'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+            target_camp = int(campagne)
+            
+            # Match by Campaign and ID_Parcelle
+            mask = (df['Camp_Int'] == target_camp) & (df['ID_Parcelle'].astype(str).str.strip() == parcelle)
+            
+            if mask.any():
+                # Update existing row
+                idx = df[mask].index[0]
+                for col, val in asso_dict.items():
+                    if col in df.columns:
+                        df.at[idx, col] = val
+            else:
+                # Append new row
+                # Generate ID_Assolement if it exists in columns but not in dict
+                if 'ID_Assolement' in df.columns and ('ID_Assolement' not in asso_dict or not asso_dict['ID_Assolement']):
+                    asso_dict['ID_Assolement'] = f"ASSOL_{campagne}_{parcelle}"
+                
+                new_row = pd.DataFrame([asso_dict])
+                df = pd.concat([df, new_row], ignore_index=True)
+
+            # Cleanup
+            if 'Camp_Int' in df.columns:
+                df = df.drop(columns=['Camp_Int'])
+
+            # 3. Write back
+            self.conn.update(worksheet="ASSOLEMENT", data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop("ASSOLEMENT", None)
+            st.cache_data.clear()
+            return True
+            
+        except Exception as e:
+            st.error(f"Erreur update_assolement : {e}")
+            return False
+
     def get_observations(self, campagne=None):
         """
         Retrieves field observations from JOURNAL_INTERVENTION.
