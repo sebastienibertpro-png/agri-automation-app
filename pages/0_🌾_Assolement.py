@@ -9,6 +9,34 @@ st.set_page_config(page_title="Assolement & Parcelles", page_icon="🌾", layout
 st.title("🌾 Gestion de l'Assolement & Parcelles")
 st.markdown("---")
 
+# --- Custom UI Styling ---
+st.markdown("""
+<style>
+    [data-testid="stDataEditor"] {
+        border-radius: 12px;
+        border: 1px solid #2e7d32;
+        box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
+        padding: 4px;
+        background-color: white;
+    }
+    .table-header {
+        background-color: #2e7d32;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 10px 10px 0 0;
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: -5px;
+        position: relative;
+        z-index: 10;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .table-header.blue { background-color: #1f77b4; }
+</style>
+""", unsafe_allow_html=True)
+
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 dl = active_loader
 campagne_input = int(selected_campaign)
@@ -94,7 +122,7 @@ with tab_asso:
 
 # --- TAB 2: REF_PARCELLES ---
 with tab_ref:
-    st.subheader("🗺️ Référentiel Parcelles")
+    st.markdown('<div class="table-header"><div class="table-title">🗺️ Référentiel Parcelles</div><div style="font-size: 0.8em; opacity: 0.8;">Données fixes de l\'exploitation 📍</div></div>', unsafe_allow_html=True)
     df_ref = dl.get_parcelles()
     
     # ULTIMATE STABILITY: No st.column_config objects, just labels
