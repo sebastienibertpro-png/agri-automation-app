@@ -737,6 +737,23 @@ class DataLoader:
             st.error(f"Erreur écriture REF_INTRANTS : {e}")
             return False
 
+    def overwrite_worksheet(self, sheet_name, data_df) -> bool:
+        """
+        Replaces the entire content of a worksheet with the provided DataFrame.
+        Requires Cloud Connection.
+        """
+        if not self.conn:
+            st.error("Écriture impossible en local (Lecture seule).")
+            return False
+        try:
+            self.conn.update(worksheet=sheet_name, data=data_df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop(sheet_name, None)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Erreur overwrite_worksheet {sheet_name} : {e}")
+            return False
+
     def update_usages_phyto(self, n_amm: str, usages: list[dict]) -> bool:
         """
         Remplace tous les usages existants (même N_AMM) dans REF_USAGES_PHYTO
