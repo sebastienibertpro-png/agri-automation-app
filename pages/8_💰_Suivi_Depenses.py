@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from shared import init_campaign_selector, inject_premium_css, render_premium_table
+from shared import init_campaign_selector, inject_premium_css, render_premium_table, render_premium_header
 
 st.set_page_config(page_title="Suivi Dépenses", page_icon="💰", layout="wide")
 
