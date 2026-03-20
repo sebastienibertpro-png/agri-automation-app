@@ -117,20 +117,46 @@ def render_premium_header(title, subtitle="", color="green"):
     st.markdown(f'<div class="{cls}"><span>{title}</span><span style="font-size: 0.7em; opacity: 0.8; font-weight: normal;">{subtitle}</span></div>', unsafe_allow_html=True)
 
 def render_premium_table(df, color="green"):
-    bg = "linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%)" if color == "green" else "linear-gradient(135deg, #0d47a1 0%, #1976d2 100%)"
-    border = "#2e7d32" if color == "green" else "#1976d2"
-    
-    html = f"""
-    <style>
-        .p-table {{ border-collapse: collapse; margin: 0; font-size: 0.9em; width: 100%; border-radius: 0 0 12px 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; }}
-        .p-table thead tr {{ background: {bg}; color: #ffffff !important; text-align: left; font-weight: bold; }}
-        .p-table th, .p-table td {{ padding: 12px 15px; border: 1px solid #eee; }}
-        .p-table tbody tr {{ border-bottom: 1px solid #ddd; }}
-        .p-table tbody tr:nth-of-type(even) {{ background-color: #f8f9fb; }}
-        .p-table tbody tr:last-of-type {{ border-bottom: 3px solid {border}; }}
-        .p-table tbody tr:hover {{ background-color: #f1f8e9; }}
-    </style>
+    """Render a DataFrame as a styled HTML table using fully inline CSS (no style tags).
+    This is necessary because Streamlit Cloud sanitizes <style> tags in st.markdown.
     """
-    html += df.to_html(escape=False, index=False, classes="p-table")
+    header_bg = "linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%)" if color == "green" else "linear-gradient(135deg, #0d47a1 0%, #1976d2 100%)"
+    border_color = "#2e7d32" if color == "green" else "#1976d2"
+    hover_bg = "#f1f8e9" if color == "green" else "#e3f2fd"
+
+    th_style = f'style="padding:12px 15px; border:1px solid #eee; background:{header_bg}; color:#ffffff; font-weight:bold; text-align:left;"'
+    td_style = 'style="padding:10px 15px; border:1px solid #eee; text-align:left;"'
+    td_even_style = 'style="padding:10px 15px; border:1px solid #eee; text-align:left; background-color:#f8f9fb;"'
+    td_last_style = f'style="padding:10px 15px; border:1px solid #eee; text-align:left; border-bottom:3px solid {border_color};"'
+    td_last_even_style = f'style="padding:10px 15px; border:1px solid #eee; text-align:left; background-color:#f8f9fb; border-bottom:3px solid {border_color};"'
+
+    table_style = f'style="border-collapse:collapse; width:100%; border-radius:8px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.1); font-size:0.9em; font-family: inherit; margin:4px 0;"'
+
+    rows = list(df.itertuples(index=False, name=None))
+    n = len(rows)
+
+    html = f"<table {table_style}><thead><tr>"
+    for col in df.columns:
+        html += f"<th {th_style}>{col}</th>"
+    html += "</tr></thead><tbody>"
+
+    for i, row in enumerate(rows):
+        is_last = (i == n - 1)
+        is_even = (i % 2 == 1)
+        html += "<tr>"
+        for j, cell in enumerate(row):
+            if is_last and is_even:
+                style = td_last_even_style
+            elif is_last:
+                style = td_last_style
+            elif is_even:
+                style = td_even_style
+            else:
+                style = td_style
+            html += f"<td {style}>{cell}</td>"
+        html += "</tr>"
+
+    html += "</tbody></table>"
     st.markdown(html, unsafe_allow_html=True)
+
 
