@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from shared import init_campaign_selector, inject_premium_css, render_premium_table
+from shared import init_campaign_selector, inject_premium_css, render_premium_table, render_premium_header
 import io
 
 st.set_page_config(page_title="État des Stocks", page_icon="📦", layout="wide")
