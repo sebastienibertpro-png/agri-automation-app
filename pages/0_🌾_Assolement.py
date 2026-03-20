@@ -78,6 +78,8 @@ with tab_asso:
         "Camp_Int": None
     }
     
+    render_premium_header("🌾 Plan d'Assolement", f"Campagne {campagne_input} — Modifications directes autorisées ✍️", color="green")
+    
     try:
         edited_df = st.data_editor(df_curr_asso, column_config=col_config_asso, num_rows="dynamic", use_container_width=True, hide_index=True, key="editor_asso")
         
