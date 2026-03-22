@@ -88,12 +88,16 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=False):
     # Note: Dans Streamlit, get_geolocation() renvoie None tant qu'on n'a pas bougé ou que le user n'a pas validé
     loc = get_geolocation()
     
-    default_gps = ""
+    # Correction: Sauvegarde dans le cache car Streamlit efface la valeur au clic du bouton "Enregistrer"
     if loc:
-        default_gps = f"{loc['coords']['latitude']}, {loc['coords']['longitude']}"
-        st.success(f"📍 Position GPS détectée : {default_gps}")
+        st.session_state["cached_gps"] = f"{loc['coords']['latitude']}, {loc['coords']['longitude']}"
+        
+    default_gps = st.session_state.get("cached_gps", "")
+    
+    if default_gps:
+        st.success(f"📍 Position GPS détectée et mémorisée : {default_gps}")
     else:
-        st.info("ℹ️ Pour capturer votre position automatiquement, assurez-vous que la localisation est activée sur votre appareil.")
+        st.info("ℹ️ Pour capturer votre position automatiquement, patientez que le GPS s'active.")
 
     gps_coords = st.text_input("Coordonnées GPS", value=default_gps, help="Les coordonnées sont remplies automatiquement si le GPS est activé", key="obs_gps_coord")
     
