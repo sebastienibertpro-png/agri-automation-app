@@ -3,12 +3,13 @@ import pandas as pd
 from datetime import datetime
 import os
 from ephy_fetcher import EphyFetcher
-from shared import get_dataloader, get_drive_uploader, EPHY_DRIVE_FOLDER_ID
+from shared import get_dataloader, get_drive_uploader, EPHY_DRIVE_FOLDER_ID, inject_premium_css, render_premium_header
 import time
 
 st.set_page_config(page_title="Référentiel Intrants", page_icon="🧪", layout="wide")
 
 st.title("🧪 Référentiel des Intrants")
+inject_premium_css()
 
 st.markdown("""
 <style>
@@ -26,11 +27,12 @@ st.markdown("""
 
 active_loader = get_dataloader()
 
-tab_phyto, tab_ferti, tab_semences, tab_all = st.tabs([
-    "🌿 Phytosanitaires (E-Phy)", 
-    "🚜 Engrais & Amendements", 
-    "🌱 Semences", 
-    "📊 Tableau Complet"
+tab_all, tab_usages, tab_phyto, tab_ferti, tab_semences = st.tabs([
+    "📊 Tableau des intrants",
+    "🍃 Usages Phytosanitaires",
+    "🌿 Ajouter Phyto (E-Phy)", 
+    "🚜 Ajouter Engrais", 
+    "🌱 Ajouter Semences"
 ])
 
 with tab_phyto:
@@ -272,7 +274,7 @@ with tab_semences:
                         st.success(f"Semence '{s_nom}' enregistrée avec succès !")
 
 with tab_all:
-    st.subheader("📊 Contenu complet de REF_INTRANTS")
+    render_premium_header("📊 Tableau des intrants", "Vue d'ensemble de tous les produits")
     try:
         df_ref_current = active_loader.get_intrants()
         if not df_ref_current.empty:
@@ -291,5 +293,17 @@ with tab_all:
             st.caption(f"{len(df_display)} intrants affichés sur un total de {len(df_ref_current)}.")
         else:
             st.info("ℹ️ REF_INTRANTS est vide.")
+    except Exception as e:
+        st.error(f"Erreur de chargement : {e}")
+
+with tab_usages:
+    render_premium_header("🍃 Usages Phytosanitaires", "Vue détaillée des usages homologués", color="blue")
+    try:
+        df_usages = active_loader.get_usages_phyto()
+        if not df_usages.empty:
+            st.dataframe(df_usages, use_container_width=True, hide_index=True)
+            st.caption(f"{len(df_usages)} usages affichés.")
+        else:
+            st.info("ℹ️ Aucun usage phytosanitaire disponible.")
     except Exception as e:
         st.error(f"Erreur de chargement : {e}")
