@@ -21,26 +21,17 @@ st.subheader("📍 Carte des Observations")
 df_obs = active_loader.get_observations(selected_campaign)
 
 # Initialisation de la carte avec Satellite par défaut
-m_map = folium.Map(location=[45.0, 1.0], zoom_start=13, tiles=None)
-
-# Ajout des couches de tuiles (Satellite Google par défaut)
-folium.TileLayer(
+m_map = folium.Map(
+    location=[45.0, 1.0],
+    zoom_start=13,
     tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
     attr='Google',
-    name='Satellite Hybrid (Google)',
-    overlay=False,
-    control=True
-).add_to(m_map)
+    name='Satellite Hybrid (Google)'
+)
 
-folium.TileLayer(
-    tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    attr='Google',
-    name='Satellite (Google)',
-    overlay=False,
-    control=True
-).add_to(m_map)
-
+# Couches de fond alternatives
 folium.TileLayer('openstreetmap', name='Plan (OSM)').add_to(m_map)
+
 
 folium.LayerControl().add_to(m_map)
 
