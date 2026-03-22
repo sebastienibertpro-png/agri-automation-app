@@ -85,12 +85,14 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=False):
     st.markdown("**Localisation (GPS)**")
     
     # On récupère la géolocalisation si le composant est activé
-    # Note: Dans Streamlit, get_geolocation() renvoie None tant qu'on n'a pas bougé ou que le user n'a pas validé
     loc = get_geolocation()
     
-    # Correction: Sauvegarde dans le cache car Streamlit efface la valeur au clic du bouton "Enregistrer"
+    # Correction: Mettre à jour manuellement la clé du widget pour forcer l'affichage
     if loc:
-        st.session_state["cached_gps"] = f"{loc['coords']['latitude']}, {loc['coords']['longitude']}"
+        new_gps = f"{loc['coords']['latitude']}, {loc['coords']['longitude']}"
+        if st.session_state.get("cached_gps") != new_gps:
+            st.session_state["cached_gps"] = new_gps
+            st.session_state["obs_gps_coord"] = new_gps
         
     default_gps = st.session_state.get("cached_gps", "")
     
