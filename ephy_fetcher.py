@@ -546,6 +546,7 @@ class EphyFetcher:
                 uploader.service.permissions().create(
                     fileId=folder_id,
                     body={'type': 'user', 'role': 'writer', 'emailAddress': 'sebastienibert.pro@gmail.com'},
+                    sendNotificationEmail=False,
                     fields='id'
                 ).execute()
             except Exception:
@@ -561,6 +562,7 @@ class EphyFetcher:
                             uploader.service.permissions().create(
                                 fileId=file_id,
                                 body={'type': 'user', 'role': 'writer', 'emailAddress': 'sebastienibert.pro@gmail.com'},
+                                sendNotificationEmail=False,
                                 fields='id'
                             ).execute()
                         except Exception as perm_e:
