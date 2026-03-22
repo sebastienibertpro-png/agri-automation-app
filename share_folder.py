@@ -15,6 +15,7 @@ try:
     service.permissions().create(
         fileId=EPHY_DRIVE_FOLDER_ID,
         body={'type': 'user', 'role': 'writer', 'emailAddress': user_email},
+        sendNotificationEmail=False,
         fields='id'
     ).execute()
     print("Dossier partagé avec succès.")
@@ -33,6 +34,7 @@ try:
             service.permissions().create(
                 fileId=f['id'],
                 body={'type': 'user', 'role': 'writer', 'emailAddress': user_email},
+                sendNotificationEmail=False,
                 fields='id'
             ).execute()
         except Exception as file_e:
