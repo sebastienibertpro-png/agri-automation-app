@@ -42,11 +42,33 @@ class DriveUploader:
         
         try:
             print(f"Upload de '{file_name}' vers le dossier Drive {folder_id}...", flush=True)
-            file = self.service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id'
+            
+            # Recherche d'un fichier existant avec le même nom dans ce dossier
+            query = f"'{folder_id}' in parents and name = '{file_name}' and trashed = false"
+            results = self.service.files().list(
+                q=query,
+                fields="files(id, name)"
             ).execute()
+            items = results.get('files', [])
+            
+            if items:
+                # Fichier existant -> Update
+                file_id = items[0]['id']
+                print(f"Fichier existant trouvé (ID: {file_id}). Mise à jour...", flush=True)
+                file = self.service.files().update(
+                    fileId=file_id,
+                    media_body=media,
+                    fields='id'
+                ).execute()
+            else:
+                # Nouveau fichier -> Create
+                print("Nouveau fichier. Création...", flush=True)
+                file = self.service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id'
+                ).execute()
+                
             print(f"Succès ! Fichier uploadé avec ID: {file.get('id')}", flush=True)
             return file.get('id')
         except Exception as e:
