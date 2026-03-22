@@ -55,7 +55,10 @@ if not df_obs.empty:
                 
                 popup_html = f"<b>{row['ID_Parcelle']}</b><br>{row['Date']}<br>{obs_text}"
                 if photo_id:
-                    photo_url = f"https://drive.google.com/uc?id={photo_id}"
+                    if str(photo_id).startswith("http"):
+                        photo_url = photo_id
+                    else:
+                        photo_url = f"https://drive.google.com/uc?id={photo_id}"
                     popup_html += f"<br><img src='{photo_url}' width='200'>"
                 
                 folium.Marker(
@@ -109,21 +112,33 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=False):
         else:
             photo_drive_id = ""
             if obs_photo:
-                with st.spinner("Upload de la photo vers Drive..."):
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-                        tmp.write(obs_photo.getbuffer())
-                        tmp_path = tmp.name
-                    
-                    uploader = get_drive_uploader()
-                    if uploader:
-                        try:
-                            photo_drive_id = uploader.upload_file(tmp_path, OBSERVATION_DRIVE_FOLDER_ID)
-                        except Exception as e:
-                            st.error(f"Erreur Drive: {e}")
-                        finally:
-                            os.remove(tmp_path)
-                    else:
-                        st.error("Drive uploader non disponible.")
+                with st.spinner("Upload de la photo vers ImgBB..."):
+                    try:
+                        import requests
+                        import base64
+                        
+                        api_key = st.secrets.get("imgbb_api_key", None)
+                        if not api_key:
+                            st.error("⚠️ Clé API ImgBB introuvable dans .streamlit/secrets.toml.")
+                        else:
+                            # Convert photo to base64
+                            image_b64 = base64.b64encode(obs_photo.getvalue()).decode("utf-8")
+                            
+                            url = "https://api.imgbb.com/1/upload"
+                            payload = {
+                                "key": api_key,
+                                "image": image_b64
+                            }
+                            
+                            res = requests.post(url, data=payload)
+                            
+                            if res.status_code == 200:
+                                res_data = res.json()
+                                photo_drive_id = res_data.get("data", {}).get("url", "")
+                            else:
+                                st.error(f"Erreur serveur ImgBB : {res.text}")
+                    except Exception as e:
+                        st.error(f"Erreur d'upload : {e}")
             
             new_obs = {
                 'ID_Intervention': f"OBS_{selected_campaign}_{obs_parcelle}_{pd.Timestamp.now().strftime('%H%M%S')}",
