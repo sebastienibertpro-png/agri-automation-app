@@ -135,6 +135,30 @@ def load_farm_context():
     except Exception:
         pass
 
+    # 12. REFERENTIEL PARCELLES
+    try:
+        df_parcelles = active_loader.get_parcelles()
+        if not df_parcelles.empty:
+            context_parts.append("### REFERENTIEL PARCELLES\n" + df_parcelles.to_csv(index=False))
+    except Exception:
+        pass
+
+    # 13. REFERENTIEL MATERIELS
+    try:
+        df_mat = active_loader.get_materiels()
+        if not df_mat.empty:
+            context_parts.append("### REFERENTIEL MATERIELS\n" + df_mat.to_csv(index=False))
+    except Exception:
+        pass
+
+    # 14. RELEVES COMPTEURS (irrigation)
+    try:
+        df_releves = active_loader.get_releves_compteurs()
+        if not df_releves.empty:
+            context_parts.append("### RELEVES COMPTEURS EAU\n" + df_releves.to_csv(index=False))
+    except Exception:
+        pass
+
     return "\n\n".join(context_parts)
 
 with st.spinner("Chargement des données de l'exploitation pour l'IA..."):
