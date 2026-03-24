@@ -90,7 +90,7 @@ with tab_consult:
 
         rows_summary.append({
             "Parcelle": p_id,
-            "Culture": f"{culture} {variete}".strip(),
+            "Culture": f"{culture} {variete}".strip() if str(variete).lower() not in ("nan", "none", "") else culture,
             "Surface (ha)": f"{surface:.2f}",
             "Objectif Rdt": obj_rdt,
             "Dose X (U N/ha)": dose_x,
