@@ -159,6 +159,14 @@ def load_farm_context():
     except Exception:
         pass
 
+    # 15. RH - SUIVI HORAIRES
+    try:
+        df_rh = active_loader._get_data("RH_SUIVI_HORAIRES")
+        if not df_rh.empty:
+            context_parts.append("### RH - SUIVI DES HORAIRES\n" + df_rh.to_csv(index=False))
+    except Exception:
+        pass
+
     return "\n\n".join(context_parts)
 
 with st.spinner("Chargement des données de l'exploitation pour l'IA..."):
