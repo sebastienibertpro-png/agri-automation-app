@@ -8,8 +8,8 @@ APP_BASE_URL = "https://agri-automation-app-kwz7hjkyb8hjxwhe9w7rsv.streamlit.app
 EPHY_DRIVE_FOLDER_ID = "1fMnmAMoGWVTIFaR2yOTbD7EMdBNuyH3Z"
 OBSERVATION_DRIVE_FOLDER_ID = "1_oaKK3W_YfgAQ9UPS9AkcmmIH-eZEfci"
 
-@st.cache_resource
 def get_dataloader():
+    """Crée un DataLoader frais. Pas de cache_resource pour que le TTL de conn.read() fonctionne."""
     credentials_dict = None
     if "gcp_service_account" in st.secrets:
         credentials_dict = dict(st.secrets["gcp_service_account"])
@@ -34,13 +34,17 @@ def get_drive_uploader():
     uploader = DriveUploader(credentials_path=cred_path, credentials_dict=credentials_dict)
     return uploader if uploader.service else None
 
-# Lazy check for loader capabilities
 def get_active_loader():
-    dl = get_dataloader()
-    if dl and not hasattr(dl, "load_telepac_from_cloud"):
-        st.cache_resource.clear()
-        return get_dataloader()
-    return dl
+    """Retourne un DataLoader. Utilise session_state pour éviter une recréation totale à chaque widget,
+    mais sans bloquer le rafraîchissement des données (TTL géré par st.connection en interne)."""
+    if "_dataloader" not in st.session_state or st.session_state["_dataloader"] is None:
+        st.session_state["_dataloader"] = get_dataloader()
+    return st.session_state["_dataloader"]
+
+def get_fresh_loader():
+    """Force la recréation d'un DataLoader, utile après une écriture."""
+    st.session_state["_dataloader"] = get_dataloader()
+    return st.session_state["_dataloader"]
 
 active_loader = get_active_loader()
 
