@@ -59,7 +59,11 @@ if intervention_id:
         with st.spinner("Mise à jour du statut..."):
             success = active_loader.update_intervention_status(intervention_id, "Réalisé")
             if success:
-                st.success("Statut mis à jour avec succès ! Vous pouvez fermer.")
+                st.success("Statut mis à jour avec succès ! Rafraîchissement en cours...")
+                import time
+                time.sleep(1)
+                st.query_params.clear()
+                st.rerun()
             else:
                 st.error("Échec de la mise à jour (Vérifiez les logs ou la connexion).")
     st.divider()
