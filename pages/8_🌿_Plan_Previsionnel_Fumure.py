@@ -83,7 +83,7 @@ with tab_consult:
             else:
                 df_real = df_p
             nb_apports = len(df_real)
-            for col_n in ["N_ha", "Dose_Unitaire_N", "N", "Dose_Ha"]:
+            for col_n in ["N/ha", "N_ha", "Dose_Unitaire_N", "N", "Dose_Ha"]:
                 if col_n in df_real.columns:
                     total_n_realise = pd.to_numeric(df_real[col_n], errors="coerce").fillna(0).sum()
                     break
@@ -94,8 +94,8 @@ with tab_consult:
             "Surface (ha)": f"{surface:.2f}",
             "Objectif Rdt": obj_rdt,
             "Dose X (U N/ha)": dose_x,
-            "N Réalisé (U)": f"{total_n_realise:.0f}" if nb_apports > 0 else "0",
-            "Apports": nb_apports,
+            "N Réalisé (U N/ha)": f"{total_n_realise:.0f}" if nb_apports > 0 else "0",
+            "Nb Apports": nb_apports,
             "PPF Saisi": "✅" if has_ppf else "❌",
         })
 
@@ -113,8 +113,8 @@ with tab_consult:
             "Surface (ha)": st.column_config.TextColumn("Surface"),
             "Objectif Rdt": st.column_config.TextColumn("🎯 Obj. Rdt"),
             "Dose X (U N/ha)": st.column_config.TextColumn("💊 Dose X"),
-            "N Réalisé (U)": st.column_config.TextColumn("✅ N Réalisé"),
-            "Apports": st.column_config.NumberColumn("# Apports"),
+            "N Réalisé (U N/ha)": st.column_config.TextColumn("✅ N Réalisé"),
+            "Nb Apports": st.column_config.NumberColumn("Nb Apports"),
             "PPF Saisi": st.column_config.TextColumn("PPF"),
         },
         disabled=[c for c in df_summary.columns if c != "Sélect."],
@@ -170,9 +170,18 @@ with tab_consult:
             def render_section(df_sub, label, color_hex, icon):
                 if df_sub.empty:
                     return
+                # Déterminer la colonne N/ha disponible
+                n_col = next((c for c in ["N/ha", "N_ha", "Dose_Unitaire_N", "N"] if c in df_sub.columns), None)
                 cols_show = ["Date", "Nom_Produit", "Dose_Ha", "Unité_Dose", "Surface_Travaillée_Ha"]
                 cols_show = [c for c in cols_show if c in df_sub.columns]
                 df_display = df_sub[cols_show].copy()
+                # Ajouter colonne N/ha calculée
+                if n_col and n_col in df_sub.columns:
+                    df_display.insert(len(df_display.columns), "N/ha (U)",
+                        pd.to_numeric(df_sub[n_col], errors="coerce").fillna(0).apply(lambda x: f"{x:.0f} U"))
+                elif "Dose_Ha" in df_sub.columns and "Unité_Dose" in df_sub.columns:
+                    # Fallback : on indique la dose/ha si pas de colonne N spécifique
+                    df_display.insert(len(df_display.columns), "N/ha (U)", "—")
                 rename_map = {
                     "Date": "📅 Date",
                     "Nom_Produit": "🧪 Produit",
