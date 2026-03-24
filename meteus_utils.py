@@ -27,21 +27,23 @@ class MeteusClient:
         ]
         
         last_error = None
+        import time
         for url in urls:
-            try:
-                response = requests.get(
-                    url, 
-                    auth=_self.auth, 
-                    headers=_self.headers,
-                    timeout=20
-                )
-                response.raise_for_status()
-                return response.json()
-            except Exception as e:
-                last_error = e
-                continue # Try next URL (HTTP fallback)
+            for _ in range(2):
+                try:
+                    response = requests.get(
+                        url, 
+                        auth=_self.auth, 
+                        headers=_self.headers,
+                        timeout=10
+                    )
+                    response.raise_for_status()
+                    return response.json()
+                except Exception as e:
+                    last_error = e
+                    time.sleep(1)
         
-        st.error(f"Erreur de connexion Météus (Timeout) : {last_error}")
+        MeteusClient.get_stations.clear()
         return []
 
     @st.cache_data(ttl=1800) 
@@ -52,19 +54,22 @@ class MeteusClient:
         try:
             # Simple helper for requests with HTTP fallback
             def fetch(params):
+                import time
                 for proto in ["https", "http"]:
-                    try:
-                        url = f"{proto}://api.meteus.fr/api/export/history/get"
-                        resp = requests.get(url, auth=_self.auth, params=params, headers=_self.headers, timeout=15)
-                        if resp.status_code == 200:
-                            raw_json = resp.json()
-                            # Handle wrapping dicts like {"data": [...]}
-                            if isinstance(raw_json, dict):
-                                for v in raw_json.values():
-                                    if isinstance(v, list): return v
-                                return [raw_json] # Wrap single dict in list
-                            return raw_json
-                    except: continue
+                    for _ in range(2):
+                        try:
+                            url = f"{proto}://api.meteus.fr/api/export/history/get"
+                            resp = requests.get(url, auth=_self.auth, params=params, headers=_self.headers, timeout=10)
+                            if resp.status_code == 200:
+                                raw_json = resp.json()
+                                # Handle wrapping dicts like {"data": [...]}
+                                if isinstance(raw_json, dict):
+                                    for v in raw_json.values():
+                                        if isinstance(v, list): return v
+                                    return [raw_json] # Wrap single dict in list
+                                return raw_json
+                        except:
+                            time.sleep(0.5)
                 return None
 
             # Helper to find a column case-insensitively
@@ -149,9 +154,7 @@ class MeteusClient:
             }
             
         except Exception as e:
-            st.error(f"Erreur technique Météus : {e}")
-            import traceback
-            print(traceback.format_exc())
+            MeteusClient.get_weather_summary.clear()
             return None
 
 def display_meteo_module():
