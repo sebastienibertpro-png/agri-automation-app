@@ -38,8 +38,8 @@ class DataLoader:
         df = pd.DataFrame()
         if self.conn:
             try:
-                # TTL à 10 secondes pour un rafraîchissement quasi immédiat sans exploser les quotas API
-                df = self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME, ttl=10)
+                # TTL à 60 secondes : rafraîchissement en moins d'une minute, sans exploser le quota API (60 req/min)
+                df = self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME, ttl=60)
             except Exception as e:
                 st.error(f"Erreur lecture onglet '{sheet_name}' : {e}")
         elif self.xl:
@@ -83,9 +83,9 @@ class DataLoader:
             if self.conn:
                 # Assuming tab name is 'Produits' or 'Référentiel Produits'. Let's try 'Produits' first then 'Referentiel'
                 try:
-                    df = self.conn.read(worksheet="Produits", ttl=10, spreadsheet="MASTER_EXPLOITATION")
+                    df = self.conn.read(worksheet="Produits", ttl=60, spreadsheet="MASTER_EXPLOITATION")
                 except:
-                    df = self.conn.read(worksheet="Référentiel Produits", ttl=10, spreadsheet="MASTER_EXPLOITATION")
+                    df = self.conn.read(worksheet="Référentiel Produits", ttl=60, spreadsheet="MASTER_EXPLOITATION")
             else:
                 # Local
                 try:
