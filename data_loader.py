@@ -33,16 +33,13 @@ class DataLoader:
 
     def _get_data(self, sheet_name):
         """Internal helper to get dataframe from active source with caching."""
-        if sheet_name in self._cache:
-            return self._cache[sheet_name]
-
         SPREADSHEET_NAME = "MASTER_EXPLOITATION"
         
         df = pd.DataFrame()
         if self.conn:
             try:
-                # Use a small TTL for the connection itself, but our _cache handles the session
-                df = self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME, ttl=300)
+                # TTL à 10 secondes pour un rafraîchissement quasi immédiat sans exploser les quotas API
+                df = self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME, ttl=10)
             except Exception as e:
                 st.error(f"Erreur lecture onglet '{sheet_name}' : {e}")
         elif self.xl:
@@ -50,13 +47,11 @@ class DataLoader:
         else:
             raise Exception("Source de données non initialisée.")
         
-        if not df.empty:
-            self._cache[sheet_name] = df
         return df
 
     def clear_cache(self):
         """Clears the local session cache."""
-        self._cache = {}
+        st.cache_data.clear()
 
     def get_interventions(self):
         return self._get_data("JOURNAL_INTERVENTION")
@@ -88,9 +83,9 @@ class DataLoader:
             if self.conn:
                 # Assuming tab name is 'Produits' or 'Référentiel Produits'. Let's try 'Produits' first then 'Referentiel'
                 try:
-                    df = self.conn.read(worksheet="Produits", ttl=600, spreadsheet="MASTER_EXPLOITATION")
+                    df = self.conn.read(worksheet="Produits", ttl=10, spreadsheet="MASTER_EXPLOITATION")
                 except:
-                    df = self.conn.read(worksheet="Référentiel Produits", ttl=600, spreadsheet="MASTER_EXPLOITATION")
+                    df = self.conn.read(worksheet="Référentiel Produits", ttl=10, spreadsheet="MASTER_EXPLOITATION")
             else:
                 # Local
                 try:
@@ -462,6 +457,8 @@ class DataLoader:
                      
                 # Write back
                 self.conn.update(worksheet="JOURNAL_INTERVENTION", data=df, spreadsheet="MASTER_EXPLOITATION")
+                self._cache.pop("JOURNAL_INTERVENTION", None)
+                st.cache_data.clear()
                 return True
             else:
                 st.warning("Aucune intervention correspondante trouvée (ou déjà réalisée).")
@@ -490,6 +487,8 @@ class DataLoader:
             # 3. Write back
             # Streamlit GSheets update replaces the entire worksheet's data with the dataframe
             self.conn.update(worksheet="JOURNAL_INTERVENTION", data=df_updated, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop("JOURNAL_INTERVENTION", None)
+            st.cache_data.clear()
             return True
             
         except Exception as e:
