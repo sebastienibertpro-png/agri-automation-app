@@ -216,22 +216,26 @@ with tab_consult:
 
             # Barre de progression si Dose X connue
             if dose_x_num and pd.notna(dose_x_num) and dose_x_num > 0 and not df_realisee.empty:
-                n_col = next((c for c in ["N_ha", "Dose_Unitaire_N", "N", "Dose_Ha"] if c in df_realisee.columns), None)
-                if n_col:
-                    total_n = pd.to_numeric(df_realisee[n_col], errors="coerce").fillna(0).sum()
-                    pct = min(total_n / dose_x_num, 1.0)
-                    bar_color = "#e53935" if pct > 1.0 else "#43a047"
+                n_col_jauge = next((c for c in ["N/ha", "N_ha", "Dose_Unitaire_N", "N"] if c in df_realisee.columns), None)
+                if n_col_jauge:
+                    total_n = pd.to_numeric(df_realisee[n_col_jauge], errors="coerce").fillna(0).sum()
+                    pct_reel = total_n / dose_x_num
+                    bar_color = "#e53935" if pct_reel > 1.0 else "#43a047"
+                    bar_width = min(pct_reel * 100, 100)
                     st.markdown(f"""
                     <div style="margin-bottom:12px;">
                         <div style="font-size:0.9em;color:#555;margin-bottom:4px;">
-                            N réalisé : <b>{total_n:.0f} U</b> / Dose X : <b>{dose_x_num:.0f} U</b> 
-                            — <span style="color:{bar_color};font-weight:bold;">{pct*100:.0f}%</span>
+                            N r\u00e9alis\u00e9 : <b>{total_n:.0f} U/ha</b> / Dose X : <b>{dose_x_num:.0f} U/ha</b>
+                            \u2014 <span style="color:{bar_color};font-weight:bold;">{pct_reel*100:.0f}%</span>
                         </div>
-                        <div style="background:#e0e0e0;border-radius:6px;height:12px;overflow:hidden;">
-                            <div style="width:{min(pct*100,100):.0f}%;height:12px;background:{bar_color};border-radius:6px;"></div>
+                        <div style="background:#e0e0e0;border-radius:6px;height:14px;overflow:hidden;">
+                            <div style="width:{bar_width:.0f}%;height:14px;background:{bar_color};border-radius:6px;"></div>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
+                    if pct_reel > 1.0:
+                        st.warning(f"\u26a0\ufe0f **ATTENTION \u2014 D\u00e9passement de la Dose X !** N r\u00e9alis\u00e9 ({total_n:.0f} U/ha) d\u00e9passe la Dose X ({dose_x_num:.0f} U/ha) de **+{total_n - dose_x_num:.0f} U/ha** (+{(pct_reel-1)*100:.0f}%)")
+
 
             render_section(df_realisee, "Réalisées", "#2e7d32", "✅")
             render_section(df_prevue, "Prévues", "#1565c0", "📌")
