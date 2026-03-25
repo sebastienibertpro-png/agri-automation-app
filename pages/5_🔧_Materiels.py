@@ -4,7 +4,7 @@ import tempfile
 import os
 import uuid
 from report_gen import ReportGenerator
-from shared import get_dataloader, init_campaign_selector, inject_premium_css
+from shared import get_dataloader, init_campaign_selector, inject_premium_css, render_premium_header
 
 st.set_page_config(page_title="Matériels", page_icon="🚜", layout="centered")
 
@@ -131,8 +131,8 @@ with tab_synthese:
         st.exception(e)
 
 with tab_mon_materiel:
-    st.subheader("🚜 Gestion de Mon Matériel")
-    st.markdown("Consultez, modifiez ou supprimez vos matériels dans ce tableau interactif.")
+    render_premium_header("🚜 Gestion de Mon Matériel", "Consultez, modifiez ou supprimez vos matériels dans ce tableau interactif.", color="green")
+    st.write("") # small spacer
     
     edited_df = st.data_editor(
         df_materiels,
