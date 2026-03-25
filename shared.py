@@ -88,11 +88,11 @@ def inject_premium_css():
     st.markdown("""
 <style>
     /* Global Overrides for Streamlit Widgets */
-    [data-testid*="stData"], .stDataFrame {
-        border-radius: 12px !important;
+    div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {
+        border-radius: 0 0 12px 12px !important; /* Coins bas arrondis uniquement pour fusionner avec le titre */
         border: 1px solid #e0e0e0 !important;
-        border-top: 5px solid #1976d2 !important; /* Ligne de couleur bleue au dessus du tableau */
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important; /* Ombre plus visible */
+        border-top: none !important; /* Le bandeau coloré du dessus fait la bordure */
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
         padding: 4px !important;
         background-color: white !important;
         margin-top: 0px !important;
