@@ -4,11 +4,13 @@ import tempfile
 import os
 import uuid
 from report_gen import ReportGenerator
-from shared import get_dataloader, init_campaign_selector
+from shared import get_dataloader, init_campaign_selector, inject_premium_css
 
-st.set_page_config(page_title="Entretien Matériel", page_icon="⚙️", layout="centered")
+st.set_page_config(page_title="Matériels", page_icon="🚜", layout="centered")
 
-st.title("⚙️ Entretien Matériel & Carburant")
+inject_premium_css()
+
+st.title("🚜 Matériels")
 
 st.markdown("""
 <style>
@@ -43,7 +45,109 @@ if not df_materiels.empty:
             materiel_map[label] = row
 
 # --- Utilisation des Onglets ---
-tab_maint, tab_fuel, tab_synthese = st.tabs(["🔧 Saisie Entretien", "⛽ Saisie Conso GNR", "📊 Carnets & Synthèse"])
+tab_synthese, tab_mon_materiel, tab_maint, tab_fuel = st.tabs(["📊 Carnets & Synthèse", "🚜 Mon Matériel", "🔧 Saisie Entretien", "⛽ Saisie Conso GNR"])
+
+with tab_synthese:
+    st.subheader("📊 Synthèse & Carnets d'Entretien")
+    try:
+        with st.expander("📄 Générer Carnet d'Entretien", expanded=True):
+            if not materiel_options:
+                st.info("Aucun matériel disponible pour la génération.")
+            else:
+                col_m1, col_m2 = st.columns([2, 1])
+                with col_m1:
+                    selected_mat_label_gen = st.selectbox("Sélectionnez pour PDF", sorted(materiel_options), key="pdf_sel")
+                    
+                if st.button("📄 Générer PDF"):
+                    selected_row_gen = materiel_map[selected_mat_label_gen]
+                    m_id_gen = str(selected_row_gen.get('ID_Materiel', ''))
+                    
+                    with st.spinner(f"Récupération de l'historique pour {m_id_gen}..."):
+                        df_history = active_loader.get_maintenance_history(m_id_gen)
+                        
+                        with tempfile.TemporaryDirectory() as tmpdirname:
+                            fname = f"Carnet_Entretien_{m_id_gen}.pdf"
+                            fpath = os.path.join(tmpdirname, fname)
+                            
+                            gen = ReportGenerator(fpath)
+                            gen.generate_maintenance_log(selected_row_gen.to_dict(), df_history)
+                            
+                            if os.path.exists(fpath):
+                                with open(fpath, "rb") as f:
+                                    st.download_button(
+                                        label=f"⬇️ Télécharger Carnet ({m_id_gen})",
+                                        data=f,
+                                        file_name=fname,
+                                        mime="application/pdf"
+                                    )
+                                st.success("Carnet généré ! Cliquez ci-dessus pour le télécharger.")
+                            else:
+                                st.error("Échec de la génération du PDF.")
+
+        st.divider()
+
+        # --- SECTION CONSOMMATION FUEL ---
+        st.subheader(f"⛽ Consommation Fuel - Campagne {selected_campaign}")
+        
+        with st.spinner("Analyse de la consommation..."):
+            df_fuel = active_loader.get_fuel_conso(selected_campaign)
+            df_ref_mat = active_loader.get_materiels()
+            
+            if df_fuel.empty:
+                st.info(f"Aucune donnée de consommation pour la campagne {selected_campaign}.")
+            else:
+                # Merge to get Type_Materiel
+                df_merged = pd.merge(
+                    df_fuel, 
+                    df_ref_mat[['ID_Materiel', 'Type_Materiel']], 
+                    on='ID_Materiel', 
+                    how='left'
+                )
+                
+                df_merged['Type_Materiel'] = df_merged['Type_Materiel'].fillna('Autre')
+                
+                # Aggregation by Material and Type
+                df_pivot = df_merged.groupby(['Type_Materiel', 'ID_Materiel'])['FUEL_quantité_L'].sum().reset_index()
+                df_pivot.columns = ['Type', 'Matériel', 'Consommation (L)']
+                
+                total_conso = df_pivot['Consommation (L)'].sum()
+                row_total = pd.DataFrame([{'Type': 'TOTAL', 'Matériel': '', 'Consommation (L)': total_conso}])
+                df_pivot = pd.concat([df_pivot, row_total], ignore_index=True)
+                
+                df_pivot['Consommation (L)'] = df_pivot['Consommation (L)'].apply(lambda x: f"{x:,.0f} L" if pd.notnull(x) else "")
+                
+                st.dataframe(df_pivot, use_container_width=True, hide_index=True)
+                
+                st.markdown("### 📊 Récapitulatif par Type")
+                type_conso = df_merged.groupby('Type_Materiel')['FUEL_quantité_L'].sum().sort_values(ascending=False)
+                
+                cols = st.columns(min(len(type_conso), 4))
+                for i, (m_type, total) in enumerate(type_conso.items()):
+                    if i < len(cols):
+                        cols[i].metric(m_type, f"{total:,.0f} L")
+
+    except Exception as e:
+        st.error(f"Erreur lors du traitement du carnet d'entretien : {e}")
+        st.exception(e)
+
+with tab_mon_materiel:
+    st.subheader("🚜 Gestion de Mon Matériel")
+    st.markdown("Consultez, modifiez ou supprimez vos matériels dans ce tableau interactif.")
+    
+    edited_df = st.data_editor(
+        df_materiels,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        key="editor_materiels"
+    )
+    
+    if st.button("💾 Sauvegarder les modifications", type="primary"):
+        with st.spinner("Enregistrement dans REF_MATERIELS..."):
+            success = active_loader.overwrite_worksheet("REF_MATERIELS", edited_df)
+            if success:
+                st.success("Modifications enregistrées avec succès !")
+                st.rerun()
 
 with tab_maint:
     st.subheader("Nouvelle Saisie d'Entretien")
@@ -132,81 +236,3 @@ with tab_fuel:
                             st.success("Consommation enregistrée avec succès !")
                         else:
                             st.error("Échec de l'enregistrement.")
-
-with tab_synthese:
-    try:
-        with st.expander("📄 Générer Carnet d'Entretien", expanded=True):
-            if not materiel_options:
-                st.info("Aucun matériel disponible pour la génération.")
-            else:
-                col_m1, col_m2 = st.columns([2, 1])
-                with col_m1:
-                    selected_mat_label_gen = st.selectbox("Sélectionnez pour PDF", sorted(materiel_options), key="pdf_sel")
-                    
-                if st.button("📄 Générer PDF"):
-                    selected_row_gen = materiel_map[selected_mat_label_gen]
-                    m_id_gen = str(selected_row_gen.get('ID_Materiel', ''))
-                    
-                    with st.spinner(f"Récupération de l'historique pour {m_id_gen}..."):
-                        df_history = active_loader.get_maintenance_history(m_id_gen)
-                        
-                        with tempfile.TemporaryDirectory() as tmpdirname:
-                            fname = f"Carnet_Entretien_{m_id_gen}.pdf"
-                            fpath = os.path.join(tmpdirname, fname)
-                            
-                            gen = ReportGenerator(fpath)
-                            gen.generate_maintenance_log(selected_row_gen.to_dict(), df_history)
-                            
-                            if os.path.exists(fpath):
-                                with open(fpath, "rb") as f:
-                                    st.download_button(
-                                        label=f"⬇️ Télécharger Carnet ({m_id_gen})",
-                                        data=f,
-                                        file_name=fname,
-                                        mime="application/pdf"
-                                    )
-                                st.success("Carnet généré ! Cliquez ci-dessus pour le télécharger.")
-                            else:
-                                st.error("Échec de la génération du PDF.")
-
-        st.divider()
-
-        # --- SECTION CONSOMMATION FUEL ---
-        st.subheader(f"⛽ Consommation Fuel - Campagne {selected_campaign}")
-        
-        with st.spinner("Analyse de la consommation..."):
-            df_fuel = active_loader.get_fuel_conso(selected_campaign)
-            df_ref_mat = active_loader.get_materiels()
-            
-            if df_fuel.empty:
-                st.info(f"Aucune donnée de consommation pour la campagne {selected_campaign}.")
-            else:
-                # Merge to get Type_Materiel
-                df_merged = pd.merge(
-                    df_fuel, 
-                    df_ref_mat[['ID_Materiel', 'Type_Materiel']], 
-                    on='ID_Materiel', 
-                    how='left'
-                )
-                
-                df_merged['Type_Materiel'] = df_merged['Type_Materiel'].fillna('Autre')
-                
-                # Aggregation by Material and Type
-                df_pivot = df_merged.groupby(['Type_Materiel', 'ID_Materiel'])['FUEL_quantité_L'].sum().reset_index()
-                df_pivot.columns = ['Type', 'Matériel', 'Consommation (L)']
-                
-                df_pivot['Consommation (L)'] = df_pivot['Consommation (L)'].apply(lambda x: f"{x:,.0f} L")
-                
-                st.dataframe(df_pivot, use_container_width=True, hide_index=True)
-                
-                st.markdown("### 📊 Récapitulatif par Type")
-                type_conso = df_merged.groupby('Type_Materiel')['FUEL_quantité_L'].sum().sort_values(ascending=False)
-                
-                cols = st.columns(min(len(type_conso), 4))
-                for i, (m_type, total) in enumerate(type_conso.items()):
-                    if i < len(cols):
-                        cols[i].metric(m_type, f"{total:,.0f} L")
-
-    except Exception as e:
-        st.error(f"Erreur lors du traitement du carnet d'entretien : {e}")
-        st.exception(e)
