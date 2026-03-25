@@ -139,6 +139,9 @@ with tab_mon_materiel:
         num_rows="dynamic",
         use_container_width=True,
         hide_index=True,
+        column_config={
+            "Image": None
+        },
         key="editor_materiels"
     )
     
