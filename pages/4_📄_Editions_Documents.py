@@ -13,13 +13,10 @@ st.title("📄 Édition de Documents Réglementaires")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
-col1, col2 = st.columns(2)
-with col1:
-    st.info(f"📅 Campagne active : {selected_campaign}")
+st.caption(f"📅 Campagne de travail : **{selected_campaign}** *(Modifiable dans le menu latéral)*")
 
-with col2:
-    options = ["Toutes"] + list(available_parcelles)
-    selected_parcelle = st.selectbox("🌾 Choisir la Parcelle", options)
+options = ["Toutes"] + list(available_parcelles)
+selected_parcelle = st.selectbox("🌾 Sélectionner la Parcelle cible :", options)
 
 target_parcelles = []
 if selected_parcelle == "Toutes":
