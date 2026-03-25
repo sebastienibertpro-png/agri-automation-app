@@ -32,7 +32,9 @@ active_loader, selected_campaign, df_campaign, available_parcelles = init_campai
 with st.spinner("Chargement des matériels..."):
     df_materiels = active_loader.get_materiels()
     if not df_materiels.empty:
-        df_materiels = df_materiels.fillna("")
+        # Forcer le type chaîne (str) pour déverrouiller l'édition dans Streamlit
+        df_materiels = df_materiels.astype(str)
+        df_materiels = df_materiels.replace(["nan", "None", "<NA>", "NaN"], "")
 
 materiel_options = []
 materiel_map = {} 
