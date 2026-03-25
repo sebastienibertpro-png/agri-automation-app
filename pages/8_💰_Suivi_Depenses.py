@@ -5,6 +5,9 @@ from shared import init_campaign_selector, inject_premium_css, render_premium_ta
 
 st.set_page_config(page_title="Suivi Dépenses", page_icon="💰", layout="wide")
 
+# Injection du CSS premium
+inject_premium_css()
+
 st.title("💰 Suivi des Dépenses par Poste")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
