@@ -100,8 +100,8 @@ else:
         st.divider()
 
         # --- GESTION DES FACTURES DÉTAILLÉES ---
-        st.header("📑 Gestion des Factures")
-        st.markdown("Consultez, ajoutez, modifiez ou supprimez vos factures directement dans ce tableau interactif. Cliquez en dessous pour sauvegarder.")
+        st.write("") # Espace avant la section
+        render_premium_header("📑 Gestion de vos Factures", "Consultez, ajoutez, modifiez ou supprimez vos données dans ce tableau interactif", color="blue")
         
         df_manage = df_achats.copy()
         
