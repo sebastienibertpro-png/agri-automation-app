@@ -114,14 +114,15 @@ def inject_premium_css():
     .p-green { background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%) !important; }
     .p-blue { background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%) !important; }
     
-    /* Sidebar styling */
-    [data-testid="stSidebarNav"] span {
+    /* Sidebar styling - Aggressive targeting for font size */
+    [data-testid="stSidebarNav"] span, 
+    [data-testid="stSidebarNav"] a, 
+    section[data-testid="stSidebar"] {
         font-size: 1.15rem !important;
     }
 
-    /* Colored accent for Data Editors */
-    [data-testid="stDataEditor"] {
-        border-top: 4px solid #4CAF50 !important;
+    [data-testid="stSidebarNav"] li div {
+        font-size: 1.15rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
