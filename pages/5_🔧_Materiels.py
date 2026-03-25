@@ -31,6 +31,8 @@ active_loader, selected_campaign, df_campaign, available_parcelles = init_campai
 # --- Chargement Global des Matériels ---
 with st.spinner("Chargement des matériels..."):
     df_materiels = active_loader.get_materiels()
+    if not df_materiels.empty:
+        df_materiels = df_materiels.fillna("")
 
 materiel_options = []
 materiel_map = {} 
