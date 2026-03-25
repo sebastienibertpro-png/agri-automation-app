@@ -91,10 +91,10 @@ def inject_premium_css():
     [data-testid="stDataEditor"], [data-testid="stDataFrame"] {
         border-radius: 12px !important;
         border: 1px solid #e0e0e0 !important;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15) !important;
         padding: 4px !important;
         background-color: white !important;
-        margin-top: -1px !important; /* To glue with the header */
+        margin-top: 0px !important;
     }
     
     /* Dedicated Header Styling */
