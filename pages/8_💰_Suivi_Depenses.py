@@ -100,9 +100,9 @@ else:
         st.divider()
 
         # --- GESTION DES FACTURES DÉTAILLÉES ---
-        st.header("📑 Gestion des Factures (Détails)")
+        st.header("📑 Gestion des Factures")
+        st.markdown("Consultez, ajoutez, modifiez ou supprimez vos factures directement dans ce tableau interactif. Cliquez en dessous pour sauvegarder.")
         
-        # Display selection for deletion
         df_manage = df_achats.copy()
         
         # Determine ID column name (flexible for ID_Facture or ID_Achat)
@@ -111,101 +111,119 @@ else:
         if not id_col or id_col not in df_manage.columns:
             st.error(f"Données incomplètes : Colonne ID (Facture) manquante. Colonnes dispos: {df_manage.columns.tolist()}")
         else:
-            # Mode toggle
-            manage_mode = st.radio("🛠️ Actions", ["👁️ Visualisation & Liens", "📝 Mode Édition", "🗑️ Sélection & Suppression"], horizontal=True)
+            # 1. Cleaning formatting
+            cols_to_drop_keywords = ['id_parcelle_li', 'affectation_type']
+            hidden_cols = [id_col, 'Montant'] # drop only standalone 'Montant'
+            for c in df_manage.columns.tolist():
+                c_lower = c.lower().replace('é', 'e').replace('è', 'e')
+                if any(kw in c_lower for kw in cols_to_drop_keywords):
+                    hidden_cols.append(c)
 
-            if manage_mode == "👁️ Visualisation & Liens":
-                df_viz = df_manage.copy()
-                if 'Date_facture' in df_viz.columns:
-                    df_viz['Date_facture'] = pd.to_datetime(df_viz['Date_facture'], errors='coerce', dayfirst=True)
-                    df_viz['Date_facture'] = df_viz['Date_facture'].dt.strftime('%d/%m/%Y').fillna("")
-                
-                # Drop unwanted columns (case-insensitive match for known problematic cols)
-                cols_to_drop_keywords = ['id_parcelle_li', 'affectation_type']
-                cols_to_drop_exact = [id_col, 'Montant']  # drop only standalone 'Montant', not Montant_Total_*
-                for c in df_viz.columns.tolist():
-                    c_lower = c.lower().replace('é', 'e').replace('è', 'e')
-                    if any(kw in c_lower for kw in cols_to_drop_keywords):
-                        cols_to_drop_exact.append(c)
-                df_viz = df_viz.drop(columns=[c for c in cols_to_drop_exact if c in df_viz.columns])
-                
-                # Rename columns for compact display
-                rename_map = {
-                    'Date_facture': 'Date',
-                    'Nom_Produit': 'Produit',
-                    'Quantité_Achetée': 'Quantité',
-                    'Montant_Total_Produit_HT': 'Total Produit HT',
-                    'Montant_Total_Facture_HT': 'Total Facture HT',
-                    'Montant_Total_Facture_TTC': 'Total Facture TTC',
-                }
-                df_viz = df_viz.rename(columns={k: v for k, v in rename_map.items() if k in df_viz.columns})
-                
-                # Replace NaN / None / 'nan' with empty string
-                df_viz = df_viz.astype(str).replace({'nan': '', 'None': '', '<NA>': '', 'NaT': ''})
-                
-                # Render Drive Links
-                link_col = 'Lien_facture' if 'Lien_facture' in df_viz.columns else 'Lien_Facture_Drive' if 'Lien_Facture_Drive' in df_viz.columns else 'Lien_Drive' if 'Lien_Drive' in df_viz.columns else None
-                if link_col:
-                    def make_link(url):
-                        if pd.isna(url) or str(url).strip() == "": return ""
-                        return f'<a href="{url}" target="_blank">📄 Voir</a>'
-                    df_viz['Lien'] = df_viz[link_col].apply(make_link)
-                    cols = ['Lien'] + [c for c in df_viz.columns if c not in ['Lien', link_col]]
-                    df_viz = df_viz[cols]
-                
-                render_premium_table(df_viz, color="blue", compact=True)
-                
-            elif manage_mode == "📝 Mode Édition":
-                st.info("💡 Modifiez les valeurs directement dans le tableau ci-dessous, puis cliquez sur Sauvegarder.")
-                edited_df = st.data_editor(
-                    df_manage,
-                    column_config={id_col: None, "Lien_facture": st.column_config.TextColumn("Lien Drive")},
-                    hide_index=True,
-                    use_container_width=True,
-                    key="edit_editor"
-                )
-                
-                if st.button("💾 Sauvegarder les modifications"):
-                    diff_mask = (edited_df != df_manage).any(axis=1)
-                    changed_rows = edited_df[diff_mask]
-                    
-                    if not changed_rows.empty:
-                        with st.spinner("Mise à jour des factures..."):
-                            success_count = 0
-                            for _, row in changed_rows.iterrows():
-                                if active_loader.update_achat(row[id_col], row.to_dict()):
-                                    success_count += 1
-                            if success_count > 0:
-                                st.success(f"✅ {success_count} facture(s) mise(s) à jour !")
-                                st.rerun()
-                            else:
-                                st.error("❌ Erreur lors de la mise à jour.")
-                    else:
-                        st.info("Aucun changement détecté.")
+            # Ensure data is strictly string to enable unrestricted Streamlit editing
+            df_manage = df_manage.astype(str).replace({'nan': '', 'None': '', '<NA>': '', 'NaT': ''})
+            
+            # 2. Configure aesthetic columns 
+            col_conf = {c: None for c in hidden_cols if c in df_manage.columns}
+            
+            if 'Date_facture' in df_manage.columns:
+                col_conf['Date_facture'] = st.column_config.TextColumn("Date")
+            if 'Nom_Produit' in df_manage.columns:
+                col_conf['Nom_Produit'] = st.column_config.TextColumn("Produit")
+            if 'Quantité_Achetée' in df_manage.columns:
+                col_conf['Quantité_Achetée'] = st.column_config.TextColumn("Quantité")
+            if 'Montant_Total_Produit_HT' in df_manage.columns:
+                col_conf['Montant_Total_Produit_HT'] = st.column_config.TextColumn("Total Produit HT")
+            if 'Montant_Total_Facture_HT' in df_manage.columns:
+                col_conf['Montant_Total_Facture_HT'] = st.column_config.TextColumn("Total Facture HT")
+            if 'Montant_Total_Facture_TTC' in df_manage.columns:
+                col_conf['Montant_Total_Facture_TTC'] = st.column_config.TextColumn("Total Facture TTC")
+            
+            link_col = 'Lien_facture' if 'Lien_facture' in df_manage.columns else 'Lien_Facture_Drive' if 'Lien_Facture_Drive' in df_manage.columns else 'Lien_Drive' if 'Lien_Drive' in df_manage.columns else None
+            if link_col:
+                col_conf[link_col] = st.column_config.LinkColumn("Lien Facture", display_text="Lien Drive")
 
-            else:
-                df_delete = df_manage.copy()
-                df_delete.insert(0, "Sélect. ✅", False)
-                edited_df = st.data_editor(
-                    df_delete,
-                    column_config={
-                        id_col: None,
-                        "Sélect. ✅": st.column_config.CheckboxColumn("Sélect.", default=False)
-                    },
-                    disabled=[c for c in df_delete.columns if c != "Sélect. ✅"],
-                    hide_index=True,
-                    use_container_width=True,
-                    key="delete_editor"
-                )
+            # 3. Interactive Component
+            edited_df = st.data_editor(
+                df_manage,
+                column_config=col_conf,
+                hide_index=True,
+                use_container_width=True,
+                num_rows="dynamic",
+                key="editor_factures"
+            )
+            
+            # 4. Persistence Logic
+            if st.button("💾 Sauvegarder les modifications", type="primary"):
+                import uuid
                 
-                rows_to_delete = edited_df[edited_df["Sélect. ✅"] == True]
-                if not rows_to_delete.empty:
-                    st.warning(f"⚠️ {len(rows_to_delete)} ligne(s) sélectionnée(s) pour suppression.")
-                    if st.button("🗑️ Confirmer la suppression", type="primary"):
-                        ids = rows_to_delete[id_col].tolist()
-                        if active_loader.delete_achats(ids):
-                            st.success("✅ Factures supprimées !")
-                            st.rerun()
+                # Separate rows by their ID to track modifications
+                df_orig = df_manage.set_index(id_col)
+                df_new = edited_df.dropna(subset=[id_col]).copy()
+                
+                # Additions (rows generated by num_rows="dynamic" have no ID or empty string)
+                added_mask = (edited_df[id_col].isna()) | (edited_df[id_col] == "")
+                added_rows = edited_df[added_mask].copy()
+                edited_existing = edited_df[~added_mask].copy()
+                
+                df_new_indexed = edited_existing.set_index(id_col)
+                
+                original_ids = set(df_orig.index.tolist())
+                current_ids = set(df_new_indexed.index.tolist())
+                
+                # Deletions (IDs from original missing in current)
+                deleted_ids = list(original_ids - current_ids)
+                
+                # Updates (IDs present in both, with differing content)
+                common_ids = original_ids.intersection(current_ids)
+                updated_ids = []
+                for cid in common_ids:
+                    row_old = df_orig.loc[cid].astype(str).str.strip().fillna('')
+                    row_new = df_new_indexed.loc[cid].astype(str).str.strip().fillna('')
+                    if not row_old.equals(row_new):
+                        updated_ids.append(cid)
+
+                success_count = 0
+                error_occurred = False
+                
+                # We assume the name is ACHAT_MASTER or MASTER_ACHAT. 
+                # update_achat and delete_achats are directly connected onto the active_loader wrapper.
+                with st.spinner("Application des modifications..."):
+                    # Delete
+                    if deleted_ids:
+                        if active_loader.delete_achats(deleted_ids):
+                            success_count += len(deleted_ids)
                         else:
-                            st.error("❌ Échec de la suppression.")
+                            error_occurred = True
+                            
+                    # Add
+                    if not added_rows.empty:
+                        sheet_name = "ACHAT_MASTER"
+                        for _, row in added_rows.iterrows():
+                            new_dict = row.to_dict()
+                            new_id = str(uuid.uuid4())[:8].upper()
+                            new_dict[id_col] = new_id
+                            new_dict["Campagne"] = selected_campaign
+                            if active_loader.insert_row(sheet_name, new_dict):
+                                success_count += 1
+                            else:
+                                error_occurred = True
+                            
+                    # Update
+                    for uid in updated_ids:
+                        up_dict = df_new_indexed.loc[uid].to_dict()
+                        up_dict[id_col] = uid  # Inject index back
+                        if active_loader.update_achat(uid, up_dict):
+                            success_count += 1
+                        else:
+                            error_occurred = True
+                
+                if success_count > 0 and not error_occurred:
+                    st.success(f"✅ Terminé ! {success_count} action(s) (ajout/modification/suppression) sauvegardée(s).")
+                    st.rerun()
+                elif success_count > 0 and error_occurred:
+                    st.warning(f"⚠️ Partiellement sauvegardé ({success_count} réussites), mais certaines opérations ont échoué.")
+                elif error_occurred:
+                    st.error("❌ Échec lors de la sauvegarde (vérifiez les autorisations/logs).")
+                else:
+                    st.info("Aucune modification par rapport à la base.")
 
