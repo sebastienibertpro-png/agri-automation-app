@@ -197,30 +197,25 @@ def handle_pdf_action(report_type, btn_label):
             use_container_width=True
         )
 
-st.markdown("""
-<style>
-    .stButton>button {
-        width: 100%;
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 8px;
-    }
-    .stButton>button:hover {
-        background-color: #45a049;
-    }
-</style>
-""", unsafe_allow_html=True)
+st.divider()
 
-col_pdf1, col_pdf2, col_pdf3, col_pdf4 = st.columns(4)
+st.subheader("📚 Choix du Document")
 
-with col_pdf1:
-    handle_pdf_action("ITK", "📄 Itinéraire Technique")
-with col_pdf2:
-    handle_pdf_action("PHYTO", "🛡️ Registre Phyto")
-with col_pdf3:
-    handle_pdf_action("FERTI", "🧪 Bilan Ferti")
-with col_pdf4:
-    handle_pdf_action("IRRIG_PARCELLE", "💧 Bilan Irrig Parcelle")
+doc_options = {
+    "📄 Itinéraire Technique": "ITK",
+    "🛡️ Registre Phytosanitaire": "PHYTO",
+    "🧪 Bilan de Fertilisation": "FERTI", 
+    "💧 Bilan Irrigation Parcelle": "IRRIG_PARCELLE"
+}
+
+selected_doc_label = st.radio(
+    "Spécifiez le type de document réglementaire à générer pour votre sélection :", 
+    list(doc_options.keys()),
+    horizontal=True
+)
+
+st.write("") # Espace
+handle_pdf_action(doc_options[selected_doc_label], f"🚀 Générer : {selected_doc_label}")
 
 st.divider()
 
