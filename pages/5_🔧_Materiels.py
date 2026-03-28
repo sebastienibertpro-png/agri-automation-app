@@ -453,6 +453,13 @@ with tab_journal_fuel:
 
         # Conversion str pour éviter les erreurs de compatibilité de type avec data_editor
         df_editor_fuel = df_filtered_fuel.reset_index(drop=True).copy()
+        # Supprimer les décimales inutiles sur Campagne et Quantité
+        for col in ['Campagne', 'FUEL_quantité_L']:
+            if col in df_editor_fuel.columns:
+                df_editor_fuel[col] = pd.to_numeric(df_editor_fuel[col], errors='coerce')
+                df_editor_fuel[col] = df_editor_fuel[col].apply(
+                    lambda x: str(int(x)) if pd.notnull(x) else ""
+                )
         df_editor_fuel = df_editor_fuel.astype(str).replace(["nan", "None", "<NA>", "NaN"], "")
 
         # Tableau éditable
