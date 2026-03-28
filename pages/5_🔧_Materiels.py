@@ -23,12 +23,6 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #45a049;
     }
-    /* Style pour les expanders de saisie */
-    .stExpander > details > summary {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        border-radius: 8px;
-        padding: 4px 8px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -457,9 +451,16 @@ with tab_journal_fuel:
 
         st.caption(f"📊 {len(df_filtered_fuel)} entrée(s) affichée(s)")
 
+        # Conversion numérique pour éviter l'erreur de type avec NumberColumn
+        df_editor_fuel = df_filtered_fuel.reset_index(drop=True).copy()
+        if 'FUEL_quantité_L' in df_editor_fuel.columns:
+            df_editor_fuel['FUEL_quantité_L'] = pd.to_numeric(
+                df_editor_fuel['FUEL_quantité_L'], errors='coerce'
+            )
+
         # Tableau éditable
         edited_journal_fuel = st.data_editor(
-            df_filtered_fuel.reset_index(drop=True),
+            df_editor_fuel,
             use_container_width=True,
             hide_index=True,
             num_rows="dynamic",
