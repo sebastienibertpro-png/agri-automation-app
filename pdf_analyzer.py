@@ -54,7 +54,7 @@ class PDFAnalyzer:
            "Fournisseur": "Nom propre et court",
            "Catégorie": "Valeur EXACTE choisie dans la liste stricte ci-dessus",
            "Sous_Categorie_Stockage": "Choisis un nom de dossier court et sans espace",
-           "Nom_Produit": "Nom du produit exact ou résumé de la prestation",
+           "Nom_Produit": "NOM COMMERCIAL PUR uniquement. SUPPRIMER impérativement : doses (ex: 250G, 5L), numéros AMM (ex: AMM N°2060051), conditionnement (ex: sac de 25kg, bidon). Ex: 'PEAK Dose 250G' -> 'PEAK' ; 'FLEXITY 5L AMM N° 2060051' -> 'FLEXITY' ; 'ROUNDUP 20L' -> 'ROUNDUP'.",
            "Quantité_Achetée": "Quantité (nombre, avec point pour décimale)",
            "Unité_Achat": "Ex: L, KG, Unité, Forfait, m3, kWh",
            "Prix_Unitaire_HT": "Prix unitaire HT (nombre)",
