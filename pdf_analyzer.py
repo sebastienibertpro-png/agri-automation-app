@@ -1,25 +1,16 @@
 import google.generativeai as genai
 import json
+import re
 import time
 
 class PDFAnalyzer:
     def __init__(self, api_key):
         genai.configure(api_key=api_key)
-        # On utilise gemini-2.5-flash pour sa vitesse et son très bon support natif des PDF
+        # gemini-2.5-flash pour support natif PDF et images
         self.model = genai.GenerativeModel('gemini-2.5-flash')
 
-    def analyze_invoice(self, file_path):
-        """Envoie le PDF à Gemini pour extraire la date, le fournisseur et le montant total."""
-        print(f"Analyse du PDF avec Gemini : {file_path}")
-        
-        # Upload le fichier dans l'API Gemini
-        try:
-           pdf_file = genai.upload_file(file_path, mime_type="application/pdf")
-        except Exception as e:
-           print(f"Erreur lors de l'upload vers Gemini : {e}")
-           return None
-
-        prompt = """
+    def _build_prompt(self):
+        return """
         Tu es un assistant comptable très précis, spécialisé dans l'agriculture (grandes cultures). 
         Analyse cette facture et extrais les informations pour remplir un tableau de bord comptable.
         
@@ -44,22 +35,22 @@ class PDFAnalyzer:
         - DIVERS / INCONNU
         
         RÈGLES SPÉCIALES À RESPECTER IMPÉRATIVEMENT :
-        1. Si c'est une facture EDF/Electricité : Cherche obligatoirement les mots 'irrigation', 'irrigants', 'pompage', 'forage', 'borne', 'moteur' ou des adresses/PDL spécifiques à l'eau -> 'EAU & IRRIGATION'. Sinon (Silo, Siège...) -> 'ELECTRICITE GENERALE'.
-        2. Si c'est une facture de GAZ / PROPANE : Vérifie si ça mentionne 'séchoir', 'séchage' -> 'SECHAGE'.
-        3. Si c'est une facture CUMA : Si le nom du fournisseur ou le détail mentionne 'irrigation', 'redevance eau', 'réseau collectif', 'm3' -> 'EAU & IRRIGATION'. Si on lit des travaux agricoles (traction, andainage, moisson, pressage) -> 'PRESTATION'.
+        1. Si c'est une facture EDF/Electricité : Cherche 'irrigation', 'irrigants', 'pompage', 'forage', 'borne', 'moteur' -> 'EAU & IRRIGATION'. Sinon -> 'ELECTRICITE GENERALE'.
+        2. Si c'est une facture de GAZ / PROPANE : Vérifie 'séchoir', 'séchage' -> 'SECHAGE'.
+        3. Si c'est une facture CUMA : Si ça mentionne 'irrigation', 'redevance eau', 'm3' -> 'EAU & IRRIGATION'. Si travaux agricoles -> 'PRESTATION'.
 
         RÈGLES DE DÉCOUPAGE DES LIGNES :
         1. Factures ENGRAIS, SEMENCES, PHYTO : 1 ligne par produit distinct présent sur la facture.
-        2. Factures MATÉRIEL (Réparation/Entretien) : 2 lignes maximum (regrouper 'Pièces' dans une ligne et 'Main d'œuvre' dans une autre si applicable).
-        3. AUTRES (EDF, CUMA, Gaz, Assurance, Frais généraux, etc.) : Regroupe tout en 1 seule ligne globale pour toute la facture.
+        2. Factures MATÉRIEL (Réparation/Entretien) : 2 lignes maximum (regrouper 'Pièces' et 'Main d'œuvre').
+        3. AUTRES (EDF, CUMA, Gaz, Assurance, Frais généraux, etc.) : 1 seule ligne globale.
 
-        En plus des détails des lignes, tu dois choisir un DOSSIER DE STOCKAGE (Sous_Categorie_Stockage) court pour classer le PDF sur le Drive. Ex: 'Intrants', 'Materiel', 'Electricite', 'Fermage', 'GNR', 'ETA', 'Irrigation', 'Gaz', 'Autre'.
+        En plus des détails des lignes, choisis un DOSSIER DE STOCKAGE (Sous_Categorie_Stockage) court pour classer le PDF sur le Drive. Ex: 'Intrants', 'Materiel', 'Electricite', 'Fermage', 'GNR', 'ETA', 'Irrigation', 'Gaz', 'Autre'.
 
-        Pour chaque ligne identifiée, renvoie un objet JSON avec EXACTEMENT ces clés (Même si l'info n'existe pas, mets null) :
+        Pour chaque ligne identifiée, renvoie un objet JSON avec EXACTEMENT ces clés (si l'info n'existe pas, mets null) :
         {
-           "ID_Facture": "Numéro de la facture (lettres et chiffres exacts)",
+           "ID_Facture": "Numéro de la facture (lettres et chiffres exacts tels qu'ils apparaissent sur la facture)",
            "Date_facture": "YYYY-MM-DD",
-           "Campagne": 2026, // Calcule : si Date_facture entre le 01/07/N-1 et le 30/06/N, la campagne est N (ex: 15/08/2025 -> 2026).
+           "Campagne": 2026,
            "Fournisseur": "Nom propre et court",
            "Catégorie": "Valeur EXACTE choisie dans la liste stricte ci-dessus",
            "Sous_Categorie_Stockage": "Choisis un nom de dossier court et sans espace",
@@ -69,30 +60,117 @@ class PDFAnalyzer:
            "Prix_Unitaire_HT": "Prix unitaire HT (nombre)",
            "Montant_Total_Produit_HT": "Total HT pour cette ligne (nombre)",
            "Montant_Total_Facture_HT": "Total HT de TOUTE la facture (nombre)",
-           "TVA_%": "Taux de TVA en pourcentage tel qu'affiché (nombre avec un point, ex: 5.5 ou 20.0)",
+           "TVA_%": "Taux de TVA en pourcentage (nombre avec point, ex: 5.5 ou 20.0)",
            "Montant_Total_Facture_TTC": "Total TTC de TOUTE la facture (nombre)"
         }
         
         Renvoie SEULEMENT une liste JSON valide contenant ces objets, sans aucun autre texte ou markdown. Ex: [{...}, {...}]
         """
 
-        try:
-           response = self.model.generate_content([pdf_file, prompt])
-           text = response.text.replace('```json', '').replace('```', '').strip()
-           
-           data = json.loads(text)
-           # Ensure data is a list
-           if isinstance(data, dict):
-               data = [data]
-           return data
-        except Exception as e:
-           print(f"Erreur lors de l'analyse avec Gemini : {e}")
-           print(f"Réponse brute de Gemini: {response.text if 'response' in locals() else 'Aucune réponse'}")
-           return None
+    def _parse_json_response(self, raw_text):
+        """Extrait et parse le JSON depuis la réponse Gemini, même si entouré de markdown."""
+        # Suppression des balises markdown courantes
+        text = raw_text.strip()
+        text = re.sub(r'^```json\s*', '', text)
+        text = re.sub(r'^```\s*', '', text)
+        text = re.sub(r'\s*```$', '', text)
+        text = text.strip()
 
+        # Tentative directe
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                data = [data]
+            return data, None
+        except json.JSONDecodeError:
+            pass
+
+        # Chercher un tableau JSON dans la réponse (fallback)
+        match = re.search(r'\[\s*\{.*\}\s*\]', text, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group(0))
+                if isinstance(data, dict):
+                    data = [data]
+                return data, None
+            except json.JSONDecodeError as e:
+                return None, f"JSON invalide extrait : {e}\n\nRéponse brute :\n{raw_text[:800]}"
+
+        return None, f"Impossible d'extraire un JSON valide.\n\nRéponse brute de Gemini :\n{raw_text[:800]}"
+
+    def _extract_images_from_pdf(self, file_path):
+        """Extrait les images d'un PDF scanné en fallback via PyMuPDF (fitz)."""
+        try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(file_path)
+            images = []
+            for page in doc:
+                pix = page.get_pixmap(dpi=150)
+                img_bytes = pix.tobytes("jpeg")
+                images.append(img_bytes)
+            doc.close()
+            return images
+        except ImportError:
+            return None  # PyMuPDF non installé
+        except Exception as e:
+            print(f"Erreur extraction images PDF : {e}")
+            return None
+
+    def analyze_invoice(self, file_path):
+        """
+        Analyse une facture PDF avec Gemini.
+        Retourne une liste de dicts (une entrée par ligne produit) ou None en cas d'échec.
+        En cas d'erreur, retourne aussi un message d'erreur détaillé via le tuple (data, error_msg).
+        """
+        prompt = self._build_prompt()
+        pdf_file = None
+        raw_text = None
+
+        # --- Tentative 1 : Upload PDF natif ---
+        try:
+            pdf_file = genai.upload_file(file_path, mime_type="application/pdf")
+            # Attendre que le fichier soit prêt
+            for _ in range(10):
+                f = genai.get_file(pdf_file.name)
+                if f.state.name == "ACTIVE":
+                    break
+                time.sleep(2)
+
+            response = self.model.generate_content([pdf_file, prompt])
+            raw_text = response.text
+            data, err = self._parse_json_response(raw_text)
+            if data:
+                return data, None
+            # Si le parsing JSON échoue, on note l'erreur mais on tente le fallback image
+            print(f"[Tentative PDF natif] Échec JSON : {err}")
+        except Exception as e:
+            print(f"[Tentative PDF natif] Exception : {e}")
         finally:
-           # Tentative de nettoyage du fichier de l'API Gemini (pas strictement bloquant)
-           try:
-              genai.delete_file(pdf_file.name)
-           except:
-              pass
+            if pdf_file:
+                try:
+                    genai.delete_file(pdf_file.name)
+                except Exception:
+                    pass
+
+        # --- Tentative 2 : Fallback extraction image (PDFs scannés) ---
+        images = self._extract_images_from_pdf(file_path)
+        if images:
+            try:
+                import PIL.Image
+                import io
+                parts = []
+                for img_bytes in images[:4]:  # Max 4 pages
+                    pil_img = PIL.Image.open(io.BytesIO(img_bytes))
+                    parts.append(pil_img)
+                parts.append(prompt)
+
+                response2 = self.model.generate_content(parts)
+                raw_text = response2.text
+                data, err = self._parse_json_response(raw_text)
+                if data:
+                    return data, None
+                return None, f"[Fallback image] {err}"
+            except Exception as e2:
+                return None, f"[Fallback image] Exception : {e2}\n\nRéponse brute :\n{str(raw_text)[:800] if raw_text else 'Aucune'}"
+        
+        return None, f"Échec analyse PDF. Réponse brute Gemini :\n{str(raw_text)[:800] if raw_text else 'Aucune réponse obtenue.'}"
