@@ -899,8 +899,20 @@ class DataLoader:
         return df
 
     def get_achats(self, campaign=None):
-        """Loads ACHAT_MASTER and filters by campaign year."""
-        df = self._get_data("ACHAT_MASTER")
+        """Loads ACHAT_MASTER and filters by campaign year. ttl=0 ensures fresh data after a write."""
+        df = pd.DataFrame()
+        SPREADSHEET_NAME = "MASTER_EXPLOITATION"
+        if self.conn:
+            try:
+                # ttl=0 : toujours lire en direct pour éviter d'afficher des données obsolètes
+                # après une écriture (update/delete/insert)
+                df = self.conn.read(worksheet="ACHAT_MASTER", spreadsheet=SPREADSHEET_NAME, ttl=0)
+            except Exception as e:
+                st.error(f"Erreur lecture ACHAT_MASTER : {e}")
+                return pd.DataFrame()
+        elif self.xl:
+            df = pd.read_excel(self.file_path, sheet_name="ACHAT_MASTER")
+        
         if df.empty:
             return pd.DataFrame()
             
@@ -912,6 +924,7 @@ class DataLoader:
             df = df[df['Date_dt'].dt.year == int(campaign)]
             
         return df
+
     def get_product_prices(self, campaign):
         """
         Calculates average unit price per product for a given campaign from ACHAT_MASTER.
@@ -977,12 +990,15 @@ class DataLoader:
             return False
         try:
             df = self.conn.read(worksheet="ACHAT_MASTER", ttl=0, spreadsheet="MASTER_EXPLOITATION")
-            if 'ID_Facture' not in df.columns:
-                st.error("Colonne 'ID_Facture' introuvable.")
+            # Chercher la colonne ID (flexible : ID_Facture ou ID_Achat)
+            id_col = 'ID_Facture' if 'ID_Facture' in df.columns else 'ID_Achat' if 'ID_Achat' in df.columns else None
+            if not id_col:
+                st.error("Colonne ID (ID_Facture / ID_Achat) introuvable.")
                 return False
             
-            purchase_ids = [str(i) for i in purchase_ids]
-            df = df[~df['ID_Facture'].astype(str).isin(purchase_ids)]
+            # Normalisation stricte des deux côtés pour éviter les faux non-matches
+            purchase_ids = [str(i).strip() for i in purchase_ids]
+            df = df[~df[id_col].astype(str).str.strip().isin(purchase_ids)]
             
             self.conn.update(worksheet="ACHAT_MASTER", data=df, spreadsheet="MASTER_EXPLOITATION")
             self._cache.pop("ACHAT_MASTER", None)
@@ -999,13 +1015,16 @@ class DataLoader:
             return False
         try:
             df = self.conn.read(worksheet="ACHAT_MASTER", ttl=0, spreadsheet="MASTER_EXPLOITATION")
-            if 'ID_Facture' not in df.columns:
-                st.error("Colonne 'ID_Facture' introuvable.")
+            # Chercher la colonne ID (flexible)
+            id_col = 'ID_Facture' if 'ID_Facture' in df.columns else 'ID_Achat' if 'ID_Achat' in df.columns else None
+            if not id_col:
+                st.error("Colonne ID (ID_Facture / ID_Achat) introuvable.")
                 return False
                 
-            mask = df['ID_Facture'].astype(str) == str(purchase_id)
+            # Normalisation stricte des deux côtés (.strip() évite les espaces parasites)
+            mask = df[id_col].astype(str).str.strip() == str(purchase_id).strip()
             if not mask.any():
-                st.warning("Ligne d'achat non trouvée.")
+                st.warning(f"Ligne d'achat '{purchase_id}' non trouvée dans le Sheet.")
                 return False
             
             idx = df[mask].index[0]
