@@ -151,23 +151,41 @@ def process_invoices_ui():
                     # Analyse IA
                     with st.spinner(f"Analyse IA en cours pour {original_name}..."):
                         try:
-                            rows_data = analyzer.analyze_invoice(local_path)
+                            rows_data, ia_error = analyzer.analyze_invoice(local_path)
                         except Exception as e_ia:
                             st.error(f"❌ Erreur IA pour {original_name} : {e_ia}")
-                            rows_data = None
+                            rows_data, ia_error = None, str(e_ia)
                     
                     if not rows_data:
                         st.error(f"⚠️ Échec analyse pour {original_name}")
+                        if ia_error:
+                            with st.expander("🔍 Détail de l'erreur Gemini", expanded=True):
+                                st.code(ia_error)
                         continue
                     
                     # Préparation des données pour Sheets
                     first_row = rows_data[0]
                     compta_year = get_compta_year(first_row.get("Date_facture", ""))
                     
+                    # --- Suffixe ID: FAC001 -> FAC001-1, FAC001-2, ... (si plusieurs lignes) ---
+                    base_id = str(first_row.get("ID_Facture", "") or "").strip()
+                    # Si le numéro de facture est vide, on utilise le nom du fichier sans extension
+                    if not base_id:
+                        import os as _os
+                        base_id = _os.path.splitext(original_name)[0].replace(" ", "_")[:30]
+                    
+                    n_rows = len(rows_data)
+                    
                     sheet_values = []
-                    for row in rows_data:
+                    for line_idx, row in enumerate(rows_data, start=1):
+                        # Identifiant unique par ligne : FAC001-1, FAC001-2...
+                        if n_rows > 1:
+                            row_id = f"{base_id}-{line_idx}"
+                        else:
+                            row_id = base_id
+                        
                         formatted_row = [
-                            row.get("ID_Facture", ""),
+                            row_id,
                             row.get("Date_facture", ""),
                             row.get("Campagne", compta_year),
                             row.get("Fournisseur", ""),
