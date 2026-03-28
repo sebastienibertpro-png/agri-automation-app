@@ -180,8 +180,10 @@ else:
                 common_ids = original_ids.intersection(current_ids)
                 updated_ids = []
                 for cid in common_ids:
-                    row_old = df_orig.loc[cid].astype(str).str.strip().fillna('')
-                    row_new = df_new_indexed.loc[cid].astype(str).str.strip().fillna('')
+                    raw_old = df_orig.loc[cid]
+                    row_old = (raw_old.iloc[0] if isinstance(raw_old, pd.DataFrame) else raw_old).astype(str).str.strip().fillna('')
+                    raw_new = df_new_indexed.loc[cid]
+                    row_new = (raw_new.iloc[0] if isinstance(raw_new, pd.DataFrame) else raw_new).astype(str).str.strip().fillna('')
                     if not row_old.equals(row_new):
                         updated_ids.append(cid)
 
