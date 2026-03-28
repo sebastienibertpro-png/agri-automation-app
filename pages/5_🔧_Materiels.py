@@ -329,25 +329,25 @@ with tab_journal_maint:
 
         st.caption(f"📊 {len(df_filtered_maint)} entrée(s) affichée(s)")
 
+        # Conversion str pour éviter les erreurs de type compatibilité avec data_editor
+        df_editor_maint = df_filtered_maint.reset_index(drop=True).copy()
+        df_editor_maint = df_editor_maint.astype(str).replace(["nan", "None", "<NA>", "NaN"], "")
+
         # Tableau éditable
         edited_journal_maint = st.data_editor(
-            df_filtered_maint.reset_index(drop=True),
+            df_editor_maint,
             use_container_width=True,
             hide_index=True,
             num_rows="dynamic",
             key="editor_journal_maint",
             column_config={
-                "ID_Entretien": st.column_config.TextColumn("ID", width="small"),
+                "ID_Entretien": None,
                 "Date": st.column_config.TextColumn("Date", width="small"),
                 "ID_Materiel": st.column_config.TextColumn("Matériel", width="medium"),
-                "Type_Intervention": st.column_config.SelectboxColumn(
-                    "Type",
-                    options=["Vidange", "Filtres", "Pneumatiques", "Réparation", "Révision", "Autre"],
-                    width="medium"
-                ),
+                "Type_Intervention": st.column_config.TextColumn("Type", width="medium"),
                 "Description": st.column_config.TextColumn("Description", width="large"),
-                "Heures_Moteur": st.column_config.NumberColumn("Heures", width="small"),
-                "Montant_Reel_HT": st.column_config.NumberColumn("Montant HT (€)", width="small"),
+                "Heures_Moteur": st.column_config.TextColumn("Heures", width="small"),
+                "Montant_Reel_HT": st.column_config.TextColumn("Montant HT (€)", width="small"),
             }
         )
 
@@ -451,12 +451,9 @@ with tab_journal_fuel:
 
         st.caption(f"📊 {len(df_filtered_fuel)} entrée(s) affichée(s)")
 
-        # Conversion numérique pour éviter l'erreur de type avec NumberColumn
+        # Conversion str pour éviter les erreurs de compatibilité de type avec data_editor
         df_editor_fuel = df_filtered_fuel.reset_index(drop=True).copy()
-        if 'FUEL_quantité_L' in df_editor_fuel.columns:
-            df_editor_fuel['FUEL_quantité_L'] = pd.to_numeric(
-                df_editor_fuel['FUEL_quantité_L'], errors='coerce'
-            )
+        df_editor_fuel = df_editor_fuel.astype(str).replace(["nan", "None", "<NA>", "NaN"], "")
 
         # Tableau éditable
         edited_journal_fuel = st.data_editor(
@@ -466,11 +463,11 @@ with tab_journal_fuel:
             num_rows="dynamic",
             key="editor_journal_fuel",
             column_config={
-                "ID_Conso_Fuel": st.column_config.TextColumn("ID", width="small"),
+                "ID_Conso_Fuel": None,
                 "Date": st.column_config.TextColumn("Date", width="small"),
                 "Campagne": st.column_config.TextColumn("Campagne", width="small"),
                 "ID_Materiel": st.column_config.TextColumn("Matériel", width="medium"),
-                "FUEL_quantité_L": st.column_config.NumberColumn("Quantité (L)", format="%.1f L", width="medium"),
+                "FUEL_quantité_L": st.column_config.TextColumn("Quantité (L)", width="medium"),
                 "Tache_réalisée": st.column_config.TextColumn("Tâche réalisée", width="large"),
             }
         )
