@@ -136,7 +136,10 @@ def process_invoices_ui():
                     status_text.text(f"Traitement de {original_name} ({idx+1}/{len(files)})...")
                     
                     # Téléchargement robuste
-                    local_path = os.path.join(download_dir, original_name)
+                    # Assainir le nom de fichier : les '/' dans le nom (ex: date 27/02/2026)
+                    # seraient interprétés comme des séparateurs de répertoires -> erreur FileNotFound
+                    safe_name = original_name.replace('/', '-').replace('\\', '-')
+                    local_path = os.path.join(download_dir, safe_name)
                     try:
                         request = uploader.service.files().get_media(fileId=file_id)
                         fh = io.FileIO(local_path, 'wb')
