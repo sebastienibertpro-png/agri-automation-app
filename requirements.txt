@@ -17,3 +17,4 @@ geopandas
 plotly
 google-generativeai
 streamlit-js-eval
+PyMuPDF
