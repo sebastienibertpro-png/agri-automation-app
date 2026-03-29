@@ -52,34 +52,84 @@ def init_campaign_selector():
     if not active_loader:
         st.error("Impossible de se connecter à 'MASTER_EXPLOITATION'. Vérifiez vos secrets ou votre connexion.")
         st.stop()
-        
+
     try:
-        # Avoid caching interventions too strictly during active data entry, or use session state cache
         df_intervention = active_loader.get_interventions()
         df_releves = active_loader.get_releves_compteurs()
-        
+
         years = set()
-        
+
         if not df_intervention.empty:
             df_intervention['Campagne'] = pd.to_numeric(df_intervention['Campagne'], errors='coerce').fillna(0).astype(int)
             years.update(df_intervention[df_intervention['Campagne'] > 0]['Campagne'].unique())
-        
+
         if not df_releves.empty:
             df_releves['Date_Relevé'] = pd.to_datetime(df_releves['Date_Relevé'], errors='coerce', dayfirst=True)
             years.update(df_releves['Date_Relevé'].dt.year.dropna().unique())
-            
+
+        # Also include years already present in ASSOLEMENT (campaign created but no intervention yet)
+        try:
+            df_asso_all = active_loader.get_assolement()
+            if not df_asso_all.empty and 'Campagne' in df_asso_all.columns:
+                asso_years = pd.to_numeric(df_asso_all['Campagne'], errors='coerce').dropna().astype(int)
+                years.update(asso_years[asso_years > 0].unique())
+        except Exception:
+            pass
+
+        import datetime
+        current_year = datetime.datetime.now().year
+        next_campaign = (max(int(y) for y in years) + 1) if years else current_year
+
         available_campaigns = sorted([int(y) for y in years], reverse=True)
-        
-        if not available_campaigns:
+
+        # Sentinel value used in the selectbox for the "create" option
+        NEW_CAMP_LABEL = f"➕ Nouvelle campagne ({next_campaign})"
+        options_display = [NEW_CAMP_LABEL] + [str(y) for y in available_campaigns]
+
+        # Restore previous selection if it exists in session_state
+        default_idx = 0
+        if "selected_campaign_label" in st.session_state:
+            prev = st.session_state["selected_campaign_label"]
+            if prev in options_display:
+                default_idx = options_display.index(prev)
+
+        chosen = st.sidebar.selectbox(
+            "📅 Choisir la Campagne",
+            options=options_display,
+            index=default_idx,
+            key="campaign_selectbox"
+        )
+        st.session_state["selected_campaign_label"] = chosen
+
+        if chosen == NEW_CAMP_LABEL:
+            # ── Creation mode ──────────────────────────────────────────
+            st.session_state["creating_new_campaign"] = True
+            st.session_state["new_campaign_year"] = next_campaign
+
+            # Use the last known year as fallback for pages that need a campaign
+            fallback_year = available_campaigns[0] if available_campaigns else next_campaign
+            selected_campaign = fallback_year
+
+            # Show hint in sidebar
+            st.sidebar.info(
+                f"ℹ️ Vous créez la campagne **{next_campaign}**.\n\n"
+                "Rendez-vous sur la page **🌾 Assolement** pour saisir votre plan de culture."
+            )
+        else:
+            st.session_state["creating_new_campaign"] = False
+            st.session_state["new_campaign_year"] = None
+            selected_campaign = int(chosen)
+
+        if not available_campaigns and not st.session_state.get("creating_new_campaign"):
             st.warning("Aucune donnée (intervention ou relevé) trouvée.")
             st.stop()
-            
-        selected_campaign = st.sidebar.selectbox("📅 Choisir la Campagne", available_campaigns)
-        
-        df_campaign = df_intervention[df_intervention['Campagne'].astype(str) == str(selected_campaign)]
-        available_parcelles = sorted(df_campaign['ID_Parcelle'].unique())
-        
+
+        df_campaign = df_intervention[df_intervention['Campagne'].astype(str) == str(selected_campaign)] \
+            if not df_intervention.empty else pd.DataFrame()
+        available_parcelles = sorted(df_campaign['ID_Parcelle'].unique()) if not df_campaign.empty else []
+
         return active_loader, selected_campaign, df_campaign, available_parcelles
+
     except Exception as e:
         st.error(f"Erreur lecture campagnes: {e}")
         st.stop()
