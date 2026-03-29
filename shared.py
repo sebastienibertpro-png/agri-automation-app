@@ -53,6 +53,25 @@ def init_campaign_selector():
         st.error("Impossible de se connecter à 'MASTER_EXPLOITATION'. Vérifiez vos secrets ou votre connexion.")
         st.stop()
 
+    # ── CSS sidebar uniforme sur toutes les pages ──────────────────────────────
+    st.markdown("""
+    <style>
+        /* Navigation latérale — taille de police uniforme */
+        [data-testid="stSidebarNav"] a span,
+        [data-testid="stSidebarNav"] li div span,
+        [data-testid="stSidebarNav"] span {
+            font-size: 1rem !important;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+            font-weight: 500 !important;
+        }
+        /* Entrée active : légèrement plus visible */
+        [data-testid="stSidebarNav"] li[aria-selected="true"] div span {
+            font-weight: 700 !important;
+            color: #2e7d32 !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
     try:
         df_intervention = active_loader.get_interventions()
         df_releves = active_loader.get_releves_compteurs()
