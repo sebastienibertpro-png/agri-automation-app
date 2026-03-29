@@ -192,9 +192,14 @@ if tab_new is not None:
                 color="green"
             )
 
-            # Nettoyage des "None" textuels avant affichage
+            # Nettoyage : toute valeur nulle → chaîne vide (couvre NaN, None, "None", "nan"…)
             for col in df_edit_new.select_dtypes(include='object').columns:
-                df_edit_new[col] = df_edit_new[col].replace(['None', 'nan', 'NaT', 'NAT', '<NA>'], '')
+                df_edit_new[col] = (
+                    df_edit_new[col]
+                    .fillna('')
+                    .astype(str)
+                    .replace({'None': '', 'nan': '', 'NaT': '', 'NAT': '', '<NA>': ''})
+                )
 
             # Masquer toutes les colonnes non pertinentes
             col_config_new = {
@@ -334,9 +339,14 @@ with tab_asso:
     parc_ref = dl.get_parcelles()
     parc_opts = sorted([str(x) for x in parc_ref['ID_Parcelle'].unique() if pd.notnull(x) and str(x) != 'nan']) if not parc_ref.empty else []
 
-    # Nettoyage des "None" textuels avant affichage
+    # Nettoyage : toute valeur nulle → chaîne vide (couvre NaN, None, "None", "nan"…)
     for col in df_curr_asso.select_dtypes(include='object').columns:
-        df_curr_asso[col] = df_curr_asso[col].replace(['None', 'nan', 'NaT', 'NAT', '<NA>'], '')
+        df_curr_asso[col] = (
+            df_curr_asso[col]
+            .fillna('')
+            .astype(str)
+            .replace({'None': '', 'nan': '', 'NaT': '', 'NAT': '', '<NA>': ''})
+        )
 
     col_config_asso = {
         "Campagne": st.column_config.NumberColumn("Camp.", disabled=True, format="%d"),
