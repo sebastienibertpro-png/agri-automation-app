@@ -56,14 +56,17 @@ def init_campaign_selector():
     # ── CSS sidebar uniforme sur toutes les pages ──────────────────────────────
     st.markdown("""
     <style>
-        /* Wildcard max-spécificité : écrase les règles internes Streamlit */
-        section[data-testid="stSidebar"] nav[data-testid="stSidebarNav"] *,
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] * {
+        /* Cible tous les éléments de la nav latérale sans dépendance de parent */
+        [data-testid="stSidebarNav"] *,
+        [data-testid="stSidebarNav"] a,
+        [data-testid="stSidebarNav"] span,
+        [data-testid="stSidebarNav"] li,
+        [data-testid="stSidebarNav"] div {
             font-size: 15px !important;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
         }
         /* Page active : vert gras */
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] li[aria-selected="true"] * {
+        [data-testid="stSidebarNav"] li[aria-selected="true"] * {
             font-weight: 700 !important;
             color: #2e7d32 !important;
         }
@@ -103,8 +106,9 @@ def init_campaign_selector():
         NEW_CAMP_LABEL = f"➕ Nouvelle campagne ({next_campaign})"
         options_display = [NEW_CAMP_LABEL] + [str(y) for y in available_campaigns]
 
-        # Restore previous selection if it exists in session_state
-        default_idx = 0
+        # Par défaut : la première vraie campagne (index 1), pas l'option "créer"
+        # Cela garantit qu'un refresh tombe sur la dernière campagne connue
+        default_idx = 1 if len(options_display) > 1 else 0
         if "selected_campaign_label" in st.session_state:
             prev = st.session_state["selected_campaign_label"]
             if prev in options_display:
