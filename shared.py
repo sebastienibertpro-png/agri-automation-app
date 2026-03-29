@@ -56,16 +56,14 @@ def init_campaign_selector():
     # ── CSS sidebar uniforme sur toutes les pages ──────────────────────────────
     st.markdown("""
     <style>
-        /* Navigation latérale — taille de police uniforme sur toutes les pages */
-        section[data-testid="stSidebar"],
-        [data-testid="stSidebarNav"] span,
-        [data-testid="stSidebarNav"] a,
-        [data-testid="stSidebarNav"] li div {
-            font-size: 1.15rem !important;
+        /* Wildcard max-spécificité : écrase les règles internes Streamlit */
+        section[data-testid="stSidebar"] nav[data-testid="stSidebarNav"] *,
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] * {
+            font-size: 15px !important;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
         }
         /* Page active : vert gras */
-        [data-testid="stSidebarNav"] li[aria-selected="true"] div span {
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] li[aria-selected="true"] * {
             font-weight: 700 !important;
             color: #2e7d32 !important;
         }
