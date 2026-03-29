@@ -56,15 +56,15 @@ def init_campaign_selector():
     # ── CSS sidebar uniforme sur toutes les pages ──────────────────────────────
     st.markdown("""
     <style>
-        /* Navigation latérale — taille de police uniforme */
-        [data-testid="stSidebarNav"] a span,
-        [data-testid="stSidebarNav"] li div span,
-        [data-testid="stSidebarNav"] span {
-            font-size: 1rem !important;
+        /* Navigation latérale — taille de police uniforme sur toutes les pages */
+        section[data-testid="stSidebar"],
+        [data-testid="stSidebarNav"] span,
+        [data-testid="stSidebarNav"] a,
+        [data-testid="stSidebarNav"] li div {
+            font-size: 1.15rem !important;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-            font-weight: 500 !important;
         }
-        /* Entrée active : légèrement plus visible */
+        /* Page active : vert gras */
         [data-testid="stSidebarNav"] li[aria-selected="true"] div span {
             font-weight: 700 !important;
             color: #2e7d32 !important;
@@ -184,16 +184,6 @@ def inject_premium_css():
     .p-green { background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%) !important; }
     .p-blue { background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%) !important; }
     
-    /* Sidebar styling - Aggressive targeting for font size */
-    [data-testid="stSidebarNav"] span, 
-    [data-testid="stSidebarNav"] a, 
-    section[data-testid="stSidebar"] {
-        font-size: 1.15rem !important;
-    }
-
-    [data-testid="stSidebarNav"] li div {
-        font-size: 1.15rem !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
