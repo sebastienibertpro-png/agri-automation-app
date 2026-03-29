@@ -54,21 +54,19 @@ def init_campaign_selector():
         st.stop()
 
     # ── CSS sidebar uniforme sur toutes les pages ──────────────────────────────
+    # Même CSS que l'ancien inject_premium_css qui FONCTIONNAIT :
+    # on force la taille sur le conteneur sidebar + les éléments nav
     st.markdown("""
     <style>
-        /* Cible tous les éléments de la nav latérale sans dépendance de parent */
-        [data-testid="stSidebarNav"] *,
-        [data-testid="stSidebarNav"] a,
-        [data-testid="stSidebarNav"] span,
-        [data-testid="stSidebarNav"] li,
-        [data-testid="stSidebarNav"] div {
-            font-size: 15px !important;
+        section[data-testid="stSidebar"],
+        section[data-testid="stSidebar"] * {
+            font-size: 1rem !important;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
         }
-        /* Page active : vert gras */
-        [data-testid="stSidebarNav"] li[aria-selected="true"] * {
-            font-weight: 700 !important;
-            color: #2e7d32 !important;
+        [data-testid="stSidebarNav"] span,
+        [data-testid="stSidebarNav"] a,
+        [data-testid="stSidebarNav"] li div {
+            font-size: 1rem !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -106,18 +104,23 @@ def init_campaign_selector():
         NEW_CAMP_LABEL = f"➕ Nouvelle campagne ({next_campaign})"
         options_display = [NEW_CAMP_LABEL] + [str(y) for y in available_campaigns]
 
-        # Par défaut : la première vraie campagne (index 1), pas l'option "créer"
-        # Cela garantit qu'un refresh tombe sur la dernière campagne connue
-        default_idx = 1 if len(options_display) > 1 else 0
-        if "selected_campaign_label" in st.session_state:
-            prev = st.session_state["selected_campaign_label"]
-            if prev in options_display:
-                default_idx = options_display.index(prev)
+        # ── Initialisation du widget selectbox avant création ───────────────────────
+        # La première vraie campagne (index 1) est le défaut absolu
+        first_real = options_display[1] if len(options_display) > 1 else options_display[0]
+
+        if "campaign_selectbox" not in st.session_state:
+            # Premier chargement (refresh navigateur) : choisir la dernière campagne
+            st.session_state["campaign_selectbox"] = first_real
+        elif (
+            st.session_state["campaign_selectbox"] == NEW_CAMP_LABEL
+            and not st.session_state.get("creating_new_campaign", False)
+        ):
+            # L'utilisateur n'est plus en mode création mais le widget est bloqué
+            st.session_state["campaign_selectbox"] = first_real
 
         chosen = st.sidebar.selectbox(
             "📅 Choisir la Campagne",
             options=options_display,
-            index=default_idx,
             key="campaign_selectbox"
         )
         st.session_state["selected_campaign_label"] = chosen
