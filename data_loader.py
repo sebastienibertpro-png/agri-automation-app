@@ -1134,3 +1134,95 @@ class DataLoader:
         df_stock = df_stock.drop(columns=['Nom_Produit_Norm'])
         
         return df_stock
+
+    # -----------------------------------------------------------------------
+    # GESTION RECOLTE, STOCKAGE ET CONTRATS
+    # -----------------------------------------------------------------------
+
+    def get_recolte_stockage(self, campaign=None):
+        df = self._get_data("RECOLTE_STOCKAGE")
+        if df.empty: return pd.DataFrame()
+        if campaign and 'Campagne' in df.columns:
+            df['Campagne'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+            df = df[df['Campagne'] == int(campaign)]
+        return df
+
+    def get_contrats_ventes(self, campaign=None):
+        df = self._get_data("CONTRATS_VENTES")
+        if df.empty: return pd.DataFrame()
+        if campaign and 'Campagne' in df.columns:
+            df['Campagne'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+            df = df[df['Campagne'] == int(campaign)]
+        return df
+
+    def get_silos(self):
+        df = self._get_data("SILO")
+        if df.empty: return pd.DataFrame()
+        return df
+
+    def update_recolte_stockage(self, id_mouvement: str, row_dict: dict) -> bool:
+        return self._upsert_row_by_id("RECOLTE_STOCKAGE", "ID_Mouvement", id_mouvement, row_dict)
+        
+    def delete_recolte_stockage(self, ids: list) -> bool:
+        return self._delete_rows_by_id("RECOLTE_STOCKAGE", "ID_Mouvement", ids)
+
+    def update_contrats_ventes(self, id_contrat: str, row_dict: dict) -> bool:
+        return self._upsert_row_by_id("CONTRATS_VENTES", "ID_contrat", id_contrat, row_dict)
+
+    def delete_contrats_ventes(self, ids: list) -> bool:
+        return self._delete_rows_by_id("CONTRATS_VENTES", "ID_contrat", ids)
+
+    def _upsert_row_by_id(self, sheet_name: str, id_col: str, id_value: str, row_dict: dict) -> bool:
+        if not self.conn:
+            st.error("Mise à jour impossible en local.")
+            return False
+        try:
+            df = self.conn.read(worksheet=sheet_name, ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            if id_col not in df.columns:
+                 df[id_col] = ""
+
+            for col in row_dict:
+                if col not in df.columns:
+                    df[col] = ""
+
+            mask = df[id_col].astype(str).str.strip() == str(id_value).strip()
+            new_row = pd.DataFrame([row_dict])
+
+            if mask.any():
+                idx = df[mask].index[0]
+                for col in row_dict:
+                    df.at[idx, col] = row_dict[col]
+            else:
+                df = pd.concat([df, new_row], ignore_index=True)
+
+            self.conn.update(worksheet=sheet_name, data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop(sheet_name, None)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Erreur upsert {sheet_name} : {e}")
+            return False
+
+    def _delete_rows_by_id(self, sheet_name: str, id_col: str, ids: list) -> bool:
+        if not self.conn:
+            st.error("Suppression impossible en local.")
+            return False
+        try:
+            df = self.conn.read(worksheet=sheet_name, ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            if id_col not in df.columns:
+                 return False
+
+            ids_str = [str(i).strip() for i in ids]
+            original_len = len(df)
+            df = df[~df[id_col].astype(str).str.strip().isin(ids_str)]
+
+            if len(df) == original_len:
+                 return False
+
+            self.conn.update(worksheet=sheet_name, data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop(sheet_name, None)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Erreur delete {sheet_name} : {e}")
+            return False
