@@ -38,10 +38,19 @@ class DataLoader:
         df = pd.DataFrame()
         if self.conn:
             try:
-                # TTL à 60 secondes : rafraîchissement en moins d'une minute, sans exploser le quota API (60 req/min)
-                df = self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME, ttl=60)
+                # TTL étendu à 600s pour limiter les requêtes répétitives (Quota API)
+                df = self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME, ttl=600)
+                self._cache[sheet_name] = df.copy()
             except Exception as e:
-                st.error(f"Erreur lecture onglet '{sheet_name}' : {e}")
+                # Rate limit fallback to RAM cache
+                err_str = str(e)
+                if ('429' in err_str or 'Quota' in err_str):
+                    if sheet_name in self._cache:
+                        df = self._cache[sheet_name]
+                    else:
+                        st.error(f"⚠️ Quota de requêtes Google atteint. Impossible de lire '{sheet_name}'. Veuillez patienter 1 minute.")
+                else:
+                    st.error(f"Erreur lecture onglet '{sheet_name}' : {err_str}")
         elif self.xl:
             df = pd.read_excel(self.file_path, sheet_name=sheet_name)
         else:
@@ -1177,7 +1186,17 @@ class DataLoader:
             st.error("Mise à jour impossible en local.")
             return False
         try:
-            df = self.conn.read(worksheet=sheet_name, ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            try:
+                df = self.conn.read(worksheet=sheet_name, ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            except Exception as e:
+                # If Quota exceeded on write read, try to use RAM cache but it's risky. 
+                # For safety we just abort if we can't read fresh data on write.
+                if '429' in str(e) or 'Quota' in str(e):
+                    st.error(f"⚠️ Quota Google atteint. Impossible de modifier '{sheet_name}'. Réessayez dans 1 min.")
+                    return False
+                else:
+                    raise e
+                    
             if id_col not in df.columns:
                  df[id_col] = ""
 
@@ -1196,7 +1215,7 @@ class DataLoader:
                 df = pd.concat([df, new_row], ignore_index=True)
 
             self.conn.update(worksheet=sheet_name, data=df, spreadsheet="MASTER_EXPLOITATION")
-            self._cache.pop(sheet_name, None)
+            self._cache[sheet_name] = df.copy()  # Maintient le cache en vie après un clear
             st.cache_data.clear()
             return True
         except Exception as e:
@@ -1208,7 +1227,15 @@ class DataLoader:
             st.error("Suppression impossible en local.")
             return False
         try:
-            df = self.conn.read(worksheet=sheet_name, ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            try:
+                df = self.conn.read(worksheet=sheet_name, ttl=0, spreadsheet="MASTER_EXPLOITATION")
+            except Exception as e:
+                if '429' in str(e) or 'Quota' in str(e):
+                    st.error(f"⚠️ Quota Google atteint. Impossible de supprimer dans '{sheet_name}'. Réessayez dans 1 min.")
+                    return False
+                else:
+                    raise e
+                    
             if id_col not in df.columns:
                  return False
 
@@ -1220,7 +1247,7 @@ class DataLoader:
                  return False
 
             self.conn.update(worksheet=sheet_name, data=df, spreadsheet="MASTER_EXPLOITATION")
-            self._cache.pop(sheet_name, None)
+            self._cache[sheet_name] = df.copy()  # Maintient le cache en vie après un clear
             st.cache_data.clear()
             return True
         except Exception as e:
