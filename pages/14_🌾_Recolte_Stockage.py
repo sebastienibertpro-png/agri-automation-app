@@ -137,10 +137,59 @@ with tab1:
         for col in ["Total Entrées (T)", "Total Sorties (T)", "Stock Actuel (T)"]:
              df_format_silo[col] = df_format_silo[col].apply(lambda x: f"{x:.2f} T")
         
-        st.dataframe(df_format_silo, use_container_width=True, hide_index=True)
+        from shared import render_premium_table
+        render_premium_table(df_format_silo, color="blue")
         
-        # Mini bar chart pour visualiser les stocks (si besoin et rapide)
-        st.bar_chart(df_stock_silo.set_index("Lieu de Stockage")["Stock Actuel (T)"], color="#4CAF50")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        import plotly.express as px
+        
+        col_graph1, col_graph2 = st.columns(2)
+        
+        with col_graph1:
+             fig_bar = px.bar(
+                 df_stock_silo, 
+                 x="Lieu de Stockage", 
+                 y="Stock Actuel (T)", 
+                 color="Lieu de Stockage",
+                 text_auto='.1f',
+                 hover_data=["Produits Stockés", "Total Entrées (T)"],
+                 title="📊 Volume Stocké par Cellule"
+             )
+             fig_bar.update_layout(
+                 plot_bgcolor="rgba(0,0,0,0)",
+                 paper_bgcolor="rgba(0,0,0,0)",
+                 showlegend=False,
+                 title_font=dict(size=18, family="Segoe UI", color="#1E88E5"),
+                 xaxis=dict(showgrid=False, title=""),
+                 yaxis=dict(showgrid=True, gridcolor="#f0f0f0", title="Tonnes (T)")
+             )
+             fig_bar.update_traces(
+                 marker_line_color='black', 
+                 marker_line_width=1, 
+                 opacity=0.85, 
+                 textposition="auto", 
+                 textfont_size=14, 
+                 textfont_color="white"
+             )
+             st.plotly_chart(fig_bar, use_container_width=True)
+             
+        with col_graph2:
+             fig_pie = px.pie(
+                 df_stock_silo, 
+                 values="Stock Actuel (T)", 
+                 names="Produits Stockés",
+                 hole=0.4,
+                 title="🌾 Répartition par Produit"
+             )
+             fig_pie.update_layout(
+                 plot_bgcolor="rgba(0,0,0,0)",
+                 paper_bgcolor="rgba(0,0,0,0)",
+                 title_font=dict(size=18, family="Segoe UI", color="#4CAF50"),
+                 legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+             )
+             fig_pie.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#000000', width=1)))
+             st.plotly_chart(fig_pie, use_container_width=True)
     else:
         st.info("Aucun mouvement enregistré pour vérifier l'état des silos sur cette campagne.")
 
