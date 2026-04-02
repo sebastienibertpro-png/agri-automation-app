@@ -24,14 +24,10 @@ df_obs = active_loader.get_observations(selected_campaign)
 m_map = folium.Map(
     location=[45.0, 1.0],
     zoom_start=13,
-    tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-    attr='Google',
-    name='Satellite Hybrid (Google)'
+    tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attr='Esri',
+    name='Satellite (Esri)'
 )
-
-# Couches de fond alternatives
-folium.TileLayer('openstreetmap', name='Plan (OSM)').add_to(m_map)
-
 
 folium.LayerControl().add_to(m_map)
 
@@ -64,6 +60,51 @@ if not df_obs.empty:
             except: pass
 
 st_folium(m_map, width=None, height=500, use_container_width=True)
+
+st.divider()
+
+# --- DIAGNOSTIC IA ---
+st.subheader("🤖 Diagnostic IA (Maladies & Adventices)")
+st.markdown("Prenez une photo d'une plante malade, d'un symptôme ou d'une adventice pour obtenir un diagnostic instantané par l'Intelligence Artificielle.")
+
+diag_col1, diag_col2 = st.columns([1, 1])
+with diag_col1:
+    diag_photo = st.file_uploader("Charger une photo pour le diagnostic", type=["jpg", "jpeg", "png"], key="diag_img_ia")
+
+if diag_photo:
+    with diag_col2:
+        st.image(diag_photo, caption="Photo à analyser", use_container_width=True)
+    
+    if st.button("Lancer le diagnostic 🔍", type="primary", use_container_width=True):
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        if not api_key:
+            st.error("⚠️ Clé d'API Gemini (GEMINI_API_KEY) introuvable dans .streamlit/secrets.toml.")
+        else:
+            with st.spinner("Analyse de l'image par Gemini Vision en cours..."):
+                try:
+                    import google.generativeai as genai
+                    import PIL.Image
+                    
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel("gemini-2.5-flash")
+                    img = PIL.Image.open(diag_photo)
+                    
+                    prompt = """
+                    Tu es un expert agronome hautement qualifié spécialisé dans la protection des cultures.
+                    Analyse cette photo fournie par un agriculteur et fournis un diagnostic détaillé :
+                    1. IDENTIFICATION : Identifie la culture ou la plante présente (si c'est une adventice, donne son nom commun et scientifique).
+                    2. DIAGNOSTIC : Identifie les symptômes visibles sur la plante (maladie fongique, bactérie, virus, carence en nutriments, attaque d'insecte, stress abiotique, etc.).
+                    3. RECOMMANDATIONS : Propose des solutions concrètes ou des recommandations pour traiter le problème.
+                    Si la photo n'est pas claire, précise-le. Sois précis, professionnel et structure ta réponse.
+                    """
+                    
+                    response = model.generate_content([prompt, img])
+                    
+                    st.success("Analyse terminée !")
+                    st.markdown("### 📋 Résultat du Diagnostic")
+                    st.info(response.text)
+                except Exception as e:
+                    st.error(f"Erreur lors du diagnostic IA : {e}")
 
 st.divider()
 
