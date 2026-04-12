@@ -8,12 +8,7 @@ import json
 import tempfile
 import os
 import datetime
-from google import genai
-
-
-def get_gemini_client(api_key: str):
-    """Initialise et retourne un client Gemini."""
-    return genai.Client(api_key=api_key)
+import google.generativeai as genai
 
 
 def build_context_from_loader(active_loader, selected_campaign):
@@ -121,7 +116,7 @@ def transcribe_audio_bytes(audio_bytes: bytes, context_data: dict, api_key: str,
     if not api_key:
         return [{"error": "NO_API_KEY", "raw": "Clé API Gemini manquante dans les secrets."}]
 
-    client = get_gemini_client(api_key)
+    genai.configure(api_key=api_key)
 
     # Sauvegarder en fichier temporaire
     suffix = f".{audio_format}"
@@ -134,7 +129,7 @@ def transcribe_audio_bytes(audio_bytes: bytes, context_data: dict, api_key: str,
             tmp_path = f.name
 
         # Upload vers Gemini Files API
-        audio_file = client.files.upload(file=tmp_path)
+        audio_file = genai.upload_file(path=tmp_path)
 
         # Construire le prompt (même logique que le voice_intervention_bot)
         parcelles_str = "\n".join(context_data.get('parcelles', []))
@@ -233,10 +228,8 @@ Formate les valeurs numériques avec un POINT (pas de virgule).
 RÉPONDS UNIQUEMENT AU FORMAT JSON. SANS BALISES MARKDOWN (juste le texte brut commençant par [ et finissant par ]).
 """
 
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[prompt, audio_file]
-        )
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content([prompt, audio_file])
 
         text = response.text.strip()
         # Nettoyage markdown éventuel
@@ -263,7 +256,7 @@ RÉPONDS UNIQUEMENT AU FORMAT JSON. SANS BALISES MARKDOWN (juste le texte brut c
                 pass
         if audio_file:
             try:
-                client.files.delete(name=audio_file.name)
+                genai.delete_file(name=audio_file.name)
             except:
                 pass
 
