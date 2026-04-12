@@ -19,3 +19,4 @@ google-generativeai
 streamlit-js-eval
 PyMuPDF
 streamlit-lottie
+audio-recorder-streamlit
