@@ -228,7 +228,7 @@ Formate les valeurs numériques avec un POINT (pas de virgule).
 RÉPONDS UNIQUEMENT AU FORMAT JSON. SANS BALISES MARKDOWN (juste le texte brut commençant par [ et finissant par ]).
 """
 
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         response = model.generate_content([prompt, audio_file])
 
         text = response.text.strip()
