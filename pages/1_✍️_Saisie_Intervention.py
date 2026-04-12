@@ -5,9 +5,61 @@ import random
 from datetime import datetime
 from shared import init_campaign_selector
 
+# --- Imports optionnels pour le mode vocal ---
+try:
+    from audio_recorder_streamlit import audio_recorder
+    AUDIO_RECORDER_AVAILABLE = True
+except ImportError:
+    AUDIO_RECORDER_AVAILABLE = False
+
+try:
+    from voice_processor import (
+        build_context_from_loader,
+        transcribe_audio_bytes,
+        format_voice_summary
+    )
+    VOICE_PROCESSOR_AVAILABLE = True
+except ImportError:
+    VOICE_PROCESSOR_AVAILABLE = False
+
 st.set_page_config(page_title="Saisie Intervention", page_icon="✍️", layout="centered")
 
-# --- GESTION DU MODE ÉDITION ---
+# ═══════════════════════════════════════════════════════════════════
+# CSS
+# ═══════════════════════════════════════════════════════════════════
+st.markdown("""
+<style>
+.voice-box {
+    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f1 100%);
+    border: 1.5px solid #66bb6a;
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin-bottom: 18px;
+}
+.voice-result-card {
+    background: linear-gradient(135deg, #e3f2fd 0%, #f0f7ff 100%);
+    border-left: 4px solid #1976d2;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 10px 0;
+    font-size: 0.93em;
+}
+.voice-result-card h4 { margin: 0 0 8px 0; color: #1565c0; }
+.prefill-banner {
+    background: linear-gradient(135deg, #e8f5e9 0%, #dcedc8 100%);
+    border: 1px solid #81c784;
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+    font-size: 0.9em;
+    color: #2e7d32;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════════════════════════
+# GESTION DU MODE ÉDITION
+# ═══════════════════════════════════════════════════════════════════
 is_edit_mode = False
 edit_data = {}
 if "edit_intervention" in st.session_state and st.session_state.edit_intervention:
@@ -19,9 +71,132 @@ if "edit_intervention" in st.session_state and st.session_state.edit_interventio
         st.session_state.edit_intervention = None
         st.rerun()
 else:
-    st.title("✍️ Saisie Rapide Multi-Interventions")
+    st.title("✍️ Saisie Rapide d'Intervention")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
+
+# ═══════════════════════════════════════════════════════════════════
+# 🎙️ ASSISTANT VOCAL — SECTION EN HAUT
+# ═══════════════════════════════════════════════════════════════════
+if not is_edit_mode:
+    st.markdown('<div class="voice-box">', unsafe_allow_html=True)
+    col_mic_icon, col_mic_title = st.columns([1, 8])
+    with col_mic_icon:
+        st.markdown("<div style='font-size:2.2em; text-align:center; margin-top:4px;'>🎙️</div>", unsafe_allow_html=True)
+    with col_mic_title:
+        st.markdown("### Assistant Vocal")
+        st.caption("Parlez naturellement pour pré-remplir le formulaire. Ex : *« J'ai traité les Buissons avec du Peak à 0.25 L/ha avec le 220 CVX »*")
+
+    if not AUDIO_RECORDER_AVAILABLE:
+        st.warning("⚠️ Module `audio-recorder-streamlit` non installé. Redéployez l'application après la mise à jour des requirements.")
+    elif not VOICE_PROCESSOR_AVAILABLE:
+        st.warning("⚠️ Module `voice_processor` introuvable. Vérifiez que le fichier est bien dans le dossier de l'application.")
+    else:
+        # Récupérer la clé API
+        api_key = st.secrets.get("GEMINI_API_KEY", "")
+
+        if not api_key:
+            st.warning("⚠️ Clé GEMINI_API_KEY manquante dans les secrets Streamlit.")
+        else:
+            # Bouton d'enregistrement (s'affiche uniquement si pas déjà un résultat en attente)
+            col_rec, col_status = st.columns([3, 5])
+            with col_rec:
+                audio_bytes = audio_recorder(
+                    text="Cliquez pour enregistrer",
+                    recording_color="#e53935",
+                    neutral_color="#43a047",
+                    icon_name="microphone",
+                    icon_size="2x",
+                    pause_threshold=3.0,
+                    sample_rate=16000,
+                    key="voice_audio_recorder"
+                )
+            with col_status:
+                if audio_bytes:
+                    st.success(f"✅ Audio enregistré ({len(audio_bytes)//1000} Ko) — Cliquez sur **Analyser** ci-dessous")
+                elif "voice_result" in st.session_state and st.session_state.voice_result:
+                    st.info("💡 Un résultat est en mémoire. Enregistrez à nouveau pour recommencer.")
+                else:
+                    st.caption("Appuyez sur le micro, parlez, puis attendez l'arrêt automatique (3s de silence).")
+
+            # Stocker les bytes audio en session pour pouvoir analyser
+            if audio_bytes:
+                st.session_state["voice_audio_bytes"] = audio_bytes
+
+            # Bouton Analyser
+            col_analyze, col_clear = st.columns([3, 2])
+            with col_analyze:
+                do_analyze = st.button(
+                    "✨ Analyser avec l'IA",
+                    type="primary",
+                    disabled="voice_audio_bytes" not in st.session_state,
+                    use_container_width=True,
+                    key="btn_analyze_voice"
+                )
+            with col_clear:
+                if st.button("🗑️ Effacer", use_container_width=True, key="btn_clear_voice"):
+                    for k in ["voice_audio_bytes", "voice_result", "voice_prefill"]:
+                        st.session_state.pop(k, None)
+                    st.rerun()
+
+            # --- Analyse Gemini ---
+            if do_analyze and "voice_audio_bytes" in st.session_state:
+                with st.spinner("🤖 Analyse en cours avec Gemini 2.5 Flash..."):
+                    try:
+                        context = build_context_from_loader(active_loader, selected_campaign)
+                        result = transcribe_audio_bytes(
+                            st.session_state["voice_audio_bytes"],
+                            context,
+                            api_key,
+                            audio_format="wav"
+                        )
+                        st.session_state["voice_result"] = result
+                        # Pré-sélectionner les items INTERVENTION valides
+                        prefill_list = [item for item in result if item.get("Type_Action", "INTERVENTION") == "INTERVENTION" and "error" not in item]
+                        st.session_state["voice_prefill"] = prefill_list
+                    except Exception as e:
+                        st.error(f"Erreur lors de l'analyse : {e}")
+                        st.session_state["voice_result"] = [{"error": "EXCEPTION", "raw": str(e)}]
+                st.rerun()
+
+            # --- Résultat affiché ---
+            if "voice_result" in st.session_state and st.session_state.voice_result:
+                result = st.session_state.voice_result
+                summary = format_voice_summary(result)
+
+                first = result[0]
+                if "error" in first:
+                    st.error(summary)
+                else:
+                    st.markdown('<div class="voice-result-card">', unsafe_allow_html=True)
+                    st.markdown("**🎯 Compris par l'IA :**")
+                    st.markdown(summary)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                    # Bouton Appliquer au formulaire
+                    if st.button("✅ Appliquer au formulaire ↓", type="primary",
+                                 use_container_width=True, key="btn_apply_voice"):
+                        # voice_prefill est déjà set — on force un rerun pour que le form se rende avec les valeurs
+                        st.success("✅ Formulaire pré-rempli ! Vérifiez et corrigez si besoin avant d'enregistrer.")
+                        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════════════════════════
+# Bannière si pré-remplissage actif
+# ═══════════════════════════════════════════════════════════════════
+voice_pf_list = st.session_state.get("voice_prefill", [])
+_pf = voice_pf_list[0] if voice_pf_list else {}
+if _pf:
+    produits_lbl = " | ".join(filter(None, [p.get("Nom_Produit") for p in voice_pf_list]))
+    st.markdown(f"""
+    <div class="prefill-banner">
+        🎙️ <b>Formulaire pré-rempli par l'assistant vocal</b> — Vérifiez chaque champ avant d'enregistrer.<br>
+        <small>Nature : {_pf.get('Nature_Intervention','?')} | Parcelle : {_pf.get('ID_Parcelle','?')} | Produits : {produits_lbl}</small>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.divider()
 
 def generate_intervention_id():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
@@ -35,14 +210,16 @@ def get_index(options, value):
     try: return options.index(value)
     except: return 0
 
-default_nature = get_index(nature_options, edit_data.get('Nature_Intervention', 'Traitement'))
+# Source des valeurs par défaut : édition > vocal > vide
+_src = edit_data if is_edit_mode else _pf  # shortcut
+
+default_nature = get_index(nature_options, _src.get('Nature_Intervention', 'Traitement'))
 nature_interv = st.selectbox("Nature de l'intervention", nature_options, index=default_nature)
 
 col_g1, col_g2, col_g3 = st.columns(3)
 with col_g1:
     if is_edit_mode:
         raw_date = edit_data.get('Date')
-        # Handle Timestamp, datetime, or date objects directly
         if hasattr(raw_date, 'date'):
             default_date = raw_date.date()
         elif isinstance(raw_date, str):
@@ -52,53 +229,68 @@ with col_g1:
                 default_date = datetime.now().date()
         else:
             default_date = datetime.now().date()
+    elif _pf.get('Date'):
+        try:
+            default_date = datetime.strptime(_pf['Date'], '%d/%m/%Y').date()
+        except:
+            default_date = datetime.now().date()
     else:
         default_date = datetime.now().date()
-        
+
     date_interv = st.date_input("Date de l'intervention", value=default_date)
 with col_g2:
-    default_statut = get_index(["Prévu", "Réalisé"], edit_data.get('Statut_Intervention', 'Réalisé'))
+    default_statut = get_index(["Prévu", "Réalisé"], _src.get('Statut_Intervention', 'Réalisé'))
     statut = st.selectbox("Statut", ["Prévu", "Réalisé"], index=default_statut)
 with col_g3:
-    default_campagne = int(edit_data.get('Campagne', selected_campaign))
+    default_campagne = int(_src.get('Campagne', selected_campaign) or selected_campaign)
     campagne_saisie = st.number_input("Campagne", value=default_campagne, format="%d")
-    
+
 col_m1, col_m2, col_m3 = st.columns(3)
 with col_m1:
     if nature_interv == "Traitement":
-        default_type = get_index(["Herbicide", "Fongicide", "Insecticide", "Régulateur", "Autre"], edit_data.get('Type_Intervention', 'Herbicide'))
+        default_type = get_index(["Herbicide", "Fongicide", "Insecticide", "Régulateur", "Autre"], _src.get('Type_Intervention', 'Herbicide'))
         type_interv = st.selectbox("Type d'intervention", ["Herbicide", "Fongicide", "Insecticide", "Régulateur", "Autre"], index=default_type)
     elif nature_interv == "Fertilisation":
-        default_type = get_index(["Minérale", "Organique", "Foliaire"], edit_data.get('Type_Intervention', 'Minérale'))
+        default_type = get_index(["Minérale", "Organique", "Foliaire"], _src.get('Type_Intervention', 'Minérale'))
         type_interv = st.selectbox("Type d'intervention", ["Minérale", "Organique", "Foliaire"], index=default_type)
     else:
-        type_interv = st.text_input("Type d'intervention", value=edit_data.get('Type_Intervention', ''), disabled=True)
-        
+        type_interv = st.text_input("Type d'intervention", value=_src.get('Type_Intervention', ''), disabled=True)
+
 with col_m2:
     tracteur_options = ["130_CVX", "220_CVX", "Berthoud_Raptor", "Axial_5140"]
-    default_tracteur = get_index(tracteur_options, edit_data.get('Tracteur', '130_CVX'))
+    default_tracteur = get_index(tracteur_options, _src.get('Tracteur', '130_CVX'))
     tracteur = st.selectbox("Tracteur", tracteur_options, index=default_tracteur)
 with col_m3:
     outil_options = ["- Aucun -", "Agata", "Ependeur_Engrais", "DDI", "Rotative", "Cultivateur_Bonnel", "Bineuse", "Fissurateur", "Rabe"]
-    default_outil = get_index(outil_options, edit_data.get('Outil', '- Aucun -'))
+    default_outil = get_index(outil_options, _src.get('Outil', '- Aucun -'))
     outil = st.selectbox("Outil", outil_options, index=default_outil)
-    
+
 stade_options = ["", "Pré-levée", "Levée", "2F", "4-6F", "8-10F", "12F", "Floraison", "Tallage", "Epis 1cm", "Montaison", "Maturité", "Récolte"]
-default_stade = get_index(stade_options, edit_data.get('Stade_Culture', ''))
+default_stade = get_index(stade_options, _src.get('Stade_Culture', ''))
 stade = st.selectbox("Stade Culture", stade_options, index=default_stade)
 
 if nature_interv == "Traitement":
-    try: default_vol = float(edit_data.get('Volume_Bouillie_L_Ha', 100.0) or 100.0)
+    try: default_vol = float(_src.get('Volume_Bouillie_L_Ha', 100.0) or 100.0)
     except: default_vol = 100.0
     volume_bouillie = st.number_input("Volume Bouillie (L/ha)", min_value=0.0, value=default_vol, step=10.0)
 else:
     volume_bouillie = 0.0
-    
-observations = st.text_input("Observations", value=edit_data.get('Observations', ''))
+
+observations = st.text_input("Observations", value=_src.get('Observations', ''))
 
 st.markdown("##### 2. Choix des Parcelles")
-default_parcelles = [edit_data['ID_Parcelle']] if is_edit_mode else []
+
+# Pré-sélection vocale de la parcelle
+voice_parcelle = _pf.get('ID_Parcelle', '') if not is_edit_mode else ''
+if is_edit_mode:
+    default_parcelles = [edit_data['ID_Parcelle']]
+elif voice_parcelle and voice_parcelle in available_parcelles:
+    default_parcelles = [voice_parcelle]
+else:
+    default_parcelles = []
+
 selected_p_for_entry = st.multiselect("Parcelles concernées", available_parcelles, default=default_parcelles)
+
 
 parcelles_data = [] 
 if selected_p_for_entry:
@@ -134,12 +326,14 @@ try:
 except Exception:
      df_intrants = pd.DataFrame()
 
-# Pré-remplissage des produits en mode édition
+# Pré-remplissage des produits en mode édition / vocal
 raw_products = []
 if is_edit_mode:
     df_raw = active_loader.get_interventions()
     mask = df_raw['ID_Intervention'].isin(edit_data['ID_Intervention'])
     raw_products = df_raw[mask].to_dict('records')
+elif voice_pf_list:
+    raw_products = voice_pf_list
 
 if nature_interv == "Traitement":
     liste_produits = []
@@ -186,7 +380,7 @@ if nature_interv == "Traitement":
         d_val = 0.0
         u_val = "L/ha"
         
-        if is_edit_mode and (i-1) < len(raw_products):
+        if (is_edit_mode or _pf) and (i-1) < len(raw_products):
             row_p = raw_products[i-1]
             p_val = row_p.get('Nom_Produit', "- Aucun -")
             c_val = row_p.get('Cible', "")
@@ -225,8 +419,8 @@ if nature_interv == "Traitement":
             st.session_state[col_key_cible] = cible_val
             st.session_state[f"prod_dose_{i}"] = float(auto_dose) if auto_dose is not None else 0.0
             st.session_state[f"prod_unite_{i}"] = auto_unite if auto_unite in unite_options else "L/ha"
-        elif is_edit_mode and f"first_load_{i}" not in st.session_state:
-            # Premier chargement en mode édition : on force les valeurs de l'intervention
+        elif (is_edit_mode or _pf) and f"first_load_{i}" not in st.session_state:
+            # Premier chargement en mode édition ou vocal : on force les valeurs de l'intervention
             st.session_state[f"prod_dose_{i}"] = d_val
             st.session_state[f"prod_unite_{i}"] = u_val
             st.session_state[f"first_load_{i}"] = True
@@ -254,7 +448,7 @@ elif nature_interv == "Fertilisation":
     d_f_val = 100.0
     u_f_val = "Kg/ha"
     
-    if is_edit_mode and raw_products:
+    if (is_edit_mode or _pf) and raw_products:
         row_e = raw_products[0]
         e_val = row_e.get('Nom_Produit', "- Aucun -")
         try: d_f_val = float(row_e.get('Dose_Ha', 0.0))
@@ -313,7 +507,7 @@ elif nature_interv == "Semis":
     u_dens_val = "Grains/m²"
     pmg_val = 0.0
     
-    if is_edit_mode and raw_products:
+    if (is_edit_mode or _pf) and raw_products:
         row_s = raw_products[0]
         s_val = row_s.get('Nom_Produit', "- Aucun -")
         try: dens_val = float(row_s.get('Densité_Semis', 0.0))
@@ -335,7 +529,7 @@ elif nature_interv == "Semis":
     if not liste_autres: liste_autres = ["(Saisir manuellement)"]
     
     semis_assoc_prods = []
-    assoc_rows = raw_products[1:] if is_edit_mode else []
+    assoc_rows = raw_products[1:] if (is_edit_mode or _pf) else []
     
     for i in range(1, 4):
         c_p1, c_p2, c_p3 = st.columns([2, 1, 1])
@@ -387,7 +581,7 @@ elif nature_interv == "Récolte":
     rdt_val = 0.0
     h_val = 14.0
     ps_val = 76.0
-    if is_edit_mode and raw_products:
+    if (is_edit_mode or _pf) and raw_products:
         row_r = raw_products[0]
         r_val = row_r.get('Produit_Récolté', "")
         try: rdt_val = float(row_r.get('Rendement_Ha', 0.0))
