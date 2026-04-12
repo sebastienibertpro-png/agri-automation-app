@@ -5,12 +5,19 @@ import tempfile
 import shutil
 from datetime import datetime
 import time
+import requests
 
 from shared import get_dataloader, get_drive_uploader
 from pdf_analyzer import PDFAnalyzer
 import traceback
 import io
 from googleapiclient.http import MediaIoBaseDownload
+
+try:
+    from streamlit_lottie import st_lottie
+    LOTTIE_AVAILABLE = True
+except ImportError:
+    LOTTIE_AVAILABLE = False
 
 # Configuration
 DRIVE_FOLDER_NAME = "08_Factures_Achats_Ventes" # Dossier parent
@@ -20,8 +27,35 @@ SHEET_NAME = "ACHAT_MASTER"
 
 st.set_page_config(page_title="Bot Comptable", page_icon="🤖", layout="wide")
 
-st.title("🤖 Bot Comptable - Phase 2")
-st.subheader("Analyse intelligente des factures et archivage automatique")
+# --- Lottie Robot Animation ---
+@st.cache_data(ttl=3600)
+def load_lottie_url(url: str):
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
+
+# Cute robot / AI accounting animation
+lottie_robot = load_lottie_url("https://assets9.lottiefiles.com/packages/lf20_M9p23l.json")
+lottie_robot_fallback = load_lottie_url("https://assets4.lottiefiles.com/packages/lf20_bq485nmk.json")
+
+col_anim, col_title = st.columns([1, 4])
+
+with col_anim:
+    robot_data = lottie_robot or lottie_robot_fallback
+    if LOTTIE_AVAILABLE and robot_data:
+        st_lottie(robot_data, height=120, key="lottie_bot_comptable")
+    else:
+        st.markdown("<div style='font-size: 4em; text-align: center; padding: 10px;'>🤖</div>", unsafe_allow_html=True)
+
+with col_title:
+    st.title("🤖 Bot Comptable - Phase 2")
+    st.markdown("""<p style="font-size: 1.1em; color: #666; margin-top: -10px;">
+        Analyse intelligente des factures et archivage automatique
+    </p>""", unsafe_allow_html=True)
 
 def get_compta_year(date_str):
     """Calcule l'année comptable (du 01/07 au 30/06) à partir d'une date YYYY-MM-DD."""
