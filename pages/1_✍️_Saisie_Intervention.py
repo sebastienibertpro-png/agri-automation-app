@@ -102,12 +102,12 @@ if not is_edit_mode:
             col_rec, col_status = st.columns([3, 5])
             with col_rec:
                 audio_bytes = audio_recorder(
-                    text="Cliquez pour enregistrer",
+                    text="🎤 Cliquez pour parler / stopper",
                     recording_color="#e53935",
                     neutral_color="#43a047",
                     icon_name="microphone",
                     icon_size="2x",
-                    pause_threshold=3.0,
+                    pause_threshold=300.0,  # 5 minutes avant coupure auto (oblige le clic)
                     sample_rate=16000,
                     key="voice_audio_recorder"
                 )
@@ -117,7 +117,7 @@ if not is_edit_mode:
                 elif "voice_result" in st.session_state and st.session_state.voice_result:
                     st.info("💡 Un résultat est en mémoire. Enregistrez à nouveau pour recommencer.")
                 else:
-                    st.caption("Appuyez sur le micro, parlez, puis attendez l'arrêt automatique (3s de silence).")
+                    st.caption("🔴 **L'enregistrement ne s'arrêtera pas tout seul.** Appuyez sur le micro pour commencer, puis **réappuyez sur le micro pour stopper**. Pendant l'enregistrement, l'icône devient rouge.")
 
             # Stocker les bytes audio en session pour pouvoir analyser
             if audio_bytes:
