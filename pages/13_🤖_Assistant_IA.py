@@ -2,11 +2,46 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 from shared import active_loader
+import requests
+
+try:
+    from streamlit_lottie import st_lottie
+    LOTTIE_AVAILABLE = True
+except ImportError:
+    LOTTIE_AVAILABLE = False
 
 st.set_page_config(page_title="Assistant IA", page_icon="🤖", layout="wide")
 
-st.title("🤖 Assistant IA Agricole")
-st.markdown("Posez vos questions sur votre exploitation, vos campagnes, vos stocks ou demandez des simulations (rendements, trésorerie). L'IA a accès à l'ensemble de vos données.")
+# --- Lottie Animation ---
+@st.cache_data(ttl=3600)
+def load_lottie_url(url: str):
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
+
+# AI Brain / Smart assistant animation
+lottie_ai = load_lottie_url("https://assets3.lottiefiles.com/packages/lf20_UJNc2t.json")
+lottie_ai_fallback = load_lottie_url("https://assets10.lottiefiles.com/packages/lf20_kyu7xb1v.json")
+
+col_ai_anim, col_ai_title = st.columns([1, 4])
+
+with col_ai_anim:
+    ai_data = lottie_ai or lottie_ai_fallback
+    if LOTTIE_AVAILABLE and ai_data:
+        st_lottie(ai_data, height=120, key="lottie_assistant_ia")
+    else:
+        st.markdown("<div style='font-size: 4em; text-align: center; padding: 10px;'>🧠</div>", unsafe_allow_html=True)
+
+with col_ai_title:
+    st.title("🤖 Assistant IA Agricole")
+    st.markdown("""<p style="font-size: 1.05em; color: #666; margin-top: -10px;">
+        Posez vos questions sur votre exploitation, vos campagnes, vos stocks ou demandez des simulations 
+        (rendements, trésorerie). L'IA a accès à l'ensemble de vos données.
+    </p>""", unsafe_allow_html=True)
 
 # --- Vérification de la clé API ---
 api_key = st.secrets.get("GEMINI_API_KEY")
