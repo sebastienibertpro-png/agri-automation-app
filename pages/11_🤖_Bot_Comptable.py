@@ -38,9 +38,9 @@ def load_lottie_url(url: str):
         pass
     return None
 
-# Cute robot / AI accounting animation
-lottie_robot = load_lottie_url("https://assets9.lottiefiles.com/packages/lf20_M9p23l.json")
-lottie_robot_fallback = load_lottie_url("https://assets4.lottiefiles.com/packages/lf20_bq485nmk.json")
+# Robot comptable animation (Assistant-Bot par Maksim Turkov)
+lottie_robot = load_lottie_url("https://assets-v2.lottiefiles.com/a/44f53798-1172-11ee-a4ad-43339a624810/P5eWJJgQQA.json")
+lottie_robot_fallback = load_lottie_url("https://assets-v2.lottiefiles.com/a/fe807c20-1183-11ee-a7e0-738836ffd98a/LVmAcqtb4Y.json")
 
 col_anim, col_title = st.columns([1, 4])
 
