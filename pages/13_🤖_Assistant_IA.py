@@ -23,9 +23,9 @@ def load_lottie_url(url: str):
         pass
     return None
 
-# AI Brain / Smart assistant animation
-lottie_ai = load_lottie_url("https://assets3.lottiefiles.com/packages/lf20_UJNc2t.json")
-lottie_ai_fallback = load_lottie_url("https://assets10.lottiefiles.com/packages/lf20_kyu7xb1v.json")
+# Robot sympa / Assistant IA animation
+lottie_ai = load_lottie_url("https://assets9.lottiefiles.com/packages/lf20_M9p23l.json")
+lottie_ai_fallback = load_lottie_url("https://assets6.lottiefiles.com/packages/lf20_zrqthn6o.json")
 
 col_ai_anim, col_ai_title = st.columns([1, 4])
 
@@ -34,7 +34,7 @@ with col_ai_anim:
     if LOTTIE_AVAILABLE and ai_data:
         st_lottie(ai_data, height=120, key="lottie_assistant_ia")
     else:
-        st.markdown("<div style='font-size: 4em; text-align: center; padding: 10px;'>🧠</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 4em; text-align: center; padding: 10px;'>🤖</div>", unsafe_allow_html=True)
 
 with col_ai_title:
     st.title("🤖 Assistant IA Agricole")
