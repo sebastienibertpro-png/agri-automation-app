@@ -23,9 +23,9 @@ def load_lottie_url(url: str):
         pass
     return None
 
-# Robot sympa / Assistant IA animation
-lottie_ai = load_lottie_url("https://assets9.lottiefiles.com/packages/lf20_M9p23l.json")
-lottie_ai_fallback = load_lottie_url("https://assets6.lottiefiles.com/packages/lf20_zrqthn6o.json")
+# Robot sympa / Assistant IA animation (Bisola Ogunye - Robo)
+lottie_ai = load_lottie_url("https://assets-v2.lottiefiles.com/a/b37ba8ce-118a-11ee-8e0d-07358c4a8ac9/lsVmvnyDvw.json")
+lottie_ai_fallback = load_lottie_url("https://assets-v2.lottiefiles.com/a/fe807c20-1183-11ee-a7e0-738836ffd98a/LVmAcqtb4Y.json")
 
 col_ai_anim, col_ai_title = st.columns([1, 4])
 
