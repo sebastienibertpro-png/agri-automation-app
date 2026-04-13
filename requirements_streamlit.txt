@@ -10,3 +10,5 @@ streamlit-folium
 geopandas
 plotly
 google-generativeai>=0.8.0
+streamlit-lottie
+requests
