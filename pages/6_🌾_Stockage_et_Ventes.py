@@ -398,47 +398,88 @@ with tab3:
         c_list = []
         for idx, row in df_contrats.iterrows():
              c_id = row['ID_contrat']
-             q_eng = row['Quantité_engagée_T']
-             q_livre = livraison_contrat.get(c_id, 0.0)
-             reste = q_eng - q_livre
+             q_eng = round(float(row['Quantité_engagée_T']), 1)
+             q_livre = round(float(livraison_contrat.get(c_id, 0.0)), 1)
+             reste = round(max(q_eng - q_livre, 0.0), 1)
              pct = min((q_livre / q_eng) if q_eng > 0 else 0, 1.0)
+             statut = str(row.get('Statut', 'Ouvert')).strip()
              
              c_list.append({
-                 "ID Contrat": c_id,
+                 "ID_contrat": c_id,
                  "Acheteur": row.get('Acheteur', ''),
                  "Produit": row.get('Produit', ''),
                  "Quantité (T)": q_eng,
                  "Déjà Livré (T)": q_livre,
                  "Reste à Livrer (T)": reste,
-                 "Prix Vente (€/T)": row.get('Prix_T', 0),
+                 "Prix Vente (€/T)": round(float(row.get('Prix_T', 0)), 2),
+                 "Statut": statut,
                  "% Réalisé": pct
              })
              
         # Visual Progress Bars
         for item in c_list:
              ct_col_text, ct_col_bar = st.columns([2, 5])
-             ct_col_text.markdown(f"**{item['ID Contrat']} - {item['Produit']}**<br><span style='color:gray; font-size:0.9em'>{item['Acheteur']}</span>", unsafe_allow_html=True)
+             ct_col_text.markdown(f"**{item['ID_contrat']} - {item['Produit']}**<br><span style='color:gray; font-size:0.9em'>{item['Acheteur']}</span>", unsafe_allow_html=True)
              
-             if item['% Réalisé'] == 1.0:
+             if item['Statut'] == "Clôturé":
+                  ct_col_bar.info(f"💾 CONTRAT CLÔTURE MANUELLEMENT (Livré: {item['Déjà Livré (T)']} T)")
+             elif item['% Réalisé'] >= 1.0:
                   ct_col_bar.progress(1.0, text=f"✅ CONTRAT SOUDÉ (Livré: {item['Déjà Livré (T)']} T)")
              else:
                   ct_col_bar.progress(item['% Réalisé'], text=f"Livré: {item['Déjà Livré (T)']} T / {item['Quantité (T)']} T (Reste : {item['Reste à Livrer (T)']} T)")
         
         st.markdown("---")
-        df_c_disp = pd.DataFrame(c_list).drop(columns=["% Réalisé"])
-        for col in ["Quantité (T)", "Déjà Livré (T)", "Reste à Livrer (T)"]:
-             df_c_disp[col] = df_c_disp[col].apply(lambda x: f"{x:.2f}")
-        df_c_disp["Prix Vente (€/T)"] = df_c_disp["Prix Vente (€/T)"].apply(lambda x: f"{x:.2f} €")
-             
-        st.dataframe(df_c_disp, use_container_width=True, hide_index=True)
+        st.subheader("📋 État de vos Engagements (Cliquable pour modifier)")
         
-        st.markdown("---")
-        del_id_c = st.selectbox("Sélectionnez un contrat à supprimer", df_contrats['ID_contrat'].tolist())
-        if st.button("🗑️ Supprimer ce contrat"):
-             if active_loader.delete_contrats_ventes([del_id_c]):
-                  st.success("Le contrat a été supprimé.")
-                  time.sleep(1)
-                  st.rerun()
+        # 2. Configuration Colonnes Éditeur
+        c_config = {
+            "ID_contrat": None, # Masqué
+            "Statut": st.column_config.SelectboxColumn("Statut", options=["Ouvert", "Clôturé"], width="small"),
+            "Quantité (T)": st.column_config.NumberColumn("Quantité (T)", format="%.1f T"),
+            "Déjà Livré (T)": st.column_config.NumberColumn("Déjà Livré (T)", format="%.1f T", disabled=True),
+            "Reste à Livrer (T)": st.column_config.NumberColumn("Reste (T)", format="%.1f T", disabled=True),
+            "Prix Vente (€/T)": st.column_config.NumberColumn("Prix (€/T)", format="%.2f €"),
+            "% Réalisé": st.column_config.ProgressColumn("% Réalisé", format="%.0f%%", min_value=0, max_value=1)
+        }
+
+        edited_contrats = st.data_editor(
+            pd.DataFrame(c_list),
+            column_config=c_config,
+            use_container_width=True,
+            hide_index=True,
+            key="contracts_editor"
+        )
+        
+        c_save1, c_save2 = st.columns([1, 1])
+        with c_save1:
+            if st.button("💾 Enregistrer les ventes", type="primary", use_container_width=True):
+                save_c = 0
+                for _, row in edited_contrats.iterrows():
+                    cid = row['ID_contrat']
+                    # On prépare le dict à sauver (on matche les colonnes du Sheet)
+                    c_data = {
+                        "ID_contrat": cid,
+                        "Acheteur": row['Acheteur'],
+                        "Produit": row['Produit'],
+                        "Quantité_engagée_T": row['Quantité (T)'],
+                        "Prix_T": row['Prix Vente (€/T)'],
+                        "Statut": row['Statut']
+                    }
+                    if active_loader.update_contrats_ventes(cid, c_data):
+                        save_c += 1
+                if save_c > 0:
+                    st.success("✅ Contrats mis à jour !")
+                    time.sleep(1)
+                    st.rerun()
+
+        with c_save2:
+            st.caption("Sélectionnez en bas pour supprimer")
+            del_id_c = st.selectbox("Supprimer un contrat", [""] + df_contrats['ID_contrat'].tolist(), key="del_c_sel")
+            if del_id_c and st.button("🗑️ Supprimer ce contrat", type="secondary", use_container_width=True):
+                 if active_loader.delete_contrats_ventes([del_id_c]):
+                      st.success("Supprimé !")
+                      time.sleep(1)
+                      st.rerun()
     else:
         st.info("Aucun contrat d'engagement enregistré pour cette campagne.")
 
