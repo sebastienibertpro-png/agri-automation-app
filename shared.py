@@ -173,28 +173,17 @@ def inject_premium_css():
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
 
-    /* Global Overrides for Streamlit Widgets */
-    html, body, .stApp, p, h1, h2, h3, label, .stMarkdown {
-        font-family: 'Outfit', sans-serif;
+    /* Typographie : Ciblage chirurgical pour éviter de casser les ligatures des icônes Material Symbols */
+    
+    /* Titres principaux (Toutes les tailles) */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 700 !important;
     }
-
-    /* Force Headers strictly */
-    h1, h2, h3 { font-family: 'Outfit', sans-serif !important; font-weight: 700 !important; }
-
-    /* Restore Streamlit Material Icons specifically with extreme precision */
-    details summary svg, 
-    details summary span,
-    details summary div,
-    [data-testid="stSidebarCollapseButton"] *,
-    [data-testid="stSidebarNavItems"] *,
-    button[kind="header"] *,
-    .stIcon, .stIcon *,
-    .material-symbols-rounded,
-    .material-icons,
-    [class*="material-symbols-"],
-    [data-testid="stIconMaterial"],
-    svg text, .notranslate {
-        font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
+    
+    /* Paragraphes standards et libellés (sans toucher aux span ou summary internes de Streamlit) */
+    .stMarkdown p, label, .stMetricValue > div, .stMetricLabel > div {
+        font-family: 'Outfit', sans-serif !important;
     }
 
     div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {
