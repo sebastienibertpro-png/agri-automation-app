@@ -16,6 +16,11 @@ class DataLoader:
         self.xl = None 
         self._cache = {} # Local session cache
 
+    def _remove_accents(self, s):
+        import unicodedata
+        if not s or not isinstance(s, str): return s
+        return "".join(c for c in unicodedata.normalize('NFKD', s) if unicodedata.category(c) != 'Mn')
+
     def normalize_product_name(self, raw_name, ref_names=None, threshold=82):
         """
         Normalise un nom de produit en cherchant le match le plus proche dans REF_INTRANTS.
@@ -33,20 +38,27 @@ class DataLoader:
                 return raw_name, 0
 
         raw_upper = raw_name.upper()
+        raw_clean = self._remove_accents(raw_upper)
         
-        # 1. Règle de Subset Match (Très sûr)
+        # 1. Règle de Subset Match (Très sûr, insensible aux accents)
         for ref in ref_names:
             ref_upper = str(ref).upper().strip()
-            if ref_upper == raw_upper:
+            ref_clean = self._remove_accents(ref_upper)
+            
+            if ref_clean == raw_clean:
                 return ref, 100
-            # Si le nom de référence court est un mot entier dans le nom long
-            if len(ref_upper) > 2 and re.search(rf'\b{re.escape(ref_upper)}\b', raw_upper):
+            
+            # Utilisation de regex sans \b pour les accents, ou simple inclusion avec espaces
+            # On cherche si l'un est contenu dans l'autre (comme mot entier ou début de chaine)
+            pattern = rf'(^|[^a-zA-Z0-9]){re.escape(ref_clean)}($|[^a-zA-Z0-9])'
+            if len(ref_clean) > 2 and re.search(pattern, raw_clean):
                 return ref, 100
-            # Inversement (si l'utilisateur a saisi un nom court mais que le réf est long, moins commun mais possible)
-            if len(raw_upper) > 2 and re.search(rf'\b{re.escape(raw_upper)}\b', ref_upper):
+            
+            inverse_pattern = rf'(^|[^a-zA-Z0-9]){re.escape(raw_clean)}($|[^a-zA-Z0-9])'
+            if len(raw_clean) > 2 and re.search(inverse_pattern, ref_clean):
                 return ref, 100
 
-        # 2. Fuzzy Matching Classique
+        # 2. Fuzzy Matching Classique (Laisse rapidfuzz gérer les scores)
         if rfz_process and rfz_fuzz:
             result = rfz_process.extractOne(raw_name, ref_names, scorer=rfz_fuzz.token_set_ratio)
             if result and result[1] >= threshold:
@@ -1110,16 +1122,26 @@ class DataLoader:
         # --- 1. Agrégation des Achats ---
         if not df_achats.empty:
             df_achats['Nom_Produit_Norm'] = df_achats['Nom_Produit'].apply(norm_func)
-            df_achats['Quantité_Achetée'] = pd.to_numeric(df_achats['Quantité_Achetée'], errors='coerce').fillna(0)
+            
+            # Harmonisation des unités d'achat vers Kg
+            def normalize_purchase_to_kg(row):
+                val = pd.to_numeric(row.get('Quantité_Achetée', 0), errors='coerce')
+                if pd.isna(val): val = 0.0
+                u = str(row.get('Unité_Achat', "")).strip().lower()
+                if u in ['t', 'tonne', 'tonnes']: return val * 1000.0
+                return val
+                
+            df_achats['Quantité_Achetée_Kg'] = df_achats.apply(normalize_purchase_to_kg, axis=1)
             df_achats['Montant_Total_Produit_HT'] = pd.to_numeric(df_achats['Montant_Total_Produit_HT'], errors='coerce').fillna(0)
             
             achats_agg = df_achats.groupby('Nom_Produit_Norm').agg({
                 'Nom_Produit': 'first',
                 'Catégorie': 'first',
                 'Unité_Achat': 'first',
-                'Quantité_Achetée': 'sum',
+                'Quantité_Achetée_Kg': 'sum',
                 'Montant_Total_Produit_HT': 'sum'
             }).reset_index()
+            achats_agg.rename(columns={'Quantité_Achetée_Kg': 'Quantité_Achetée'}, inplace=True)
         else:
             achats_agg = pd.DataFrame(columns=['Nom_Produit_Norm', 'Nom_Produit', 'Catégorie', 'Unité_Achat', 'Quantité_Achetée', 'Montant_Total_Produit_HT'])
             
@@ -1130,22 +1152,34 @@ class DataLoader:
             df_interv['Campagne'] = pd.to_numeric(df_interv['Campagne'], errors='coerce').fillna(0).astype(int)
             df_interv = df_interv[df_interv['Campagne'] == int(campaign)]
             
-            # Filtrage Statut (Réalisé)
-            status_col = next((c for c in ['Stat_Intervention', 'Statut_Intervention', 'Statut', 'Etat'] if c in df_interv.columns), None)
-            if status_col:
-                df_interv = df_interv[df_interv[status_col].astype(str).str.strip().str.lower().str.startswith('réal')]
-                
+            # Détection des unités pour conversion future
+            u_col = 'Unité_Quantité' if 'Unité_Quantité' in df_interv.columns else None
+            
+            # Application de la normalisation et des unités
             df_interv['Nom_Produit_Norm'] = df_interv['Nom_Produit'].apply(norm_func)
             
             # Détection robuste des colonnes de quantité (avec/sans accent)
             q_col = next((c for c in ['Quantité_Totale_Produit', 'Quantite_Totale_Produit'] if c in df_interv.columns), None)
             s_col = next((c for c in ['Quantité_semence_totale', 'Quantite_semence_totale'] if c in df_interv.columns), None)
             
+            # Calcul de la quantité brute
             pdf_q = pd.to_numeric(df_interv[q_col], errors='coerce').fillna(0) if q_col else pd.Series(0, index=df_interv.index)
             sem_q = pd.to_numeric(df_interv[s_col], errors='coerce').fillna(0) if s_col else pd.Series(0, index=df_interv.index)
+            total_raw = pdf_q + sem_q
             
-            df_interv['Quantité_Consommée'] = pdf_q + sem_q
-            consos_agg = df_interv.groupby('Nom_Produit_Norm')['Quantité_Consommée'].sum().reset_index()
+            # Harmonisation des unités : On normalise tout vers "Kg" ou "L" par défaut, 
+            # MAIS si on détecte des Tonnes, on garde l'info pour la comparaison finale.
+            def normalize_units_to_kg(row):
+                val = row['Quantité_Brute']
+                u = str(row.get(u_col, "")).strip().lower() if u_col else ""
+                if u in ['t', 'tonne', 'tonnes']: return val * 1000.0
+                return val
+            
+            df_interv['Quantité_Brute'] = total_raw
+            df_interv['Quantité_Consommée_Kg'] = df_interv.apply(normalize_units_to_kg, axis=1)
+            
+            consos_agg = df_interv.groupby('Nom_Produit_Norm')['Quantité_Consommée_Kg'].sum().reset_index()
+            consos_agg.rename(columns={'Quantité_Consommée_Kg': 'Quantité_Consommée'}, inplace=True)
             
         # 2a. Agrégation des Consommations GNR (Fuel)
         df_fuel = self.get_fuel_conso(campaign)
@@ -1201,6 +1235,16 @@ class DataLoader:
         # Nettoyage des valeurs numériques
         numeric_cols = ['Quantité_Achetée', 'Quantité_Consommée', 'Montant_Total_Produit_HT']
         for col in numeric_cols: df_stock[col] = df_stock[col].fillna(0)
+        
+        # --- Re-conversion vers l'unité d'achat originale pour l'affichage ---
+        def back_to_original_unit(row):
+            u = str(row.get('Unité_Achat', "")).strip().lower()
+            if u in ['t', 'tonne', 'tonnes']:
+                row['Quantité_Achetée'] = row['Quantité_Achetée'] / 1000.0
+                row['Quantité_Consommée'] = row['Quantité_Consommée'] / 1000.0
+            return row
+        
+        df_stock = df_stock.apply(back_to_original_unit, axis=1)
         
         df_stock['Reste_en_Stock'] = df_stock['Quantité_Achetée'] - df_stock['Quantité_Consommée']
         
