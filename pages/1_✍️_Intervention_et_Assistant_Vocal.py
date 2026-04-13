@@ -3,32 +3,34 @@ import pandas as pd
 import string
 import random
 from datetime import datetime
+import requests
+from streamlit_lottie import st_lottie
 from shared import init_campaign_selector
 
-# --- Imports optionnels pour le mode vocal ---
-try:
-    from audio_recorder_streamlit import audio_recorder
-    AUDIO_RECORDER_AVAILABLE = True
-except ImportError:
-    AUDIO_RECORDER_AVAILABLE = False
+def load_lottieurl(url: str):
+    try:
+        r = requests.get(url)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except:
+        return None
 
-try:
-    from voice_processor import (
-        build_context_from_loader,
-        transcribe_audio_bytes,
-        format_voice_summary
-    )
-    VOICE_PROCESSOR_AVAILABLE = True
-except ImportError:
-    VOICE_PROCESSOR_AVAILABLE = False
-
-st.set_page_config(page_title="Intervention et Assistant Vocal", page_icon="✍️", layout="wide")
+st.set_page_config(page_title="Saisie d'Intervention", page_icon="✍️", layout="wide")
 
 # ═══════════════════════════════════════════════════════════════════
 # CSS
 # ═══════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
+.manual-section-title {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+    border-left: 5px solid #4CAF50;
+    margin-top: 30px;
+    margin-bottom: 20px;
+}
 .voice-box {
     background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f1 100%);
     border: 1.5px solid #66bb6a;
@@ -71,7 +73,7 @@ if "edit_intervention" in st.session_state and st.session_state.edit_interventio
         st.session_state.edit_intervention = None
         st.rerun()
 else:
-    st.title("✍️ Saisie Rapide d'Intervention")
+    st.title("✍️ Saisie d'Intervention")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
@@ -80,8 +82,19 @@ active_loader, selected_campaign, df_campaign, available_parcelles = init_campai
 # ═══════════════════════════════════════════════════════════════════
 if not is_edit_mode:
     with st.container(border=True):
-        st.markdown("### Assistant Vocal")
-        st.caption("Dites par exemple : *« J'ai traité les Buissons avec du Peak à 0.25 L/ha avec le 220 CVX »*")
+        col_anim, col_text = st.columns([1, 4])
+        
+        with col_anim:
+            lottie_tractor = load_lottieurl("https://lottie.host/819d4546-d248-4389-9b93-b6d4fe754a6d/m8e1Pz3C7H.json")
+            if lottie_tractor:
+                st_lottie(lottie_tractor, height=120, key="voice_fun_anim")
+            else:
+                st.markdown("<div style='font-size:3em;'>🎙️</div>", unsafe_allow_html=True)
+                
+        with col_text:
+            st.markdown("### Assistant Vocal")
+            st.caption("Gagnez du temps ! Décrivez votre intervention à haute voix.")
+            st.caption("Ex : *« J'ai traité les Buissons avec du Peak à 0.25 L/ha avec le 220 CVX »*")
 
         if not AUDIO_RECORDER_AVAILABLE:
             st.warning("⚠️ Module vocal non disponible.")
@@ -116,16 +129,10 @@ if not is_edit_mode:
                     st.session_state["voice_audio_bytes"] = audio_bytes
 
                 # Boutons d'action
-                col_analyze, col_clear = st.columns([1, 1])
-                with col_analyze:
-                    do_analyze = st.button(
-                        "✨ Analyser avec l'IA",
-                        type="primary",
-                        disabled="voice_audio_bytes" not in st.session_state,
-                        use_container_width=True,
-                        key="btn_analyze_voice"
-                    )
-                with col_clear:
+                col_a1, col_a2 = st.columns([1, 1])
+                with col_a1:
+                    do_analyze = st.button("✨ Analyser avec l'IA", type="primary", use_container_width=True, key="btn_analyze_voice")
+                with col_a2:
                     if st.button("🗑️ Effacer", use_container_width=True, key="btn_clear_voice"):
                         for k in ["voice_audio_bytes", "voice_result", "voice_prefill"]:
                             st.session_state.pop(k, None)
@@ -153,24 +160,19 @@ if not is_edit_mode:
             if "voice_result" in st.session_state and st.session_state.voice_result:
                 result = st.session_state.voice_result
                 summary = format_voice_summary(result)
+                st.markdown('<div class="voice-result-card">', unsafe_allow_html=True)
+                st.markdown("**🎯 Compris par l'IA :**")
+                st.markdown(summary)
+                st.markdown('</div>', unsafe_allow_html=True)
 
-                first = result[0]
-                if "error" in first:
-                    st.error(summary)
-                else:
-                    st.markdown('<div class="voice-result-card">', unsafe_allow_html=True)
-                    st.markdown("**🎯 Compris par l'IA :**")
-                    st.markdown(summary)
-                    st.markdown('</div>', unsafe_allow_html=True)
+                if st.button("✅ Appliquer au formulaire ↓", type="primary", use_container_width=True, key="btn_apply_voice"):
+                    st.rerun()
 
-                    # Bouton Appliquer au formulaire
-                    if st.button("✅ Appliquer au formulaire ↓", type="primary",
-                                 use_container_width=True, key="btn_apply_voice"):
-                        # voice_prefill est déjà set — on force un rerun pour que le form se rende avec les valeurs
-                        st.success("✅ Formulaire pré-rempli ! Vérifiez et corrigez si besoin avant d'enregistrer.")
-                        st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
+# ═══════════════════════════════════════════════════════════════════
+# SAISIE MANUELLE
+# ═══════════════════════════════════════════════════════════════════
+st.markdown('<div class="manual-section-title"><h3>✍️ Saisie Manuelle de l\'Intervention</h3>'
+            '<p style="margin:0; opacity:0.8;">Complétez ou ajustez les détails ci-dessous.</p></div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════
 # Bannière si pré-remplissage actif
