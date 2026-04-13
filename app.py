@@ -27,15 +27,26 @@ def load_lottie_url(url: str):
 
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+    html, body, [class*="st-"], .stMarkdown {
+        font-family: 'Outfit', sans-serif !important;
+    }
+
     .stButton>button {
         width: 100%;
-        background-color: #4CAF50;
+        background-color: #5E9E47;
         color: white;
         border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
     }
     .stButton>button:hover {
-        background-color: #45a049;
+        background-color: #4a8037;
+        box-shadow: 0 4px 12px rgba(94, 158, 71, 0.3);
     }
+    
     /* Dashboard info card styling */
     .dash-card {
         padding: 18px 20px;
@@ -51,12 +62,18 @@ st.markdown("""
         transform: translateY(-2px);
         box-shadow: 0 6px 24px rgba(0,0,0,0.10);
     }
-    .dash-card h4 { margin: 0 0 6px 0; }
+    .dash-card h4 { 
+        margin: 0 0 6px 0;
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 600;
+    }
     .dash-card p { margin: 3px 0; font-size: 0.92em; }
-    .card-green { border-color: #2e7d32; }
-    .card-blue { border-color: #1565c0; }
+    
+    .card-green { border-color: #5E9E47; }
+    .card-blue { border-color: #2F6D89; }
     .card-orange { border-color: #e65100; }
     .card-purple { border-color: #7b1fa2; }
+    
     .invoice-alert {
         background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
         border: 1px solid #fb8c00;
@@ -68,14 +85,6 @@ st.markdown("""
         display: flex;
         align-items: center;
         gap: 10px;
-    }
-    .invoice-alert .alert-icon { font-size: 1.5em; }
-    .lottie-header {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 16px;
-        margin-bottom: 4px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -100,8 +109,8 @@ with col_title_l:
     else:
         st.markdown("<div style='font-size: 3.5em; text-align: center; padding: 10px;'>💡</div>", unsafe_allow_html=True)
 with col_title_c:
-    st.markdown("<h1 style='text-align:center; margin: 0;'>🚜 Tableau de Bord</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; color: #666; margin-top: 2px;'>Utilisez le menu à gauche pour naviguer entre les différents outils de l'exploitation.</p>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center; margin: 0; color: #2F6D89; font-family: \"Outfit\", sans-serif; font-weight: 700;'>🚜 Tableau de Bord</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; color: #5E9E47; font-weight: 500; margin-top: 2px;'>L'intelligence de la donnée au service du champ ✨</p>", unsafe_allow_html=True)
 with col_title_r:
     st.write("") # Espace vide pour équilibrer le titre centré
 
