@@ -6,14 +6,13 @@ import folium
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 from report_gen import ReportGenerator
-from shared import init_campaign_selector, APP_BASE_URL, OBSERVATION_DRIVE_FOLDER_ID, get_drive_uploader
+from shared import init_campaign_selector, APP_BASE_URL, OBSERVATION_DRIVE_FOLDER_ID, get_drive_uploader, render_brand_page_header
 
-st.set_page_config(page_title="Suivi Cultures", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="🌱 Observations Cultures", page_icon="🌱", layout="wide")
+
+render_brand_page_header("Observations au Champ", "Gérez vos tours de plaine et diagnostics IA ✨", icon="🌱")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
-
-# --- OBSERVATIONS AU CHAMP ---
-st.header("📸 Observations au Champ")
 
 # 1. VISUALISATION (CARTE)
 st.subheader("📍 Carte des Observations")
