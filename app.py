@@ -91,7 +91,7 @@ except Exception as e:
 
 # ─── LOTTIE ANIMATION HEADER ───────────────────────────────────────────────────
 # Animation type "Creative Squad"
-lottie_url = load_lottie_url("https://assets3.lottiefiles.com/packages/lf20_cwqf5i6h.json") # Animation par défaut "Creative Team"
+lottie_url = load_lottie_url("https://lottie.host/8ba6acd2-1170-11ee-8035-d7294cb8dec8/GRFYx53Tz9.json") # Alternative gratuite "Creative Squad"
 
 col_title_l, col_title_c, col_title_r = st.columns([1, 4, 1])
 with col_title_l:
