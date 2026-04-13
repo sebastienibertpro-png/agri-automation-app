@@ -22,7 +22,7 @@ try:
 except ImportError:
     VOICE_PROCESSOR_AVAILABLE = False
 
-st.set_page_config(page_title="Saisie Intervention", page_icon="✍️", layout="centered")
+st.set_page_config(page_title="Intervention et Assistant Vocal", page_icon="✍️", layout="wide")
 
 # ═══════════════════════════════════════════════════════════════════
 # CSS
