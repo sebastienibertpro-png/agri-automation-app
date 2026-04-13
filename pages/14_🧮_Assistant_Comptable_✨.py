@@ -201,6 +201,14 @@ def process_invoices_ui():
                     first_row = rows_data[0]
                     compta_year = get_compta_year(first_row.get("Date_facture", ""))
 
+                    # --- Normalisation des noms produits contre REF_INTRANTS ---
+                    try:
+                        loader_ref = get_dataloader()
+                        df_intrants = loader_ref.get_intrants() if loader_ref else pd.DataFrame()
+                        ref_names = []
+                        if not df_intrants.empty and 'Nom_Produit' in df_intrants.columns:
+                            ref_names = df_intrants['Nom_Produit'].dropna().astype(str).str.strip().tolist()
+
                         FUZZY_THRESHOLD = 82
                         normalization_log = []
                         
@@ -228,7 +236,6 @@ def process_invoices_ui():
                             with st.expander(f"🔄 {len(normalization_log)} nom(s) normalisé(s) pour {original_name}", expanded=False):
                                 st.dataframe(pd.DataFrame(normalization_log), hide_index=True)
                     except Exception as e_fuzz:
-                        # Non bloquant : on continue même si le fuzzy-match échoue
                         st.caption(f"⚠️ Normalisation produits ignorée : {e_fuzz}")
 
                     
