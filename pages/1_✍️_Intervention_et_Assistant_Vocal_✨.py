@@ -167,7 +167,16 @@ if not is_edit_mode:
                             audio_format="wav"
                         )
                         st.session_state["voice_result"] = result
-                        prefill_list = [item for item in result if item.get("Type_Action", "INTERVENTION") == "INTERVENTION" and "error" not in item]
+                        # Normalisation des produits extraits par la voix
+                        if prefill_list:
+                            df_ref = active_loader.get_intrants()
+                            ref_names = df_ref['Nom_Produit'].dropna().unique().tolist() if not df_ref.empty else []
+                            for item in prefill_list:
+                                raw_p = item.get("Nom_Produit")
+                                if raw_p:
+                                    norm_p, _ = active_loader.normalize_product_name(raw_p, ref_names=ref_names)
+                                    item["Nom_Produit"] = norm_p
+                        
                         st.session_state["voice_prefill"] = prefill_list
                     except Exception as e:
                         st.error(f"Erreur d'analyse : {e}")
