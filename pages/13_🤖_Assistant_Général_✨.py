@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-from shared import active_loader
+from shared import active_loader, render_brand_page_header
 import requests
 
 try:
@@ -10,7 +10,7 @@ try:
 except ImportError:
     LOTTIE_AVAILABLE = False
 
-st.set_page_config(page_title="Assistant IA", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Assistant Général", page_icon="🤖", layout="wide")
 
 # --- Lottie Animation ---
 @st.cache_data(ttl=3600)
@@ -37,11 +37,7 @@ with col_ai_anim:
         st.markdown("<div style='font-size: 4em; text-align: center; padding: 10px;'>🤖</div>", unsafe_allow_html=True)
 
 with col_ai_title:
-    st.title("🤖 Assistant IA Agricole")
-    st.markdown("""<p style="font-size: 1.05em; color: #666; margin-top: -10px;">
-        Posez vos questions sur votre exploitation, vos campagnes, vos stocks ou demandez des simulations 
-        (rendements, trésorerie). L'IA a accès à l'ensemble de vos données.
-    </p>""", unsafe_allow_html=True)
+    render_brand_page_header("Assistant Général IA", "Posez vos questions sur vos données d'exploitation et simulez vos scénarios ✨", icon="🤖")
 
 # --- Vérification de la clé API ---
 api_key = st.secrets.get("GEMINI_API_KEY")
