@@ -278,9 +278,33 @@ if telepac_gdf is not None:
         style_function=get_crop_style,
         tooltip=folium.GeoJsonTooltip(fields=tooltip_fields) if tooltip_fields else None
     ).add_to(telepac_fg)
-telepac_fg.add_to(m)
+from folium.plugins import MeasureControl, Draw
 
+telepac_fg.add_to(m)
 folium.LayerControl().add_to(m)
+
+# Ajouter l'outil de mesure (surfaces/distances)
+MeasureControl(
+    position='topleft', 
+    primary_length_unit='meters', 
+    secondary_length_unit='kilometers', 
+    primary_area_unit='sqmeters', 
+    secondary_area_unit='hectares'
+).add_to(m)
+
+# Ajouter l'outil de dessin pour entourer et créer des zones à la volée (avec cercles explicites)
+Draw(
+    export=True, 
+    position="topleft",
+    draw_options={
+        'circle': True,
+        'rectangle': True,
+        'polygon': True,
+        'polyline': True,
+        'marker': True,
+        'circlemarker': False
+    }
+).add_to(m)
 
 # 3. Render Map
 st.markdown("### 🗺️ Carte Interactive")
