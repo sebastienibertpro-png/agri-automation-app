@@ -275,24 +275,79 @@ with tab2:
 
     st.subheader("Registres des Opérations")
     if not df_recolte.empty:
-        # Trier du plus récent au plus ancien
+        # 1. Nettoyage et Préparation
+        df_edit = df_recolte.copy()
+        for col in df_edit.columns:
+            df_edit[col] = df_edit[col].apply(lambda x: "" if pd.isna(x) or str(x).strip().lower() == "none" else x)
+            
+        # Trier par date
         try:
-             df_recolte['Date_sort'] = pd.to_datetime(df_recolte['Date'], dayfirst=True)
-             df_recolte = df_recolte.sort_values('Date_sort', ascending=False)
-             df_recolte = df_recolte.drop(columns=['Date_sort'])
-        except:
-             pass
-             
-        df_disp = df_recolte.drop(columns=['Campagne']) if 'Campagne' in df_recolte.columns else df_recolte
-        st.dataframe(df_disp, use_container_width=True, hide_index=True)
+             df_edit['Date_dt'] = pd.to_datetime(df_edit['Date'], errors='coerce')
+             df_edit = df_edit.sort_values('Date_dt', ascending=False)
+             df_edit = df_edit.drop(columns=['Date_dt'])
+        except: pass
+
+        # Ajout colonne sélection
+        df_edit.insert(0, "Sélect. ✅", False)
+
+        # 2. Configuration Colonnes
+        editable_cols = [c for c in df_edit.columns if c not in ["ID_Mouvement", "Campagne"]]
         
-        st.markdown("---")
-        del_m_id = st.selectbox("Sélectionnez un identifiant de mouvement à supprimer", df_recolte['ID_Mouvement'].tolist())
-        if st.button("🗑️ Supprimer ce mouvement", type="secondary"):
-            if active_loader.delete_recolte_stockage([del_m_id]):
-                 st.success("Supprimé !")
-                 time.sleep(1)
-                 st.rerun()
+        column_config = {
+            "ID_Mouvement": None, # Masqué
+            "Campagne": None,     # Masqué
+            "Sélect. ✅": st.column_config.CheckboxColumn("Sélect. ✅", default=False),
+            "Bon_Enlèvement": st.column_config.LinkColumn("Bon d'Enlèvement", display_text="🔗 Voir le bon"),
+            "Date": st.column_config.TextColumn("Date (AAAA-MM-JJ)"), # Format standard pour édition
+            "Type_Mouvement": st.column_config.SelectboxColumn("Type", options=["Entrée", "Sortie"]),
+            "Quantite_T": st.column_config.NumberColumn("Quantité (T)", format="%.2f T"),
+            "Humidite_Moyenne": st.column_config.NumberColumn("Humidité (%)", format="%.1f%%"),
+            "PS_Moyen": st.column_config.NumberColumn("PS", format="%.1f")
+        }
+
+        # 3. Affichage de l'éditeur
+        edited_df = st.data_editor(
+            df_edit,
+            column_config=column_config,
+            use_container_width=True,
+            hide_index=True,
+            key="mvt_editor"
+        )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        c_act1, c_act2 = st.columns([1, 1])
+        
+        # 4. Actions
+        with c_act1:
+            if st.button("💾 Enregistrer les modifications", type="primary", use_container_width=True):
+                # Comparer l'original et l'édité pour trouver les changements
+                # Pour simplifier, on bulk_update tout le lot édité (sans la colonne Sélection)
+                save_count = 0
+                for _, row in edited_df.iterrows():
+                    m_id = row['ID_Mouvement']
+                    # On retire la colonne sélect pour la sauvegarde
+                    r_data = row.to_dict()
+                    del r_data["Sélect. ✅"]
+                    if active_loader.update_recolte_stockage(m_id, r_data):
+                        save_count += 1
+                
+                if save_count > 0:
+                    st.success(f"✅ {save_count} mouvements mis à jour !")
+                    time.sleep(1)
+                    st.rerun()
+
+        with c_act2:
+            to_delete = edited_df[edited_df["Sélect. ✅"] == True]["ID_Mouvement"].tolist()
+            if to_delete:
+                if st.button(f"🗑️ Supprimer sélection ({len(to_delete)})", type="secondary", use_container_width=True):
+                    if active_loader.delete_recolte_stockage(to_delete):
+                        st.success("Supprimé !")
+                        time.sleep(1)
+                        st.rerun()
+            else:
+                st.button("🗑️ Supprimer sélection", disabled=True, use_container_width=True)
+
     else:
         st.info("Historique vide. Commencez à saisir vos entrées et sorties.")
 
