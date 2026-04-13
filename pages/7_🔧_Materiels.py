@@ -274,13 +274,12 @@ with tab_mon_materiel:
         df_mon_mat[col] = df_mon_mat[col].apply(lambda x: "" if pd.isna(x) or str(x).strip().lower() == "none" else x)
     df_mon_mat = df_mon_mat.astype(str)
 
-    # Configuration des colonnes
-    mat_column_config = {
-        "Image": None,
-        "Cout_fixe_annuel_estime": None,
-        "Cout_fixe_annuel_estime_€": None, # Au cas où
-        "Statut": None
-    }
+    # Configuration des colonnes dynamique pour masquer Cout Fixe et Statut (insensible à la casse)
+    mat_column_config = {"Image": None}
+    for col in df_mon_mat.columns:
+        c_low = col.lower()
+        if "cout_fixe" in c_low or c_low == "statut":
+            mat_column_config[col] = None
 
     edited_df = st.data_editor(
         df_mon_mat,
