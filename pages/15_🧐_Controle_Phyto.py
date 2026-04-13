@@ -99,12 +99,12 @@ Explique brièvement, sois chiffré.
 
 @st.cache_resource
 def get_model():
-    """Tente les modèles Pro dans l'ordre, puis repasse sur Flash en dernier recours."""
+    """Tente les modèles Pro intelligents dans l'ordre, puis Flash en fallback."""
     candidates = [
-        "gemini-1.5-pro-001",   # Version précise API v1
-        "gemini-1.5-pro-002",   # Version alternative
-        "gemini-1.5-pro",        # Alias générique
-        "gemini-1.5-flash",      # Fallback fiable
+        "gemini-2.5-pro",        # Le tout dernier modèle pro
+        "gemini-1.5-pro-002",    # Modèle pro stable
+        "gemini-2.5-flash",      # Le flash qui a déjà matché sur votre compte (sans 404)
+        "gemini-2.0-flash",      # Alternative flash
     ]
     for model_name in candidates:
         try:
@@ -129,9 +129,9 @@ def get_model():
                 continue
     # Dernier recours absolu
     return genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-2.5-flash",
         system_instruction=system_instruction
-    ), "gemini-1.5-flash (fallback)"
+    ), "gemini-2.5-flash (fallback)"
 
 model, active_model_name = get_model()
 
