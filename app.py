@@ -425,10 +425,65 @@ try:
             
         if ppf_display_data:
             df_ppf_vis = pd.DataFrame(ppf_display_data)
-            def color_reste(val):
-                if val > 0: return 'color: #d17a22' 
-                elif val < 0: return 'color: #d32f2f' 
-                else: return 'color: #388e3c' 
-            st.dataframe(df_ppf_vis.style.map(color_reste, subset=['Reste à Apporter (U)']), use_container_width=True, hide_index=True)
-        else: st.info("Impossible de lier les parcelles du PPF.")
+            
+            # --- Rendu Premium personnalisé ---
+            # Calcul du % de réalisation pour les barres de progression
+            df_ppf_vis['Progress'] = (df_ppf_vis['N Apporté (U)'] / df_ppf_vis['Dose X Prévue (U)'] * 100).fillna(0).clip(0, 100)
+            
+            html_table = """
+            <div style="font-family: 'Outfit', sans-serif; margin-top: 10px;">
+                <table style="width: 100%; border-collapse: collapse; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+                    <thead>
+                        <tr style="background: linear-gradient(90deg, #2F6D89 0%, #5E9E47 100%); color: white; text-align: left;">
+                            <th style="padding: 15px;">📍 Parcelle</th>
+                            <th style="padding: 15px;">🌾 Culture</th>
+                            <th style="padding: 15px; width: 250px;">📊 Progression N (Unités)</th>
+                            <th style="padding: 15px; text-align: center;">⏳ Reste</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            """
+            
+            for i, row in df_ppf_vis.iterrows():
+                bg_color = "#f8f9fb" if i % 2 == 1 else "white"
+                reste = row['Reste à Apporter (U)']
+                
+                # Styles dynamiques selon le reste
+                if reste == 0:
+                    reste_color = "#5E9E47"
+                    reste_text = "✅ Terminé"
+                elif reste > 0:
+                    reste_color = "#d17a22"
+                    reste_text = f"⏳ {reste} U"
+                else:
+                    reste_color = "#d32f2f"
+                    reste_text = f"⚠️ {abs(reste)} U (trop)"
+                
+                prog = row['Progress']
+                prog_color = "#5E9E47" if prog >= 95 else "#2F6D89"
+                
+                html_table += f"""
+                    <tr style="background-color: {bg_color}; border-bottom: 1px solid #eee;">
+                        <td style="padding: 12px 15px; font-weight: 600; color: #333;">{row['Parcelle']}</td>
+                        <td style="padding: 12px 15px; color: #555;">{row['Culture']}</td>
+                        <td style="padding: 12px 15px;">
+                            <div style="font-size: 0.85em; margin-bottom: 5px; display: flex; justify-content: space-between; font-weight: 500;">
+                                <span>{row['N Apporté (U)']} / {row['Dose X Prévue (U)']} U</span>
+                                <span>{int(prog)}%</span>
+                            </div>
+                            <div style="height: 8px; width: 100%; background-color: #e0e0e0; border-radius: 4px;">
+                                <div style="height: 100%; width: {prog}%; background-color: {prog_color}; border-radius: 4px;"></div>
+                            </div>
+                        </td>
+                        <td style="padding: 12px 15px; text-align: center; font-weight: bold; color: {reste_color};">
+                            {reste_text}
+                        </td>
+                    </tr>
+                """
+            
+            html_table += "</tbody></table></div>"
+            st.markdown(html_table, unsafe_allow_html=True)
+            
+        else:
+            st.info("Impossible de lier les parcelles du PPF.")
 except Exception as e: st.error(f"Erreur bilan azoté : {e}")
