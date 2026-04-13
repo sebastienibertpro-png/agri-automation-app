@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import pandas as pd
-from shared import init_campaign_selector
+from shared import init_campaign_selector, render_brand_page_header
 from meteus_utils import display_meteo_module
 import requests
 
@@ -27,12 +27,6 @@ def load_lottie_url(url: str):
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
-
-    html, body, [class*="st-"], .stMarkdown {
-        font-family: 'Outfit', sans-serif !important;
-    }
-
     .stButton>button {
         width: 100%;
         background-color: #5E9E47;
@@ -109,8 +103,7 @@ with col_title_l:
     else:
         st.markdown("<div style='font-size: 3.5em; text-align: center; padding: 10px;'>💡</div>", unsafe_allow_html=True)
 with col_title_c:
-    st.markdown("<h1 style='text-align:center; margin: 0; color: #2F6D89; font-family: \"Outfit\", sans-serif; font-weight: 700;'>🚜 Tableau de Bord</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; color: #5E9E47; font-weight: 500; margin-top: 2px;'>L'intelligence de la donnée au service du champ ✨</p>", unsafe_allow_html=True)
+    render_brand_page_header("Tableau de Bord", "L'intelligence de la donnée au service du champ ✨", icon="🚜")
 with col_title_r:
     st.write("") # Espace vide pour équilibrer le titre centré
 
