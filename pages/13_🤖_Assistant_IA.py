@@ -66,12 +66,12 @@ Sois professionnel, clair, et utilise des listes ou des tableaux dans tes répon
 
 @st.cache_resource
 def get_model():
-    """Tente les modèles Pro dans l'ordre, puis Flash en fallback."""
+    """Tente les modèles Pro intelligemment, puis Flash en fallback."""
     candidates = [
-        "gemini-1.5-pro-001",
+        "gemini-2.5-pro",
         "gemini-1.5-pro-002",
-        "gemini-1.5-pro",
-        "gemini-1.5-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
     ]
     try:
         available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -81,7 +81,7 @@ def get_model():
     except Exception:
         pass
     # Fallback direct sans list_models
-    return genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=system_instruction), "gemini-1.5-flash"
+    return genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=system_instruction), "gemini-2.5-flash"
 
 model, active_model_name = get_model()
 
