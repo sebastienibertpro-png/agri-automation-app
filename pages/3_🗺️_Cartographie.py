@@ -8,11 +8,11 @@ import os
 import zipfile
 from datetime import datetime
 import shutil
-from shared import init_campaign_selector
+from shared import init_campaign_selector, render_brand_page_header
 
 st.set_page_config(page_title="Cartographie", page_icon="🗺️", layout="wide")
 
-st.title("🗺️ Cartographie & Relevés")
+render_brand_page_header("Cartographie & Relevés", "Visualisez votre exploitation et vos données géographiques ✨", icon="🗺️")
 
 st.markdown("""
 <style>
