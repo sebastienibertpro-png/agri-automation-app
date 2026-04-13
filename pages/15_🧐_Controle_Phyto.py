@@ -204,20 +204,30 @@ Surface : {surface_ha} ha
 Mission : Contrôle d'éventuelles infractions ou points de vigilance sur les produits phytosanitaires de cet ITK.
 """
         
-        try:
-            # Appel de Gemini
-            chat = model.start_chat(history=[])
-            response = chat.send_message(prompt, stream=True)
-            
-            st.markdown("### 📋 Rapport Synthétique :")
-            
-            # Affichage en streaming
-            message_placeholder = st.empty()
-            full_response = ""
-            for chunk in response:
-                full_response += chunk.text
-                message_placeholder.markdown(full_response + "▌")
-            message_placeholder.markdown(full_response)
-            
-        except Exception as e:
-            st.error(f"Erreur lors de l'appel à l'IA : {e}")
+        import time
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                # Appel de Gemini
+                chat = model.start_chat(history=[])
+                response = chat.send_message(prompt, stream=True)
+                
+                st.markdown("### 📋 Rapport Synthétique :")
+                
+                # Affichage en streaming
+                message_placeholder = st.empty()
+                full_response = ""
+                for chunk in response:
+                    full_response += chunk.text
+                    message_placeholder.markdown(full_response + "▌")
+                message_placeholder.markdown(full_response)
+                break  # Succès, on sort de la boucle de retry
+                
+            except Exception as e:
+                error_str = str(e)
+                if ("429" in error_str or "quota" in error_str.lower()) and attempt < max_retries - 1:
+                    st.warning(f"⚠️ Limite de l'API gratuite atteinte. Nouvelle tentative dans 17 secondes...")
+                    time.sleep(17)
+                else:
+                    st.error(f"Erreur lors de l'appel à l'IA : {e}")
+                    break
