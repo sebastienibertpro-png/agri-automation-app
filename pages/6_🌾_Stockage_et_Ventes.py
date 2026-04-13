@@ -2,47 +2,11 @@ import streamlit as st
 import pandas as pd
 import uuid
 import time
-from shared import init_campaign_selector
+from shared import init_campaign_selector, render_brand_page_header
 
 st.set_page_config(page_title="Gestion du stockage et des ventes", page_icon="🌾", layout="wide")
 
-st.markdown("""
-<style>
-    .metric-card {
-        background-color: #f8f9fa;
-        border-radius: 10px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        text-align: center;
-        margin-bottom: 20px;
-        border-left: 5px solid #4CAF50;
-    }
-    .metric-value {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #2E7D32;
-    }
-    .metric-label {
-        font-size: 1.1rem;
-        color: #6c757d;
-        text-transform: uppercase;
-        margin-bottom: 10px;
-    }
-    .metric-card-orange {
-        border-left: 5px solid #ff9800;
-    }
-    .metric-card-orange .metric-value { color: #f57c00; }
-    
-    .metric-card-blue {
-        border-left: 5px solid #2196F3;
-    }
-    .metric-card-blue .metric-value { color: #1976D2; }
-</style>
-""", unsafe_allow_html=True)
-
-st.title("🌾 Gestion du stockage et des ventes")
-
-st.markdown("Suivi unifié de vos récoltes, du remplissage de vos cellules et de l'exécution de vos contrats de vente pour la campagne sélectionnée.")
+render_brand_page_header("Gestion du stockage et des ventes", "Suivi unifié de vos récoltes et de l'exécution de vos contrats ✨", icon="🌾")
 
 active_loader, selected_campaign, _, _ = init_campaign_selector()
 
