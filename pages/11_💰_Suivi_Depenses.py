@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from shared import init_campaign_selector, inject_premium_css, render_premium_table, render_premium_header
+from shared import init_campaign_selector, inject_premium_css, render_premium_table, render_premium_header, render_brand_page_header
 
 st.set_page_config(page_title="Suivi Dépenses", page_icon="💰", layout="wide")
 
 # Injection du CSS premium
 inject_premium_css()
 
-st.title("💰 Suivi des Dépenses par Poste")
+render_brand_page_header("Suivi des Dépenses par Poste", "Analysez vos coûts et optimisez votre rentabilité ✨", icon="💰")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
