@@ -53,20 +53,30 @@ def init_campaign_selector():
         st.error("Impossible de se connecter à 'MASTER_EXPLOITATION'. Vérifiez vos secrets ou votre connexion.")
         st.stop()
 
-    # ── CSS sidebar uniforme sur toutes les pages ──────────────────────────────
-    # Même CSS que l'ancien inject_premium_css qui FONCTIONNAIT :
-    # on force la taille sur le conteneur sidebar + les éléments nav
+    # ── CSS global et sidebar uniforme ─────────────────────────────────────────
     st.markdown("""
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+        /* Global Font */
+        html, body, [class*="st-"], .stMarkdown, p, span, h1, h2, h3, h4, h5, h6 {
+            font-family: 'Outfit', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+        }
+
         section[data-testid="stSidebar"],
         section[data-testid="stSidebar"] * {
             font-size: 1rem !important;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+            font-family: 'Outfit', sans-serif !important;
         }
         [data-testid="stSidebarNav"] span,
         [data-testid="stSidebarNav"] a,
         [data-testid="stSidebarNav"] li div {
             font-size: 1rem !important;
+        }
+        /* Style des boutons dans la sidebar */
+        section[data-testid="stSidebar"] .stButton>button {
+            border-radius: 8px !important;
+            font-weight: 600 !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -161,33 +171,39 @@ def init_campaign_selector():
 def inject_premium_css():
     st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
     /* Global Overrides for Streamlit Widgets */
+    html, body, [class*="st-"] {
+        font-family: 'Outfit', sans-serif !important;
+    }
+
     div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {
-        border-radius: 0 0 12px 12px !important; /* Coins bas arrondis uniquement pour fusionner avec le titre */
+        border-radius: 0 0 12px 12px !important;
         border: 1px solid #e0e0e0 !important;
-        border-top: none !important; /* Le bandeau coloré du dessus fait la bordure */
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+        border-top: none !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
         padding: 4px !important;
         background-color: white !important;
         margin-top: 0px !important;
     }
     
-    /* Dedicated Header Styling */
+    /* Dedicated Header Styling - AgriDiA Colors */
     .p-header {
         color: white !important;
         padding: 12px 18px !important;
-        font-weight: bold !important;
-        font-size: 1.1em !important;
+        font-weight: 600 !important;
+        font-size: 1.15em !important;
         display: flex !important;
         justify-content: space-between !important;
         align-items: center !important;
         border-radius: 12px 12px 0 0 !important;
         margin-bottom: 0 !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+        font-family: 'Outfit', sans-serif !important;
     }
-    .p-green { background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%) !important; }
-    .p-blue { background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%) !important; }
+    .p-green { background: linear-gradient(135deg, #5E9E47 0%, #4a8037 100%) !important; }
+    .p-blue { background: linear-gradient(135deg, #2F6D89 0%, #1a4153 100%) !important; }
     
 </style>
 """, unsafe_allow_html=True)
@@ -200,8 +216,8 @@ def render_premium_table(df, color="green", compact=False):
     """Render a DataFrame as a styled HTML table using fully inline CSS (no style tags).
     This is necessary because Streamlit Cloud sanitizes <style> tags in st.markdown.
     """
-    header_bg = "linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%)" if color == "green" else "linear-gradient(135deg, #0d47a1 0%, #1976d2 100%)"
-    border_color = "#2e7d32" if color == "green" else "#1976d2"
+    header_bg = "linear-gradient(135deg, #5E9E47 0%, #4a8037 100%)" if color == "green" else "linear-gradient(135deg, #2F6D89 0%, #1a4153 100%)"
+    border_color = "#5E9E47" if color == "green" else "#2F6D89"
 
     pad = "6px 10px" if compact else "12px 15px"
     font_size = "0.8em" if compact else "0.9em"
