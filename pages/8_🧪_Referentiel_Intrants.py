@@ -3,27 +3,13 @@ import pandas as pd
 from datetime import datetime
 import os
 from ephy_fetcher import EphyFetcher
-from shared import get_dataloader, get_drive_uploader, EPHY_DRIVE_FOLDER_ID, inject_premium_css, render_premium_header
+from shared import get_dataloader, get_drive_uploader, EPHY_DRIVE_FOLDER_ID, inject_premium_css, render_premium_header, render_brand_page_header
 import time
 
 st.set_page_config(page_title="Référentiel Intrants", page_icon="🧪", layout="wide")
 
-st.title("🧪 Référentiel des Intrants")
+render_brand_page_header("Référentiel des Intrants", "Base de données E-Phy et gestion de vos produits phytos ✨", icon="🧪")
 inject_premium_css()
-
-st.markdown("""
-<style>
-    .stButton>button {
-        width: 100%;
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 8px;
-    }
-    .stButton>button:hover {
-        background-color: #45a049;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 active_loader = get_dataloader()
 
