@@ -11,7 +11,7 @@ try:
 except ImportError:
     LOTTIE_AVAILABLE = False
 
-st.set_page_config(page_title="Tableau de Bord", page_icon="🚜", layout="centered")
+st.set_page_config(page_title="Tableau de Bord", page_icon="🚜", layout="wide")
 
 # --- Lottie Loader ---
 @st.cache_data(ttl=3600)
