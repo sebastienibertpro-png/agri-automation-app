@@ -6,7 +6,7 @@ import uuid
 from report_gen import ReportGenerator
 from shared import get_dataloader, init_campaign_selector, inject_premium_css, render_premium_header
 
-st.set_page_config(page_title="Matériels", page_icon="🚜", layout="centered")
+st.set_page_config(page_title="Matériels", page_icon="🚜", layout="wide")
 
 inject_premium_css()
 
