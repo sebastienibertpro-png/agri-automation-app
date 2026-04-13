@@ -4,25 +4,11 @@ import tempfile
 import os
 from report_gen import ReportGenerator
 from email_utils import send_email_with_attachment
-from shared import init_campaign_selector
+from shared import init_campaign_selector, render_brand_page_header
 
 st.set_page_config(page_title="Gestion Irrigation", page_icon="💧", layout="wide")
 
-st.title("💧 Gestion de l'Irrigation")
-
-st.markdown("""
-<style>
-    .stButton>button {
-        width: 100%;
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 8px;
-    }
-    .stButton>button:hover {
-        background-color: #45a049;
-    }
-</style>
-""", unsafe_allow_html=True)
+render_brand_page_header("Gestion de l'Irrigation", "Optimisez vos apports en eau et gérez vos relevés ✨", icon="💧")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
