@@ -67,7 +67,7 @@ Sois professionnel, clair, et utilise des listes ou des tableaux dans tes répon
 @st.cache_resource
 def get_model():
     return genai.GenerativeModel(
-        model_name="gemini-1.5-pro",
+        model_name="gemini-1.5-pro-latest",
         system_instruction=system_instruction
     )
 
