@@ -1,12 +1,12 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from shared import init_campaign_selector, inject_premium_css, render_premium_header
+from shared import init_campaign_selector, inject_premium_css, render_premium_header, render_brand_page_header
 
 st.set_page_config(page_title="Consulter mes interventions", page_icon="📋", layout="wide")
 inject_premium_css()
 
-st.title("📋 Consulter mes Interventions")
+render_brand_page_header("Consulter mes Interventions", "Historique et suivi détaillé de vos travaux ✨", icon="📋")
 
 # 1. Utilisation du sélecteur de campagne partagé
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
