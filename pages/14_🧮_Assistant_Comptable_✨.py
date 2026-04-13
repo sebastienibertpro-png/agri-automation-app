@@ -7,7 +7,7 @@ from datetime import datetime
 import time
 import requests
 
-from shared import get_dataloader, get_drive_uploader
+from shared import get_dataloader, get_drive_uploader, render_brand_page_header
 from pdf_analyzer import PDFAnalyzer
 import traceback
 import io
@@ -25,7 +25,7 @@ DRIVE_SUBFOLDER_NAME = "A_Traiter"     # Dossier source des factures
 SPREADSHEET_ID = "1rNY5Skg8hTekiKKbJrPibB4kmbkQjq0uQpzEnhXPmBA" 
 SHEET_NAME = "ACHAT_MASTER"
 
-st.set_page_config(page_title="Bot Comptable", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Assistant Comptable", page_icon="🧮", layout="wide")
 
 # --- Lottie Robot Animation ---
 @st.cache_data(ttl=3600)
@@ -52,10 +52,7 @@ with col_anim:
         st.markdown("<div style='font-size: 4em; text-align: center; padding: 10px;'>🤖</div>", unsafe_allow_html=True)
 
 with col_title:
-    st.title("🤖 Bot Comptable - Phase 2")
-    st.markdown("""<p style="font-size: 1.1em; color: #666; margin-top: -10px;">
-        Analyse intelligente des factures et archivage automatique
-    </p>""", unsafe_allow_html=True)
+    render_brand_page_header("Assistant Comptable", "Analyse intelligente des factures et archivage automatique ✨", icon="🤖")
 
 def get_compta_year(date_str):
     """Calcule l'année comptable (du 01/07 au 30/06) à partir d'une date YYYY-MM-DD."""
