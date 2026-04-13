@@ -412,7 +412,8 @@ try:
             # Cela évite d'avoir plusieurs lignes pour la même parcelle si elle a plusieurs entrées dans le PPF
             df_ppf_grouped = df_ppf.copy()
             df_ppf_grouped['Dose_X'] = pd.to_numeric(df_ppf_grouped['Dose_X'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-            df_ppf_grouped = df_ppf_grouped.groupby(['ID_Parcelle', 'Culture'])['Dose_X'].sum().reset_index()
+            # Utilisation de 'max' au lieu de 'sum' car Dose_X est souvent l'objectif total répété sur chaque ligne de passage
+            df_ppf_grouped = df_ppf_grouped.groupby(['ID_Parcelle', 'Culture'])['Dose_X'].max().reset_index()
             
             ppf_display_data = []
             for _, row in df_ppf_grouped.iterrows():
