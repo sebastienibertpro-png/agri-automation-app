@@ -371,4 +371,4 @@ else:
     process_invoices_ui()
 
 st.markdown("---")
-st.info("💡 **Rappel** : Placez vos factures PDF dans le dossier Drive `AGRI_AUTOMATION/A_Traiter`. L'IA s'occupe de tout le reste.")
+st.info("💳 **Rappel** : Votre assistant comptable a récupéré vos factures et les a placées dans votre Drive. Pensez à régler vos factures avant analyse et archivage.")
