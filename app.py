@@ -407,28 +407,41 @@ try:
             sum_n = df_ferti_realized.groupby('ID_Parcelle')['N/ha'].sum()
             realized_n_by_parcel = sum_n.to_dict()
             
-        ppf_display_data = []
-        for _, row in df_ppf.iterrows():
-            p_id = str(row.get('ID_Parcelle', 'N/A')).strip()
-            if p_id == 'N/A' or not p_id: continue
-            dose_x_raw = str(row.get('Dose_X', '0')).replace(',', '.')
-            try: dose_x = float(dose_x_raw)
-            except: dose_x = 0.0
-            n_apport = realized_n_by_parcel.get(p_id, 0.0)
-            reste = dose_x - n_apport
-            culture = str(row.get('Culture', ''))
-            ppf_display_data.append({
-                'Parcelle': p_id, 'Culture': culture,
-                'Dose X Prévue (U)': int(round(dose_x)), 'N Apporté (U)': int(round(n_apport)),
-                'Reste à Apporter (U)': int(round(reste))
-            })
+        if not df_ppf.empty:
+            # Consolidation : On groupe par Parcelle et Culture pour sommer les besoins prévus
+            # Cela évite d'avoir plusieurs lignes pour la même parcelle si elle a plusieurs entrées dans le PPF
+            df_ppf_grouped = df_ppf.copy()
+            df_ppf_grouped['Dose_X'] = pd.to_numeric(df_ppf_grouped['Dose_X'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+            df_ppf_grouped = df_ppf_grouped.groupby(['ID_Parcelle', 'Culture'])['Dose_X'].sum().reset_index()
+            
+            ppf_display_data = []
+            for _, row in df_ppf_grouped.iterrows():
+                p_id = str(row.get('ID_Parcelle', 'N/A')).strip()
+                if p_id == 'N/A' or not p_id: continue
+                
+                dose_x = float(row.get('Dose_X', 0.0))
+                n_apport = realized_n_by_parcel.get(p_id, 0.0)
+                reste = dose_x - n_apport
+                culture = str(row.get('Culture', ''))
+                
+                # Calcul de la progression réelle (avant clip pour affichage texte)
+                actual_prog = (n_apport / dose_x * 100) if dose_x > 0 else 0
+                
+                ppf_display_data.append({
+                    'Parcelle': p_id, 
+                    'Culture': culture,
+                    'Dose X Prévue (U)': int(round(dose_x)), 
+                    'N Apporté (U)': int(round(n_apport)),
+                    'Reste à Apporter (U)': int(round(reste)),
+                    'Actual_Prog': actual_prog
+                })
             
         if ppf_display_data:
             df_ppf_vis = pd.DataFrame(ppf_display_data)
             
             # --- Rendu Premium personnalisé ---
-            # Calcul du % de réalisation pour les barres de progression
-            df_ppf_vis['Progress'] = (df_ppf_vis['N Apporté (U)'] / df_ppf_vis['Dose X Prévue (U)'] * 100).fillna(0).clip(0, 100)
+            # Barre de progression limitée à 100% visuellement
+            df_ppf_vis['VisProgress'] = df_ppf_vis['Actual_Prog'].clip(0, 100)
             
             html_table = """
             <div style="font-family: 'Outfit', sans-serif; margin-top: 10px;">
@@ -459,8 +472,15 @@ try:
                     reste_color = "#d32f2f"
                     reste_text = f"⚠️ {abs(reste)} U (trop)"
                 
-                prog = row['Progress']
-                prog_color = "#5E9E47" if prog >= 95 else "#2F6D89"
+                prog_text = int(row['Actual_Prog'])
+                prog_vis = row['VisProgress']
+                # Vert si entre 95% et 105%, Rouge si > 105%, Bleu sinon
+                if 95 <= prog_text <= 105:
+                    prog_color = "#5E9E47"
+                elif prog_text > 105:
+                    prog_color = "#d32f2f"
+                else:
+                    prog_color = "#2F6D89"
                 
                 html_table += f"""
                     <tr style="background-color: {bg_color}; border-bottom: 1px solid #eee;">
@@ -469,10 +489,10 @@ try:
                         <td style="padding: 12px 15px;">
                             <div style="font-size: 0.85em; margin-bottom: 5px; display: flex; justify-content: space-between; font-weight: 500;">
                                 <span>{row['N Apporté (U)']} / {row['Dose X Prévue (U)']} U</span>
-                                <span>{int(prog)}%</span>
+                                <span>{prog_text}%</span>
                             </div>
                             <div style="height: 8px; width: 100%; background-color: #e0e0e0; border-radius: 4px;">
-                                <div style="height: 100%; width: {prog}%; background-color: {prog_color}; border-radius: 4px;"></div>
+                                <div style="height: 100%; width: {prog_vis}%; background-color: {prog_color}; border-radius: 4px;"></div>
                             </div>
                         </td>
                         <td style="padding: 12px 15px; text-align: center; font-weight: bold; color: {reste_color};">
