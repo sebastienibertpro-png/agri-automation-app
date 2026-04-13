@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
-from shared import init_campaign_selector, inject_premium_css, render_premium_table, render_premium_header
+from shared import init_campaign_selector, inject_premium_css, render_premium_table, render_premium_header, render_brand_page_header
 import io
 
 st.set_page_config(page_title="État des Stocks", page_icon="📦", layout="wide")
 
-st.title("📦 État des Stocks")
+render_brand_page_header("État des Stocks", "Suivez vos inventaires de semences, engrais, phytos et carburant ✨", icon="📦")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
