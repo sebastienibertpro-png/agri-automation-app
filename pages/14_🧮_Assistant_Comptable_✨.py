@@ -80,7 +80,7 @@ def process_invoices_ui():
 
     analyzer = PDFAnalyzer(api_key=gemini_key)
     
-    st.info(f"📂 Recherche des PDF dans le dossier Drive : `{DRIVE_FOLDER_NAME}/{DRIVE_SUBFOLDER_NAME}`")
+    st.info("📂 Recherche des factures sur votre Drive...")
     
     try:
         # 1. Obtenir les IDs des dossiers via le service drive de l'uploader
@@ -371,4 +371,4 @@ else:
     process_invoices_ui()
 
 st.markdown("---")
-st.info("💳 **Rappel** : Votre assistant comptable a récupéré vos factures et les a placées dans votre Drive. Pensez à régler vos factures avant analyse et archivage.")
+st.info("💡 **Rappel** : Votre assistant comptable a récupéré vos factures et les a placées dans votre Drive. Pensez à régler vos factures avant analyse et archivage.")
