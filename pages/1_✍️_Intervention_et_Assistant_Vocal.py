@@ -7,6 +7,23 @@ import requests
 from streamlit_lottie import st_lottie
 from shared import init_campaign_selector
 
+# --- Imports optionnels pour le mode vocal ---
+try:
+    from audio_recorder_streamlit import audio_recorder
+    AUDIO_RECORDER_AVAILABLE = True
+except ImportError:
+    AUDIO_RECORDER_AVAILABLE = False
+
+try:
+    from voice_processor import (
+        build_context_from_loader,
+        transcribe_audio_bytes,
+        format_voice_summary
+    )
+    VOICE_PROCESSOR_AVAILABLE = True
+except ImportError:
+    VOICE_PROCESSOR_AVAILABLE = False
+
 def load_lottieurl(url: str):
     try:
         r = requests.get(url)
