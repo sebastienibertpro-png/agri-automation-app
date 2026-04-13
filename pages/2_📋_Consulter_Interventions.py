@@ -91,10 +91,8 @@ def group_interventions(df):
                     pass
         return total_cost
 
-    # Pour le calcul de coût, on a besoin des originaux temporairement
-    df_with_cost = df.copy()
-    df_with_cost['€/ha'] = df_with_cost.apply(calculate_cost, axis=1)
-    # on max ou sum le coût dans le groupby
+    # Ajout de la colonne au DataFrame principal avant groupement
+    df['€/ha'] = df.apply(calculate_cost, axis=1)
     agg_cols['€/ha'] = 'sum'
 
     df_grouped = df.groupby(group_cols, as_index=False).agg(agg_cols)
