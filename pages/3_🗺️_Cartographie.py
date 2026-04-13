@@ -278,10 +278,18 @@ if telepac_gdf is not None:
         style_function=get_crop_style,
         tooltip=folium.GeoJsonTooltip(fields=tooltip_fields) if tooltip_fields else None
     ).add_to(telepac_fg)
-from folium.plugins import MeasureControl, Draw
+from folium.plugins import MeasureControl, Draw, Fullscreen
 
 telepac_fg.add_to(m)
 folium.LayerControl().add_to(m)
+
+# Ajouter le mode plein écran
+Fullscreen(
+    position='topright',
+    title='Passer en Plein Écran',
+    title_cancel='Quitter le Plein Écran',
+    force_separate_button=True
+).add_to(m)
 
 # Ajouter l'outil de mesure (surfaces/distances)
 MeasureControl(
