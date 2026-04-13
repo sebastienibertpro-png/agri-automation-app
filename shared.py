@@ -174,8 +174,13 @@ def inject_premium_css():
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
 
     /* Global Overrides for Streamlit Widgets */
-    html, body, [class*="st-"] {
+    html, body, [class*="st-"], .stMarkdown {
         font-family: 'Outfit', sans-serif !important;
+    }
+    
+    h1, h2, h3 {
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 700 !important;
     }
 
     div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {
@@ -207,6 +212,21 @@ def inject_premium_css():
     
 </style>
 """, unsafe_allow_html=True)
+
+def render_brand_page_header(title, subtitle="", icon=""):
+    """Rendu d'un en-tête de page premium aux couleurs AgriDiA."""
+    icon_html = f'<span style="margin-right: 15px;">{icon}</span>' if icon else ""
+    st.markdown(f"""
+        <div style="margin-bottom: 25px;">
+            <div style="display: flex; align-items: center;">
+                <h1 style="color: #2F6D89; font-family: 'Outfit', sans-serif; font-weight: 700; margin: 0; font-size: 1.8em; line-height: 1.2;">
+                    {icon_html}{title}
+                </h1>
+            </div>
+            {f'<p style="color: #5E9E47; font-family: \'Outfit\', sans-serif; font-weight: 500; font-size: 1.0em; margin: 5px 0 0 0;">{subtitle}</p>' if subtitle else ""}
+            <div style="height: 3px; width: 60px; background: linear-gradient(90deg, #2F6D89 0%, #5E9E47 100%); margin-top: 8px; border-radius: 2px;"></div>
+        </div>
+    """, unsafe_allow_html=True)
 
 def render_premium_header(title, subtitle="", color="green"):
     cls = "p-header p-green" if color == "green" else "p-header p-blue"
