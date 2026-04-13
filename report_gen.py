@@ -1355,6 +1355,53 @@ class ReportGenerator:
         self.doc.build(self.elements)
         print(f"PDF Generated: {self.filename}")
 
+    def _clean_markdown(self, text):
+        """Conversion simplifiée du Markdown Gemini en tags ReportLab."""
+        import re
+        # Gras **text** -> <b>text</b>
+        text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+        # Italique *text* -> <i>text</i>
+        text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)
+        # Sauts de ligne
+        text = text.replace('\n', '<br/>')
+        return text
+
+    def generate_ai_audit_report(self, parcelle, culture, report_text):
+        """
+        Génère un rapport PDF basé sur l'analyse IA.
+        """
+        self.doc.pagesize = A4
+        self.add_title(f"Audit de Conformité Phyto - {parcelle}")
+        
+        # Sous-titre
+        self.elements.append(Paragraph(f"<b>Culture :</b> {culture}", self.styles['Normal']))
+        self.elements.append(Paragraph(f"<b>Date du rapport :</b> {datetime.now().strftime('%d/%m/%Y à %H:%M')}", self.styles['Normal']))
+        self.elements.append(Spacer(1, 20))
+        
+        # Contenu du rapport
+        clean_text = self._clean_markdown(report_text)
+        
+        # Style spécifique pour le rapport
+        report_style = ParagraphStyle(
+            'AIReport',
+            parent=self.styles['Normal'],
+            fontSize=10,
+            leading=14,
+            spaceAfter=10
+        )
+        
+        # Découpage par blocs
+        lines = clean_text.split('<br/><br/>')
+        for line in lines:
+            if line.strip():
+                l = line.strip()
+                if l.startswith('- '): l = '• ' + l[2:]
+                self.elements.append(Paragraph(l, report_style))
+                self.elements.append(Spacer(1, 5))
+        
+        self.doc.build(self.elements)
+        print(f"AI Report Generated: {self.filename}")
+
 import io
 
 def generate_ppf_pdf(ppf_dict, interv_list):
@@ -1493,3 +1540,17 @@ def generate_ppf_pdf(ppf_dict, interv_list):
         print(f"Error generating PPF PDF: {e}")
         return None
 
+def generate_ai_audit_pdf(parcelle, culture, report_text):
+    """
+    Helper pour générer le PDF de l'audit IA et retourner les bytes.
+    """
+    buffer = io.BytesIO()
+    report = ReportGenerator(buffer)
+    try:
+        report.generate_ai_audit_report(parcelle, culture, report_text)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        return pdf_bytes
+    except Exception as e:
+        print(f"Error generating AI Audit PDF: {e}")
+        return None
