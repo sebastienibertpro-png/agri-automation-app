@@ -216,6 +216,7 @@ def inject_premium_css():
 def render_brand_page_header(title, subtitle="", icon=""):
     """Rendu d'un en-tête de page premium aux couleurs AgriDiA."""
     icon_html = f'<span style="margin-right: 15px;">{icon}</span>' if icon else ""
+    subtitle_html = f'<p style="color: #5E9E47; font-family: \'Outfit\', sans-serif; font-weight: 500; font-size: 1.0em; margin: 5px 0 0 0;">{subtitle}</p>' if subtitle else ""
     st.markdown(f"""
         <div style="margin-bottom: 25px;">
             <div style="display: flex; align-items: center;">
@@ -223,7 +224,7 @@ def render_brand_page_header(title, subtitle="", icon=""):
                     {icon_html}{title}
                 </h1>
             </div>
-            {f'<p style="color: #5E9E47; font-family: \'Outfit\', sans-serif; font-weight: 500; font-size: 1.0em; margin: 5px 0 0 0;">{subtitle}</p>' if subtitle else ""}
+            {subtitle_html}
             <div style="height: 3px; width: 60px; background: linear-gradient(90deg, #2F6D89 0%, #5E9E47 100%); margin-top: 8px; border-radius: 2px;"></div>
         </div>
     """, unsafe_allow_html=True)
