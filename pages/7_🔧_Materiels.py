@@ -183,7 +183,7 @@ with tab_entretien_gnr:
                     on='ID_Materiel',
                     how='left'
                 )
-                df_merged['Type_Materiel'] = df_merged['Type_Materiel'].fillna('Autre')
+                df_merged['Type_Materiel'] = df_merged['Type_Materiel'].fillna('Autre').astype(str).str.strip().str.title()
 
                 df_pivot = df_merged.groupby(['Type_Materiel', 'ID_Materiel'])['FUEL_quantité_L'].sum().reset_index()
                 df_pivot.columns = ['Type', 'Matériel', 'Consommation (L)']
@@ -196,12 +196,26 @@ with tab_entretien_gnr:
                 )
                 st.dataframe(df_pivot, use_container_width=True, hide_index=True)
 
-                st.markdown("### 📊 Récapitulatif par Type")
-                type_conso = df_merged.groupby('Type_Materiel')['FUEL_quantité_L'].sum().sort_values(ascending=False)
-                cols = st.columns(min(len(type_conso), 4))
-                for i, (m_type, total) in enumerate(type_conso.items()):
-                    if i < len(cols):
-                        cols[i].metric(m_type, f"{total:,.0f} L")
+                col_recap1, col_recap2 = st.columns(2)
+                
+                with col_recap1:
+                    st.markdown("### 📊 Récapitulatif par Type")
+                    type_conso = df_merged.groupby('Type_Materiel')['FUEL_quantité_L'].sum().sort_values(ascending=False)
+                    cols_type = st.columns(min(max(len(type_conso), 1), 3))
+                    for i, (m_type, total) in enumerate(type_conso.items()):
+                        if i < len(cols_type):
+                            cols_type[i].metric(m_type, f"{total:,.0f} L")
+                
+                with col_recap2:
+                    st.markdown("### 📊 Récapitulatif par Tâche")
+                    if 'Tache_réalisée' in df_merged.columns:
+                        df_merged['Tache_réalisée'] = df_merged['Tache_réalisée'].fillna('Non spécifié').astype(str).str.strip().str.title()
+                        df_merged.loc[df_merged['Tache_réalisée'] == '', 'Tache_réalisée'] = 'Non spécifié'
+                        tache_conso = df_merged.groupby('Tache_réalisée')['FUEL_quantité_L'].sum().sort_values(ascending=False)
+                        cols_tache = st.columns(min(max(len(tache_conso), 1), 3))
+                        for i, (t_type, total) in enumerate(tache_conso.items()):
+                            if i < len(cols_tache):
+                                cols_tache[i].metric(t_type, f"{total:,.0f} L")
 
         # ─── EXPANDER : SAISIE CONSO GNR ─────────────────────────────────
         with st.expander("⛽ Saisie Consommation GNR", expanded=False):
