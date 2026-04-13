@@ -173,14 +173,18 @@ def inject_premium_css():
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
 
-    /* Global Overrides for Streamlit Widgets */
-    html, body, [class*="st-"], .stMarkdown {
+    /* Global Overrides for Streamlit Widgets - Restricted to avoid breaking icons */
+    html, body, [data-testid="stAppViewContainer"] {
         font-family: 'Outfit', sans-serif !important;
     }
     
-    h1, h2, h3 {
+    h1, h2, h3, p, label, .stMarkdown {
         font-family: 'Outfit', sans-serif !important;
-        font-weight: 700 !important;
+    }
+
+    /* Restore Streamlit Icons specifically */
+    [data-testid="stIconMaterial"], .notranslate {
+        font-family: 'Material Symbols Outlined' !important;
     }
 
     div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {
