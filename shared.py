@@ -56,17 +56,9 @@ def init_campaign_selector():
     # ── CSS global et sidebar uniforme ─────────────────────────────────────────
     st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
-
-        /* Global Font */
-        html, body, [class*="st-"], .stMarkdown, p, span, h1, h2, h3, h4, h5, h6 {
-            font-family: 'Outfit', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-        }
-
-        section[data-testid="stSidebar"],
-        section[data-testid="stSidebar"] * {
+        /* Ajustement de la taille de texte dans la sidebar (les polices sont gérées par inject_premium_css) */
+        section[data-testid="stSidebar"] {
             font-size: 1rem !important;
-            font-family: 'Outfit', sans-serif !important;
         }
         [data-testid="stSidebarNav"] span,
         [data-testid="stSidebarNav"] a,
