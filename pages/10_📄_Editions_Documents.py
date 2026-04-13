@@ -7,7 +7,7 @@ import os
 from report_gen import ReportGenerator
 from shared import init_campaign_selector, APP_BASE_URL
 
-st.set_page_config(page_title="Édition de Documents", page_icon="📄", layout="centered")
+st.set_page_config(page_title="Édition de Documents", page_icon="📄", layout="wide")
 
 st.title("📄 Édition de Documents Réglementaires")
 
