@@ -1097,56 +1097,54 @@ class DataLoader:
         df_achats = self.get_achats(campaign)
         df_interv = self.get_interventions()
         
-        if df_achats.empty:
-            return pd.DataFrame()
+        # --- 0. Préparation de la normalisation ---
+        # On définit ces outils ici pour qu'ils soient dispos même si un des DF est vide
+        df_ref = self.get_intrants()
+        ref_names = df_ref['Nom_Produit'].dropna().unique().tolist() if not df_ref.empty and 'Nom_Produit' in df_ref.columns else []
+        
+        def norm_func(name):
+            if not name or pd.isna(name): return ""
+            n, _ = self.normalize_product_name(str(name), ref_names=ref_names)
+            return str(n).upper().strip()
             
-        # 1. Agrégation des Achats
-        # Normalisation automatique pour rattraper les noms "bruyants"
+        # --- 1. Agrégation des Achats ---
         if not df_achats.empty:
-            df_ref = self.get_intrants()
-            ref_names = df_ref['Nom_Produit'].dropna().unique().tolist() if not df_ref.empty else []
-            
-            def norm_func(name):
-                n, _ = self.normalize_product_name(name, ref_names=ref_names)
-                return n.upper().strip()
-                
             df_achats['Nom_Produit_Norm'] = df_achats['Nom_Produit'].apply(norm_func)
             df_achats['Quantité_Achetée'] = pd.to_numeric(df_achats['Quantité_Achetée'], errors='coerce').fillna(0)
             df_achats['Montant_Total_Produit_HT'] = pd.to_numeric(df_achats['Montant_Total_Produit_HT'], errors='coerce').fillna(0)
             
             achats_agg = df_achats.groupby('Nom_Produit_Norm').agg({
-                'Nom_Produit': 'first', # Garde le nom affiché (normalisé)
+                'Nom_Produit': 'first',
                 'Catégorie': 'first',
                 'Unité_Achat': 'first',
                 'Quantité_Achetée': 'sum',
                 'Montant_Total_Produit_HT': 'sum'
             }).reset_index()
         else:
-            achats_agg = pd.DataFrame(columns=['Nom_Produit_Norm', 'Nom_Produit', 'Quantité_Achetée', 'Montant_Total_Produit_HT'])
-        
-        # 2. Agrégation des Consommations
+            achats_agg = pd.DataFrame(columns=['Nom_Produit_Norm', 'Nom_Produit', 'Catégorie', 'Unité_Achat', 'Quantité_Achetée', 'Montant_Total_Produit_HT'])
+            
+        # --- 2. Agrégation des Consommations ---
         consos_agg = pd.DataFrame(columns=['Nom_Produit_Norm', 'Quantité_Consommée'])
         if not df_interv.empty and 'Nom_Produit' in df_interv.columns:
+            df_interv = df_interv.copy() # Évite SettingWithCopyWarning
             df_interv['Campagne'] = pd.to_numeric(df_interv['Campagne'], errors='coerce').fillna(0).astype(int)
             df_interv = df_interv[df_interv['Campagne'] == int(campaign)]
             
-            # Seulement les statuts Réalisés
-            status_col = None
-            for col in ['Stat_Intervention', 'Statut_Intervention', 'Statut', 'Etat']:
-                if col in df_interv.columns:
-                    status_col = col; break
-                    
+            # Filtrage Statut (Réalisé)
+            status_col = next((c for c in ['Stat_Intervention', 'Statut_Intervention', 'Statut', 'Etat'] if c in df_interv.columns), None)
             if status_col:
                 df_interv = df_interv[df_interv[status_col].astype(str).str.strip().str.lower().str.startswith('réal')]
                 
-            # Normalisation aussi pour les consommations
             df_interv['Nom_Produit_Norm'] = df_interv['Nom_Produit'].apply(norm_func)
             
-            # Les quantités sont soit dans Quantité_Totale_Produit (Phyto/Engrais) ou Quantité_semence_totale (Semis)
-            pdf_q = pd.to_numeric(df_interv.get('Quantité_Totale_Produit', 0), errors='coerce').fillna(0)
-            sem_q = pd.to_numeric(df_interv.get('Quantité_semence_totale', 0), errors='coerce').fillna(0)
-            df_interv['Quantité_Consommée'] = pdf_q + sem_q
+            # Détection robuste des colonnes de quantité (avec/sans accent)
+            q_col = next((c for c in ['Quantité_Totale_Produit', 'Quantite_Totale_Produit'] if c in df_interv.columns), None)
+            s_col = next((c for c in ['Quantité_semence_totale', 'Quantite_semence_totale'] if c in df_interv.columns), None)
             
+            pdf_q = pd.to_numeric(df_interv[q_col], errors='coerce').fillna(0) if q_col else pd.Series(0, index=df_interv.index)
+            sem_q = pd.to_numeric(df_interv[s_col], errors='coerce').fillna(0) if s_col else pd.Series(0, index=df_interv.index)
+            
+            df_interv['Quantité_Consommée'] = pdf_q + sem_q
             consos_agg = df_interv.groupby('Nom_Produit_Norm')['Quantité_Consommée'].sum().reset_index()
             
         # 2a. Agrégation des Consommations GNR (Fuel)
@@ -1181,12 +1179,32 @@ class DataLoader:
                 break # Just apply to the first found fuel purchase entry
                 
         # 3. Fusion et calculs
-        df_stock = pd.merge(achats_agg, consos_agg, on='Nom_Produit_Norm', how='left')
-        df_stock['Quantité_Consommée'] = df_stock['Quantité_Consommée'].fillna(0)
+        df_stock = pd.merge(achats_agg, consos_agg, on='Nom_Produit_Norm', how='outer')
+        
+        # Remplissage des infos manquantes pour les produits consommés sans achat
+        if not df_ref.empty:
+            # Créer une map Nom_Norm -> Real_Info
+            df_ref['Nom_Norm'] = df_ref['Nom_Produit'].astype(str).str.strip().str.upper()
+            ref_map = df_ref.set_index('Nom_Norm')
+            
+            for idx, row in df_stock[df_stock['Nom_Produit'].isna()].iterrows():
+                norm_name = row['Nom_Produit_Norm']
+                if norm_name in ref_map.index:
+                    ref_info = ref_map.loc[norm_name]
+                    # Si c'est un DataFrame (doublons dans ref), on prend le premier
+                    if isinstance(ref_info, pd.DataFrame): ref_info = ref_info.iloc[0]
+                    
+                    df_stock.at[idx, 'Nom_Produit'] = ref_info['Nom_Produit']
+                    df_stock.at[idx, 'Catégorie'] = ref_info['Type']
+                    df_stock.at[idx, 'Unité_Achat'] = ref_info.get('Unite_Achat', '')
+        
+        # Nettoyage des valeurs numériques
+        numeric_cols = ['Quantité_Achetée', 'Quantité_Consommée', 'Montant_Total_Produit_HT']
+        for col in numeric_cols: df_stock[col] = df_stock[col].fillna(0)
         
         df_stock['Reste_en_Stock'] = df_stock['Quantité_Achetée'] - df_stock['Quantité_Consommée']
         
-        # Calcul du prix moyen unitaire et de la valeur estimée (Prorata)
+        # Calcul du prix moyen unitaire et de la valeur estimée
         df_stock['Prix_Moyen_Unitaire'] = 0.0
         df_stock['Valeur_Stock_Estimee'] = 0.0
         
