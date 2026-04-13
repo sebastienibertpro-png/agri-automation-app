@@ -2,6 +2,11 @@ import pandas as pd
 import os
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
+import re
+try:
+    from rapidfuzz import process as rfz_process, fuzz as rfz_fuzz
+except ImportError:
+    rfz_process, rfz_fuzz = None, None
 
 class DataLoader:
     def __init__(self, file_path, use_cloud=True, credentials_dict=None):
@@ -10,6 +15,44 @@ class DataLoader:
         self.conn = None
         self.xl = None 
         self._cache = {} # Local session cache
+
+    def normalize_product_name(self, raw_name, ref_names=None, threshold=82):
+        """
+        Normalise un nom de produit en cherchant le match le plus proche dans REF_INTRANTS.
+        Gère les sous-chaînes (ex: 'Urée' dans 'Urée 46%') avec une confiance de 100%.
+        """
+        if not raw_name or not isinstance(raw_name, str):
+            return raw_name, 0
+            
+        raw_name = raw_name.strip()
+        if not ref_names:
+            df_ref = self.get_intrants()
+            if not df_ref.empty and 'Nom_Produit' in df_ref.columns:
+                ref_names = df_ref['Nom_Produit'].dropna().unique().tolist()
+            else:
+                return raw_name, 0
+
+        raw_upper = raw_name.upper()
+        
+        # 1. Règle de Subset Match (Très sûr)
+        for ref in ref_names:
+            ref_upper = str(ref).upper().strip()
+            if ref_upper == raw_upper:
+                return ref, 100
+            # Si le nom de référence court est un mot entier dans le nom long
+            if len(ref_upper) > 2 and re.search(rf'\b{re.escape(ref_upper)}\b', raw_upper):
+                return ref, 100
+            # Inversement (si l'utilisateur a saisi un nom court mais que le réf est long, moins commun mais possible)
+            if len(raw_upper) > 2 and re.search(rf'\b{re.escape(raw_upper)}\b', ref_upper):
+                return ref, 100
+
+        # 2. Fuzzy Matching Classique
+        if rfz_process and rfz_fuzz:
+            result = rfz_process.extractOne(raw_name, ref_names, scorer=rfz_fuzz.token_set_ratio)
+            if result and result[1] >= threshold:
+                return result[0], result[1]
+        
+        return raw_name, 0
 
     def load_source(self):
         """Loads data source: Google Sheets if available/requested, else local Excel."""
@@ -1058,17 +1101,28 @@ class DataLoader:
             return pd.DataFrame()
             
         # 1. Agrégation des Achats
-        df_achats['Nom_Produit_Norm'] = df_achats['Nom_Produit'].astype(str).str.strip().str.upper()
-        df_achats['Quantité_Achetée'] = pd.to_numeric(df_achats['Quantité_Achetée'], errors='coerce').fillna(0)
-        df_achats['Montant_Total_Produit_HT'] = pd.to_numeric(df_achats['Montant_Total_Produit_HT'], errors='coerce').fillna(0)
-        
-        achats_agg = df_achats.groupby('Nom_Produit_Norm').agg({
-            'Nom_Produit': 'first',
-            'Catégorie': 'first',
-            'Unité_Achat': 'first',
-            'Quantité_Achetée': 'sum',
-            'Montant_Total_Produit_HT': 'sum'
-        }).reset_index()
+        # Normalisation automatique pour rattraper les noms "bruyants"
+        if not df_achats.empty:
+            df_ref = self.get_intrants()
+            ref_names = df_ref['Nom_Produit'].dropna().unique().tolist() if not df_ref.empty else []
+            
+            def norm_func(name):
+                n, _ = self.normalize_product_name(name, ref_names=ref_names)
+                return n.upper().strip()
+                
+            df_achats['Nom_Produit_Norm'] = df_achats['Nom_Produit'].apply(norm_func)
+            df_achats['Quantité_Achetée'] = pd.to_numeric(df_achats['Quantité_Achetée'], errors='coerce').fillna(0)
+            df_achats['Montant_Total_Produit_HT'] = pd.to_numeric(df_achats['Montant_Total_Produit_HT'], errors='coerce').fillna(0)
+            
+            achats_agg = df_achats.groupby('Nom_Produit_Norm').agg({
+                'Nom_Produit': 'first', # Garde le nom affiché (normalisé)
+                'Catégorie': 'first',
+                'Unité_Achat': 'first',
+                'Quantité_Achetée': 'sum',
+                'Montant_Total_Produit_HT': 'sum'
+            }).reset_index()
+        else:
+            achats_agg = pd.DataFrame(columns=['Nom_Produit_Norm', 'Nom_Produit', 'Quantité_Achetée', 'Montant_Total_Produit_HT'])
         
         # 2. Agrégation des Consommations
         consos_agg = pd.DataFrame(columns=['Nom_Produit_Norm', 'Quantité_Consommée'])
@@ -1085,12 +1139,13 @@ class DataLoader:
             if status_col:
                 df_interv = df_interv[df_interv[status_col].astype(str).str.strip().str.lower().str.startswith('réal')]
                 
-            df_interv['Nom_Produit_Norm'] = df_interv['Nom_Produit'].astype(str).str.strip().str.upper()
+            # Normalisation aussi pour les consommations
+            df_interv['Nom_Produit_Norm'] = df_interv['Nom_Produit'].apply(norm_func)
             
             # Les quantités sont soit dans Quantité_Totale_Produit (Phyto/Engrais) ou Quantité_semence_totale (Semis)
-            q_phyto = pd.to_numeric(df_interv.get('Quantité_Totale_Produit', 0), errors='coerce').fillna(0)
-            q_semis = pd.to_numeric(df_interv.get('Quantité_semence_totale', 0), errors='coerce').fillna(0)
-            df_interv['Quantité_Consommée'] = q_phyto + q_semis
+            pdf_q = pd.to_numeric(df_interv.get('Quantité_Totale_Produit', 0), errors='coerce').fillna(0)
+            sem_q = pd.to_numeric(df_interv.get('Quantité_semence_totale', 0), errors='coerce').fillna(0)
+            df_interv['Quantité_Consommée'] = pdf_q + sem_q
             
             consos_agg = df_interv.groupby('Nom_Produit_Norm')['Quantité_Consommée'].sum().reset_index()
             
