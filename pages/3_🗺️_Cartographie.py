@@ -306,6 +306,65 @@ Draw(
     }
 ).add_to(m)
 
+from branca.element import Element
+
+js_translation = """
+<script>
+// Exécuter l'override dès que Leaflet.draw est chargé
+function translateDrawLocal() {
+    if (typeof L !== 'undefined' && L.drawLocal) {
+        L.drawLocal.draw.toolbar.actions.title = "Annuler le dessin";
+        L.drawLocal.draw.toolbar.actions.text = "Annuler";
+        L.drawLocal.draw.toolbar.finish.title = "Terminer le dessin";
+        L.drawLocal.draw.toolbar.finish.text = "Terminer";
+        L.drawLocal.draw.toolbar.undo.title = "Supprimer le dernier point";
+        L.drawLocal.draw.toolbar.undo.text = "Effacer point";
+        L.drawLocal.draw.toolbar.buttons.polyline = "Tracer une ligne / mesurer distance";
+        L.drawLocal.draw.toolbar.buttons.polygon = "Tracer un polygone / surface";
+        L.drawLocal.draw.toolbar.buttons.rectangle = "Tracer un rectangle";
+        L.drawLocal.draw.toolbar.buttons.circle = "Tracer un cercle";
+        L.drawLocal.draw.toolbar.buttons.marker = "Placer un marqueur";
+        
+        L.drawLocal.draw.handlers.circle.tooltip.start = "Cliquez et glissez pour dessiner un cercle.";
+        L.drawLocal.draw.handlers.circle.radius = "Rayon";
+        L.drawLocal.draw.handlers.marker.tooltip.start = "Cliquez sur la carte pour placer un marqueur.";
+        L.drawLocal.draw.handlers.polygon.tooltip.start = "Cliquez pour commencer un polygone.";
+        L.drawLocal.draw.handlers.polygon.tooltip.cont = "Cliquez pour continuer le polygone.";
+        L.drawLocal.draw.handlers.polygon.tooltip.end = "Cliquez sur le 1er point pour fermer la forme.";
+        L.drawLocal.draw.handlers.polyline.tooltip.start = "Cliquez pour commencer une ligne.";
+        L.drawLocal.draw.handlers.polyline.tooltip.cont = "Cliquez pour continuer la ligne.";
+        L.drawLocal.draw.handlers.polyline.tooltip.end = "Cliquez sur le dernier point pour terminer.";
+        L.drawLocal.draw.handlers.rectangle.tooltip.start = "Cliquez et glissez pour dessiner un rectangle.";
+        L.drawLocal.draw.handlers.simpleshape.tooltip.end = "Relâchez la souris pour terminer.";
+        
+        L.drawLocal.edit.toolbar.actions.save.title = "Sauvegarder les modifications";
+        L.drawLocal.edit.toolbar.actions.save.text = "Sauvegarder";
+        L.drawLocal.edit.toolbar.actions.cancel.title = "Annuler l'édition";
+        L.drawLocal.edit.toolbar.actions.cancel.text = "Annuler";
+        L.drawLocal.edit.toolbar.actions.clearAll.title = "Tout effacer";
+        L.drawLocal.edit.toolbar.actions.clearAll.text = "Tout effacer";
+        L.drawLocal.edit.toolbar.buttons.edit = "Éditer un tracé";
+        L.drawLocal.edit.toolbar.buttons.editDisabled = "Aucun tracé à éditer";
+        L.drawLocal.edit.toolbar.buttons.remove = "Effacer des tracés";
+        L.drawLocal.edit.toolbar.buttons.removeDisabled = "Aucun tracé à effacer";
+        
+        L.drawLocal.edit.handlers.edit.tooltip.text = "Bougez les poignées pour modifier la forme.";
+        L.drawLocal.edit.handlers.remove.tooltip.text = "Cliquez sur une forme pour l'effacer.";
+    }
+}
+// Essayer de l'injecter rapidement via interval
+let checkDraw = setInterval(() => {
+    if (typeof L !== 'undefined' && L.drawLocal) {
+        translateDrawLocal();
+        clearInterval(checkDraw);
+    }
+}, 100);
+// Assurer l'arrêt après qq seq
+setTimeout(() => clearInterval(checkDraw), 5000);
+</script>
+"""
+m.get_root().html.add_child(Element(js_translation))
+
 # 3. Render Map
 st.markdown("### 🗺️ Carte Interactive")
 st.info("💡 Cliquez sur le marqueur bleu d'un compteur pour ouvrir le formulaire de saisie de relevé en dessous.")
