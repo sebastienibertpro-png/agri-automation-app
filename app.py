@@ -90,25 +90,20 @@ except Exception as e:
     st.warning(f"Erreur d'image: {e}")
 
 # ─── LOTTIE ANIMATION HEADER ───────────────────────────────────────────────────
-# Agriculture / Smart Farming / AI animation
-lottie_farm = load_lottie_url("https://assets5.lottiefiles.com/packages/lf20_fcfjwiyb.json")
-lottie_farm_fallback = load_lottie_url("https://assets2.lottiefiles.com/packages/lf20_jcikwtux.json")
+# Animation type "Creative Squad"
+lottie_url = load_lottie_url("https://assets3.lottiefiles.com/packages/lf20_cwqf5i6h.json") # Animation par défaut "Creative Team"
 
-col_title_l, col_title_c, col_title_r = st.columns([1, 3, 1])
+col_title_l, col_title_c, col_title_r = st.columns([1, 4, 1])
 with col_title_l:
-    animation_data = lottie_farm or lottie_farm_fallback
-    if LOTTIE_AVAILABLE and animation_data:
-        st_lottie(animation_data, height=100, key="lottie_farm_left")
+    if LOTTIE_AVAILABLE and lottie_url:
+        st_lottie(lottie_url, height=100, key="lottie_cs")
     else:
-        st.markdown("<div style='font-size: 3.5em; text-align: center; padding: 10px;'>🌾</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 3.5em; text-align: center; padding: 10px;'>💡</div>", unsafe_allow_html=True)
 with col_title_c:
     st.markdown("<h1 style='text-align:center; margin: 0;'>🚜 Tableau de Bord</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center; color: #666; margin-top: 2px;'>Utilisez le menu à gauche pour naviguer entre les différents outils de l'exploitation.</p>", unsafe_allow_html=True)
 with col_title_r:
-    if LOTTIE_AVAILABLE and animation_data:
-        st_lottie(animation_data, height=100, key="lottie_farm_right")
-    else:
-        st.markdown("<div style='font-size: 3.5em; text-align: center; padding: 10px;'>🤖</div>", unsafe_allow_html=True)
+    st.write("") # Espace vide pour équilibrer le titre centré
 
 # --- Météus Weather Module ---
 try:
