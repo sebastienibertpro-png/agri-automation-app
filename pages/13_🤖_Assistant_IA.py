@@ -66,12 +66,24 @@ Sois professionnel, clair, et utilise des listes ou des tableaux dans tes répon
 
 @st.cache_resource
 def get_model():
-    return genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",
-        system_instruction=system_instruction
-    )
+    """Tente les modèles Pro dans l'ordre, puis Flash en fallback."""
+    candidates = [
+        "gemini-1.5-pro-001",
+        "gemini-1.5-pro-002",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+    ]
+    try:
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        for model_name in candidates:
+            if any(model_name in n for n in available):
+                return genai.GenerativeModel(model_name=model_name, system_instruction=system_instruction), model_name
+    except Exception:
+        pass
+    # Fallback direct sans list_models
+    return genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=system_instruction), "gemini-1.5-flash"
 
-model = get_model()
+model, active_model_name = get_model()
 
 # --- Chargement du contexte (Données de l'exploitation) ---
 @st.cache_data(ttl=600)
@@ -210,6 +222,11 @@ with st.spinner("Chargement des données de l'exploitation pour l'IA..."):
 # --- Sidebar Actions ---
 with st.sidebar:
     st.header("⚙️ Options IA")
+    # Badge modèle actif
+    is_pro = "pro" in active_model_name.lower()
+    badge_color = "#1b5e20" if is_pro else "#e65100"
+    st.markdown(f"**🤖 Modèle actif :** <span style='background:{badge_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.8em;font-weight:bold;'>{active_model_name}</span>", unsafe_allow_html=True)
+    st.divider()
     if st.button("🗑️ Nouvelle discussion", use_container_width=True):
         st.session_state.chat_history = []
         if "gemini_chat" in st.session_state:
