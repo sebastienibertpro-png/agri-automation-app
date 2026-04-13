@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
 from data_loader import DataLoader
-from shared import init_campaign_selector, inject_premium_css, render_premium_header
+from shared import init_campaign_selector, inject_premium_css, render_premium_header, render_brand_page_header
 from report_gen import generate_ppf_pdf
 
 st.set_page_config(page_title="Plan Prévisionnel de Fumure", page_icon="🌿", layout="wide")
 inject_premium_css()
 
-st.title("🌿 Plan Prévisionnel de Fumure (PPF)")
-st.markdown("---")
+render_brand_page_header("Plan Prévisionnel de Fumure (PPF)", "Planifiez vos apports d'azote et assurez votre conformité ✨", icon="🌿")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 dl = active_loader
