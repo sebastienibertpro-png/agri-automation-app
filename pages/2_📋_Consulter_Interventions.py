@@ -163,7 +163,7 @@ if not selected_rows.empty:
     col_act1, col_act2 = st.columns(2)
     
     with col_act1:
-        st.warning(f"⚠️ {len(selected_rows)} sélection(s)")
+        st.warning(f"⚠️ {len(selected_rows)} ligne(s) sélectionnée(s) pour suppression")
         if st.button("🔥 Supprimer définitivement", type="primary", use_container_width=True):
             all_ids = []
             for ids in selected_rows['ID_Intervention']: all_ids.extend(ids)
@@ -174,11 +174,12 @@ if not selected_rows.empty:
                 st.rerun()
 
     with col_act2:
-        st.info("Modifier l'entrée")
-        if st.button("✍️ Modifier cette intervention", use_container_width=True):
-            if len(selected_rows) > 1:
-                st.error("Sélectionnez une seule ligne pour modifier.")
-            else:
+        if len(selected_rows) > 1:
+            st.warning("ℹ️ Pour modifier, veuillez ne cocher **qu'une seule ligne** à la fois.")
+            st.button("✍️ Modifier cette intervention", disabled=True, use_container_width=True)
+        else:
+            st.success("✅ Ligne prête à être modifiée")
+            if st.button("✍️ Modifier cette intervention", use_container_width=True):
                 st.session_state.edit_intervention = selected_rows.iloc[0].to_dict()
                 st.switch_page("pages/1_✍️_Intervention_et_Assistant_Vocal.py")
 else:
