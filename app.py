@@ -368,7 +368,7 @@ with col_factures:
         
         st.markdown(f"""
         <div class="dash-card card-purple">
-            <h4 style="color: #7b1fa2;">🤖 Bot Comptable</h4>
+            <h4 style="color: #7b1fa2;">🤖 Assistant Comptable</h4>
             <p style="font-size: 2em; font-weight: bold; text-align: center; margin: 8px 0; color: {badge_color};">{badge_icon} {nb_factures}</p>
             <p style="text-align: center; font-weight: 600;">facture(s) à traiter</p>
         </div>
@@ -384,7 +384,7 @@ with col_factures:
     except Exception:
         st.markdown("""
         <div class="dash-card card-purple">
-            <h4 style="color: #7b1fa2;">🤖 Bot Comptable</h4>
+            <h4 style="color: #7b1fa2;">🤖 Assistant Comptable</h4>
             <p>Service indisponible.</p>
         </div>
         """, unsafe_allow_html=True)
