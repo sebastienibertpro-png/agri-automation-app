@@ -4,27 +4,13 @@ import tempfile
 import os
 import uuid
 from report_gen import ReportGenerator
-from shared import get_dataloader, init_campaign_selector, inject_premium_css, render_premium_header
+from shared import get_dataloader, init_campaign_selector, inject_premium_css, render_premium_header, render_brand_page_header
 
 st.set_page_config(page_title="Matériels", page_icon="🚜", layout="wide")
 
 inject_premium_css()
 
-st.title("🚜 Matériels")
-
-st.markdown("""
-<style>
-    .stButton>button {
-        width: 100%;
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 8px;
-    }
-    .stButton>button:hover {
-        background-color: #45a049;
-    }
-</style>
-""", unsafe_allow_html=True)
+render_brand_page_header("Matériels", "Gérez votre parc machine, vos entretiens et votre consommation GNR ✨", icon="🚜")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
