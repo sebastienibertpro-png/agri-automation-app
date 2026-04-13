@@ -268,12 +268,25 @@ with tab_mon_materiel:
     )
     st.write("")
 
+    # Nettoyage supplémentaire pour l'affichage (éviter les "None" résiduels)
+    df_mon_mat = df_materiels.copy()
+    for col in df_mon_mat.columns:
+        df_mon_mat[col] = df_mon_mat[col].apply(lambda x: "" if pd.isna(x) or str(x).strip().lower() == "none" else x)
+
+    # Configuration des colonnes
+    mat_column_config = {
+        "Image": None,
+        "Cout_fixe_annuel_estime": None,
+        "Cout_fixe_annuel_estime_€": None, # Au cas où
+        "Statut": None
+    }
+
     edited_df = st.data_editor(
-        df_materiels,
+        df_mon_mat,
         num_rows="dynamic",
         use_container_width=True,
         hide_index=True,
-        column_config={"Image": None},
+        column_config=mat_column_config,
         key="editor_materiels"
     )
 
@@ -341,9 +354,10 @@ with tab_journal_maint:
 
         st.caption(f"📊 {len(df_filtered_maint)} entrée(s) affichée(s)")
 
-        # Conversion str pour éviter les erreurs de type compatibilité avec data_editor
+        # Nettoyage robuste pour l'affichage
         df_editor_maint = df_filtered_maint.reset_index(drop=True).copy()
-        df_editor_maint = df_editor_maint.astype(str).replace(["nan", "None", "<NA>", "NaN"], "")
+        for col in df_editor_maint.columns:
+            df_editor_maint[col] = df_editor_maint[col].apply(lambda x: "" if pd.isna(x) or str(x).strip().lower() == "none" else x)
 
         # Tableau éditable
         edited_journal_maint = st.data_editor(
@@ -463,16 +477,10 @@ with tab_journal_fuel:
 
         st.caption(f"📊 {len(df_filtered_fuel)} entrée(s) affichée(s)")
 
-        # Conversion str pour éviter les erreurs de compatibilité de type avec data_editor
+        # Nettoyage robuste pour l'affichage
         df_editor_fuel = df_filtered_fuel.reset_index(drop=True).copy()
-        # Supprimer les décimales inutiles sur Campagne et Quantité
-        for col in ['Campagne', 'FUEL_quantité_L']:
-            if col in df_editor_fuel.columns:
-                df_editor_fuel[col] = pd.to_numeric(df_editor_fuel[col], errors='coerce')
-                df_editor_fuel[col] = df_editor_fuel[col].apply(
-                    lambda x: str(int(x)) if pd.notnull(x) else ""
-                )
-        df_editor_fuel = df_editor_fuel.astype(str).replace(["nan", "None", "<NA>", "NaN"], "")
+        for col in df_editor_fuel.columns:
+            df_editor_fuel[col] = df_editor_fuel[col].apply(lambda x: "" if pd.isna(x) or str(x).strip().lower() == "none" else x)
 
         # Tableau éditable
         edited_journal_fuel = st.data_editor(
