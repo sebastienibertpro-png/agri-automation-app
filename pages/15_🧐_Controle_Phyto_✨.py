@@ -57,14 +57,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─── HEADER ────────────────────────────────────────────────────────
-col_l, col_r = st.columns([1, 4])
-with col_l:
-    if LOTTIE_AVAILABLE and lottie_inspection:
-        st_lottie(lottie_inspection, height=120, key="lottie_inspection")
-    else:
-        st.markdown("<div style='font-size: 4em; text-align: center; padding: 10px;'>🧐</div>", unsafe_allow_html=True)
-with col_r:
-    render_brand_page_header("Assistant Contrôle Phyto ✨", "Analysez vos Itinéraires Techniques et vérifiez la conformité réglementaire de vos traitements grâce à l'IA.", icon="🧐")
+render_brand_page_header("Assistant Contrôle Phyto ✨", "Analysez vos Itinéraires Techniques et vérifiez la conformité réglementaire de vos traitements grâce à l'IA.", icon="🧐")
 
 # --- INITIALISATION API ---
 api_key = st.secrets.get("GEMINI_API_KEY")
