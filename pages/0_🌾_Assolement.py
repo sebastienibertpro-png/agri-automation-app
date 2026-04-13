@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import datetime
-from shared import init_campaign_selector, inject_premium_css, render_premium_header
+from shared import init_campaign_selector, inject_premium_css, render_premium_header, render_brand_page_header
 
 st.set_page_config(page_title="Assolement & Parcelles", page_icon="🌾", layout="wide")
 inject_premium_css()
 
-st.title("🌾 Gestion de l'Assolement & Parcelles")
+render_brand_page_header("Gestion de l'Assolement & Parcelles", "Définissez vos cultures et gérez votre parcellaire ✨", icon="🌾")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 dl = active_loader
