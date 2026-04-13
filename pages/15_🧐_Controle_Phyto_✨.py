@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import json
 import google.generativeai as genai
-from shared import init_campaign_selector, render_premium_header, render_premium_table, get_active_loader
+from shared import init_campaign_selector, render_premium_header, render_premium_table, get_active_loader, render_brand_page_header
 from report_gen import generate_ai_audit_pdf
 
 try:
@@ -64,10 +64,7 @@ with col_l:
     else:
         st.markdown("<div style='font-size: 4em; text-align: center; padding: 10px;'>🧐</div>", unsafe_allow_html=True)
 with col_r:
-    st.markdown("<h1 style='margin-bottom: 0px;'>🧐 Assistant Contrôle Phyto <span style='font-size: 0.8em;'>✨</span></h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #666; font-size: 1.1em;'>Analysez vos Itinéraires Techniques et vérifiez la conformité réglementaire de vos traitements grâce à l'IA ✨.</p>", unsafe_allow_html=True)
-
-st.divider()
+    render_brand_page_header("Assistant Contrôle Phyto ✨", "Analysez vos Itinéraires Techniques et vérifiez la conformité réglementaire de vos traitements grâce à l'IA.", icon="🧐")
 
 # --- INITIALISATION API ---
 api_key = st.secrets.get("GEMINI_API_KEY")
