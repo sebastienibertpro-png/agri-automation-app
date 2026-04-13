@@ -32,24 +32,55 @@ if df_filtered.empty:
     st.stop()
 
 # 3. Logique de regroupement (Similaire ITK)
+def format_traitement(row):
+    prod = str(row.get('Nom_Produit', ''))
+    typ = str(row.get('Type_Intervention', ''))
+    
+    if (pd.isna(row.get('Nom_Produit')) or prod.strip() in ["", "None", "nan"]):
+        # Pas de produit
+        return f"🔧 {typ}" if pd.notna(row.get('Type_Intervention')) and typ.strip() not in ["", "None", "nan"] else ""
+        
+    dose = row.get('Dose_Ha', '')
+    unit = row.get('Unité_Dose', '')
+    cible = row.get('Cible', '')
+    
+    parts = [f"🔹 {prod.strip()}"]
+    
+    # Dose
+    if pd.notna(dose) and str(dose).strip() not in ["", "None", "nan", "0", "0.0"]:
+        unit_str = str(unit) if pd.notna(unit) and str(unit).strip() not in ["", "None", "nan"] else ""
+        parts.append(f"➔ {dose} {unit_str}".strip())
+        
+    # Type (Herbicide, Fongicide...)
+    if pd.notna(typ) and typ.strip() not in ["", "None", "nan"]:
+         parts.append(f"({typ.strip()})")
+         
+    # Cible
+    if pd.notna(cible) and cible.strip() not in ["", "None", "nan"]:
+         parts.append(f"🎯 {cible.strip()}")
+         
+    return " ".join(parts)
+
 def group_interventions(df):
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
     df = df.sort_values(by=['Date', 'ID_Parcelle'], ascending=[False, True])
+    
+    # Création de la ligne de détail agglomérée par produit
+    df['Detail_Traitement'] = df.apply(format_traitement, axis=1)
+    
     group_cols = ['Date', 'ID_Parcelle', 'Nature_Intervention']
     agg_cols = {
-        'Nom_Produit': lambda x: "\n".join([str(i) for i in x if pd.notna(i) and str(i).strip() != ""]),
-        'Type_Intervention': lambda x: "\n".join(list(dict.fromkeys([str(i) for i in x if pd.notna(i) and str(i).strip() != ""]))),
-        'Dose_Ha': lambda x: "\n".join([f"{i}" for i in x if pd.notna(i)]),
-        'Unité_Dose': lambda x: "\n".join([str(i) for i in x if pd.notna(i)]),
-        'Cible': lambda x: "\n".join(list(dict.fromkeys([str(i) for i in x if pd.notna(i) and str(i).strip() != ""]))),
+        'Detail_Traitement': lambda x: [str(i) for i in x if str(i).strip() != ""],
         'ID_Intervention': lambda x: list(x.dropna().unique()),
     }
+    
     keep_cols = ['Surface_Travaillée_Ha', 'Tracteur', 'Outil', 'Stade_Culture', 'Conditions_Météo', 'Observations', 'Statut_Intervention']
     for col in keep_cols:
         if col in df.columns: agg_cols[col] = 'first'
+        
     def calculate_cost(row):
-        prods = str(row['Nom_Produit']).split('\n')
-        doses = str(row['Dose_Ha']).split('\n')
+        prods = str(row.get('Nom_Produit', '')).split('\n')
+        doses = str(row.get('Dose_Ha', '')).split('\n')
         total_cost = 0.0
         for p, d in zip(prods, doses):
             p_norm = p.strip().upper()
@@ -60,18 +91,22 @@ def group_interventions(df):
                     pass
         return total_cost
 
+    # Pour le calcul de coût, on a besoin des originaux temporairement
+    df_with_cost = df.copy()
+    df_with_cost['€/ha'] = df_with_cost.apply(calculate_cost, axis=1)
+    # on max ou sum le coût dans le groupby
+    agg_cols['€/ha'] = 'sum'
+
     df_grouped = df.groupby(group_cols, as_index=False).agg(agg_cols)
     
-    # Ajout du coût à l'ha
-    df_grouped['€/ha'] = df_grouped.apply(calculate_cost, axis=1).round(1)
+    # Nettoyage doublons éventuels dans les listes de traitements et suppression des listes vides
+    df_grouped['Detail_Traitement'] = df_grouped['Detail_Traitement'].apply(lambda lst: list(dict.fromkeys(lst)))
     
     return df_grouped
 
 df_display = group_interventions(df_filtered)
 
 from shared import init_campaign_selector, inject_premium_css, render_premium_header
-
-# ... (rest of imports)
 
 # 4. Affichage
 render_premium_header("📖 Journal Détaillé", "Cochez une ligne pour agir ✍️🔥", color="blue")
@@ -81,10 +116,7 @@ column_config = {
     "Date": st.column_config.DateColumn("Date", format="DD/MM/YYYY"),
     "ID_Parcelle": "Parcelle",
     "Nature_Intervention": "Nature",
-    "Type_Intervention": st.column_config.TextColumn("Type"),
-    "Nom_Produit": st.column_config.TextColumn("Produits"),
-    "Dose_Ha": st.column_config.TextColumn("Dose/ha"),
-    "Unité_Dose": st.column_config.TextColumn("Unité"),
+    "Detail_Traitement": st.column_config.ListColumn("Produits & Détails", width="large"),
     "Surface_Travaillée_Ha": "Surf. (ha)",
     "€/ha": st.column_config.NumberColumn("€/ha", format="%.1f €"),
     "Statut_Intervention": "Statut",
@@ -131,7 +163,7 @@ if not selected_rows.empty:
                 st.error("Sélectionnez une seule ligne pour modifier.")
             else:
                 st.session_state.edit_intervention = selected_rows.iloc[0].to_dict()
-                st.switch_page("pages/1_✍️_Saisie_Intervention.py")
+                st.switch_page("pages/1_✍️_Intervention_et_Assistant_Vocal.py")
 else:
     st.write("---")
     st.caption("Cochez une ligne pour la supprimer ou la modifier.")
