@@ -174,17 +174,26 @@ def inject_premium_css():
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
 
     /* Global Overrides for Streamlit Widgets */
-    html, body, [data-testid="stAppViewContainer"], p, h1, h2, h3, label, .stMarkdown {
-        font-family: 'Outfit', sans-serif !important;
+    html, body, .stApp, p, h1, h2, h3, label, .stMarkdown {
+        font-family: 'Outfit', sans-serif;
     }
 
-    /* Restore Streamlit Material Icons specifically */
+    /* Force Headers strictly */
+    h1, h2, h3 { font-family: 'Outfit', sans-serif !important; font-weight: 700 !important; }
+
+    /* Restore Streamlit Material Icons specifically with extreme precision */
+    details summary svg, 
+    details summary span,
+    details summary div,
+    [data-testid="stSidebarCollapseButton"] *,
+    [data-testid="stSidebarNavItems"] *,
+    button[kind="header"] *,
+    .stIcon, .stIcon *,
     .material-symbols-rounded,
-    .material-symbols-outlined,
     .material-icons,
-    [class*="material-symbols"],
+    [class*="material-symbols-"],
     [data-testid="stIconMaterial"],
-    .notranslate {
+    svg text, .notranslate {
         font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
     }
 
