@@ -272,6 +272,7 @@ with tab_mon_materiel:
     df_mon_mat = df_materiels.copy()
     for col in df_mon_mat.columns:
         df_mon_mat[col] = df_mon_mat[col].apply(lambda x: "" if pd.isna(x) or str(x).strip().lower() == "none" else x)
+    df_mon_mat = df_mon_mat.astype(str)
 
     # Configuration des colonnes
     mat_column_config = {
@@ -358,6 +359,7 @@ with tab_journal_maint:
         df_editor_maint = df_filtered_maint.reset_index(drop=True).copy()
         for col in df_editor_maint.columns:
             df_editor_maint[col] = df_editor_maint[col].apply(lambda x: "" if pd.isna(x) or str(x).strip().lower() == "none" else x)
+        df_editor_maint = df_editor_maint.astype(str)
 
         # Tableau éditable
         edited_journal_maint = st.data_editor(
@@ -481,6 +483,7 @@ with tab_journal_fuel:
         df_editor_fuel = df_filtered_fuel.reset_index(drop=True).copy()
         for col in df_editor_fuel.columns:
             df_editor_fuel[col] = df_editor_fuel[col].apply(lambda x: "" if pd.isna(x) or str(x).strip().lower() == "none" else x)
+        df_editor_fuel = df_editor_fuel.astype(str)
 
         # Tableau éditable
         edited_journal_fuel = st.data_editor(
