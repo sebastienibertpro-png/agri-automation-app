@@ -5,15 +5,13 @@ import tempfile
 import zipfile
 import os
 from report_gen import ReportGenerator
-from shared import init_campaign_selector, APP_BASE_URL
+from shared import init_campaign_selector, APP_BASE_URL, render_brand_page_header
 
 st.set_page_config(page_title="Édition de Documents", page_icon="📄", layout="wide")
 
-st.title("📄 Édition de Documents Réglementaires")
+render_brand_page_header("Édition de Documents Réglementaires", "Générez vos registres, bilans et fiches de préparation en quelques clics ✨", icon="📄")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
-
-st.caption(f"📅 Campagne de travail : **{selected_campaign}** *(Modifiable dans le menu latéral)*")
 
 options = ["Toutes"] + list(available_parcelles)
 selected_parcelle = st.selectbox("🌾 Sélectionner la Parcelle cible :", options)
