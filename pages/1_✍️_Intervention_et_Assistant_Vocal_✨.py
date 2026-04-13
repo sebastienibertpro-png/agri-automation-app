@@ -5,7 +5,7 @@ import random
 from datetime import datetime
 import requests
 from streamlit_lottie import st_lottie
-from shared import init_campaign_selector
+from shared import init_campaign_selector, render_brand_page_header
 
 # --- Imports optionnels pour le mode vocal ---
 try:
@@ -84,13 +84,13 @@ edit_data = {}
 if "edit_intervention" in st.session_state and st.session_state.edit_intervention:
     is_edit_mode = True
     edit_data = st.session_state.edit_intervention
-    st.title("✍️ Modifier l'Intervention")
+    render_brand_page_header("Modifier l'Intervention", "Correction d'une saisie existante", icon="✍️")
     st.info(f"Mode Édition activé pour l'intervention du {edit_data.get('Date', '')} sur {edit_data.get('ID_Parcelle', '')}")
     if st.button("❌ Annuler l'édition"):
         st.session_state.edit_intervention = None
         st.rerun()
 else:
-    st.title("✍️ Saisie d'Intervention")
+    render_brand_page_header("Saisie d'Intervention", "Enregistrez vos travaux, à la main ou à la voix ✨", icon="✍️")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
