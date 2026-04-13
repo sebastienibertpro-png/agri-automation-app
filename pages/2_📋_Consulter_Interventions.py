@@ -46,10 +46,21 @@ def format_traitement(row):
     
     parts = [f"🔹 {prod.strip()}"]
     
+    cost_part = ""
+    
     # Dose
     if pd.notna(dose) and str(dose).strip() not in ["", "None", "nan", "0", "0.0"]:
         unit_str = str(unit) if pd.notna(unit) and str(unit).strip() not in ["", "None", "nan"] else ""
         parts.append(f"➔ {dose} {unit_str}".strip())
+        
+        # Calcul du coût
+        p_norm = prod.strip().upper()
+        if 'product_prices' in globals() and p_norm in product_prices:
+            try:
+                cst = float(dose) * product_prices[p_norm]
+                cost_part = f"💰 {cst:.1f} €"
+            except:
+                pass
         
     # Type (Herbicide, Fongicide...)
     if pd.notna(typ) and typ.strip() not in ["", "None", "nan"]:
@@ -58,6 +69,10 @@ def format_traitement(row):
     # Cible
     if pd.notna(cible) and cible.strip() not in ["", "None", "nan"]:
          parts.append(f"🎯 {cible.strip()}")
+         
+    # Ajouter le coût à la fin
+    if cost_part:
+         parts.append(cost_part)
          
     return " ".join(parts)
 
@@ -103,6 +118,10 @@ def group_interventions(df):
     return df_grouped
 
 df_display = group_interventions(df_filtered)
+
+# Nettoyer l'affichage général (remplacer les "None" par rien)
+df_display = df_display.replace(["None", "nan", "<NA>", "NaN"], "")
+df_display = df_display.fillna("")
 
 from shared import init_campaign_selector, inject_premium_css, render_premium_header
 
