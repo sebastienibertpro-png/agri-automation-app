@@ -99,12 +99,48 @@ Explique brièvement, sois chiffré.
 
 @st.cache_resource
 def get_model():
+    """Tente les modèles Pro dans l'ordre, puis repasse sur Flash en dernier recours."""
+    candidates = [
+        "gemini-1.5-pro-001",   # Version précise API v1
+        "gemini-1.5-pro-002",   # Version alternative
+        "gemini-1.5-pro",        # Alias générique
+        "gemini-1.5-flash",      # Fallback fiable
+    ]
+    for model_name in candidates:
+        try:
+            # Vérifier si le modèle est accessible via list_models
+            available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            full_name = f"models/{model_name}"
+            if any(model_name in n for n in available):
+                m = genai.GenerativeModel(
+                    model_name=model_name,
+                    system_instruction=system_instruction
+                )
+                return m, model_name
+        except Exception:
+            # Si list_models échoue, on tente directement
+            try:
+                m = genai.GenerativeModel(
+                    model_name=model_name,
+                    system_instruction=system_instruction
+                )
+                return m, model_name
+            except Exception:
+                continue
+    # Dernier recours absolu
     return genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",
+        model_name="gemini-1.5-flash",
         system_instruction=system_instruction
-    )
+    ), "gemini-1.5-flash (fallback)"
 
-model = get_model()
+model, active_model_name = get_model()
+
+# --- Affichage du modèle actif dans la sidebar ---
+with st.sidebar:
+    st.markdown(f"**🤖 Modèle IA actif :**")
+    is_pro = "pro" in active_model_name.lower()
+    badge_color = "#1b5e20" if is_pro else "#e65100"
+    st.markdown(f"<span style='background:{badge_color};color:white;padding:3px 10px;border-radius:12px;font-size:0.85em;font-weight:bold;'>{active_model_name}</span>", unsafe_allow_html=True)
 
 # --- SELECTION CONTEXTE ---
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
