@@ -4,7 +4,7 @@ import uuid
 import time
 from shared import init_campaign_selector
 
-st.set_page_config(page_title="Récolte & Stockage", page_icon="🌾", layout="wide")
+st.set_page_config(page_title="Gestion du stockage et des ventes", page_icon="🌾", layout="wide")
 
 st.markdown("""
 <style>
@@ -40,7 +40,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🌾 Gestion Récolte, Stockage et Ventes")
+st.title("🌾 Gestion du stockage et des ventes")
 
 st.markdown("Suivi unifié de vos récoltes, du remplissage de vos cellules et de l'exécution de vos contrats de vente pour la campagne sélectionnée.")
 
@@ -140,6 +140,33 @@ with tab1:
         from shared import render_premium_table
         render_premium_table(df_format_silo, color="blue")
         
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.divider()
+        st.subheader("🔍 Zoom sur l'historique d'une cellule")
+        
+        sel_silo_zoom = st.selectbox("Sélectionnez une cellule pour voir ses mouvements récents :", ["- Choisir -"] + silos_list, key="silo_zoom_explorer")
+        
+        if sel_silo_zoom != "- Choisir -":
+            if not df_recolte.empty:
+                df_zoom = df_recolte[df_recolte['Lieu_Stockage'] == sel_silo_zoom].copy()
+                if not df_zoom.empty:
+                    # Formattage pour le tableau premium
+                    df_zoom_disp = df_zoom[['Date', 'Type_Mouvement', 'Produit', 'Quantite_T', 'Humidite_Moyenne', 'PS_Moyen']].copy()
+                    df_zoom_disp = df_zoom_disp.rename(columns={
+                        'Quantite_T': 'Quantité (T)',
+                        'Humidite_Moyenne': 'Humidité',
+                        'PS_Moyen': 'PS'
+                    })
+                    # Remplacer les None/nan par vide
+                    df_zoom_disp = df_zoom_disp.fillna("")
+                    
+                    st.info(f"Mouvements enregistrés pour : **{sel_silo_zoom}**")
+                    render_premium_table(df_zoom_disp, color="blue", compact=True)
+                else:
+                    st.info(f"Aucun mouvement trouvé pour {sel_silo_zoom}.")
+            else:
+                st.info("Aucune donnée disponible.")
+
         st.markdown("<br>", unsafe_allow_html=True)
         
         import plotly.express as px
