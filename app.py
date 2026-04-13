@@ -492,7 +492,7 @@ try:
                                 <span>{prog_text}%</span>
                             </div>
                             <div style="height: 8px; width: 100%; background-color: #e0e0e0; border-radius: 4px;">
-                                <div style="height: 100%; width: {prog_vis}%; background-color: {prog_color}; border-radius: 4px;"></div>
+                                <div style="height: 100%; width: {round(prog_vis, 1)}%; background-color: {prog_color}; border-radius: 4px;"></div>
                             </div>
                         </td>
                         <td style="padding: 12px 15px; text-align: center; font-weight: bold; color: {reste_color};">
