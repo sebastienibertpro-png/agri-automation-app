@@ -201,19 +201,8 @@ def process_invoices_ui():
                     first_row = rows_data[0]
                     compta_year = get_compta_year(first_row.get("Date_facture", ""))
 
-                    # --- Normalisation des noms produits contre REF_INTRANTS ---
-                    # Fuzzy-matching pour éviter les doublons de type "PEAK Dose 250G" vs "PEAK"
-                    try:
-                        from rapidfuzz import process as rfz_process, fuzz as rfz_fuzz
-                        loader_ref = get_dataloader()
-                        df_intrants = loader_ref.get_intrants() if loader_ref else pd.DataFrame()
-                        
-                        ref_names = []
-                        if not df_intrants.empty and 'Nom_Produit' in df_intrants.columns:
-                            ref_names = df_intrants['Nom_Produit'].dropna().astype(str).str.strip().tolist()
-                        
-                        FUZZY_THRESHOLD = 82  # Score minimum pour accepter le match (0-100)
-                        normalization_log = []  # Pour affichage
+                        FUZZY_THRESHOLD = 82
+                        normalization_log = []
                         
                         if ref_names:
                             for row in rows_data:
@@ -221,25 +210,19 @@ def process_invoices_ui():
                                 if not raw_name:
                                     continue
                                 
-                                # Chercher le meilleur match dans REF_INTRANTS
-                                result = rfz_process.extractOne(
-                                    raw_name,
-                                    ref_names,
-                                    scorer=rfz_fuzz.token_set_ratio  # Robuste aux mots en plus
-                                )
+                                # Utilisation de la logique centralisée dans DataLoader
+                                matched_name, score = loader_ref.normalize_product_name(raw_name, ref_names=ref_names, threshold=FUZZY_THRESHOLD)
                                 
-                                if result and result[1] >= FUZZY_THRESHOLD:
-                                    matched_name, score, _ = result
-                                    if matched_name.upper() != raw_name.upper():
-                                        # Remplacer le nom et conserver l'original dans Commentaires
-                                        row["Nom_Produit"] = matched_name
-                                        existing_comment = str(row.get("Commentaires", "") or "").strip()
-                                        row["Commentaires"] = f"[Facture: {raw_name}] {existing_comment}".strip()
-                                        normalization_log.append({
-                                            "📄 Nom sur facture": raw_name,
-                                            "✅ Normalisé vers": matched_name,
-                                            "🎯 Score": f"{score}%"
-                                        })
+                                if matched_name and matched_name.upper() != raw_name.upper():
+                                    # Remplacer le nom et conserver l'original dans Commentaires
+                                    row["Nom_Produit"] = matched_name
+                                    existing_comment = str(row.get("Commentaires", "") or "").strip()
+                                    row["Commentaires"] = f"[Facture: {raw_name}] {existing_comment}".strip()
+                                    normalization_log.append({
+                                        "📄 Nom sur facture": raw_name,
+                                        "✅ Normalisé vers": matched_name,
+                                        "🎯 Score": f"{int(score)}%"
+                                    })
                         
                         if normalization_log:
                             with st.expander(f"🔄 {len(normalization_log)} nom(s) normalisé(s) pour {original_name}", expanded=False):
