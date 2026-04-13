@@ -445,18 +445,18 @@ try:
             df_ppf_vis['VisProgress'] = df_ppf_vis['Actual_Prog'].clip(0, 100)
             
             html_table = """
-            <div style="font-family: 'Outfit', sans-serif; margin-top: 10px;">
-                <table style="width: 100%; border-collapse: collapse; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
-                    <thead>
-                        <tr style="background: linear-gradient(90deg, #2F6D89 0%, #5E9E47 100%); color: white; text-align: left;">
-                            <th style="padding: 15px;">📍 Parcelle</th>
-                            <th style="padding: 15px;">🌾 Culture</th>
-                            <th style="padding: 15px; width: 250px;">📊 Progression N (Unités)</th>
-                            <th style="padding: 15px; text-align: center;">⏳ Reste</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """
+<div style="font-family: 'Outfit', sans-serif; margin-top: 10px;">
+<table style="width: 100%; border-collapse: collapse; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+<thead>
+<tr style="background: linear-gradient(90deg, #2F6D89 0%, #5E9E47 100%); color: white; text-align: left;">
+<th style="padding: 15px;">📍 Parcelle</th>
+<th style="padding: 15px;">🌾 Culture</th>
+<th style="padding: 15px; width: 250px;">📊 Progression N (Unités)</th>
+<th style="padding: 15px; text-align: center;">⏳ Reste</th>
+</tr>
+</thead>
+<tbody>
+"""
             
             for i, row in df_ppf_vis.iterrows():
                 bg_color = "#f8f9fb" if i % 2 == 1 else "white"
@@ -484,23 +484,23 @@ try:
                     prog_color = "#2F6D89"
                 
                 html_table += f"""
-                    <tr style="background-color: {bg_color}; border-bottom: 1px solid #eee;">
-                        <td style="padding: 12px 15px; font-weight: 600; color: #333;">{row['Parcelle']}</td>
-                        <td style="padding: 12px 15px; color: #555;">{row['Culture']}</td>
-                        <td style="padding: 12px 15px;">
-                            <div style="font-size: 0.85em; margin-bottom: 5px; display: flex; justify-content: space-between; font-weight: 500;">
-                                <span>{row['N Apporté (U)']} / {row['Dose X Prévue (U)']} U</span>
-                                <span>{prog_text}%</span>
-                            </div>
-                            <div style="height: 8px; width: 100%; background-color: #e0e0e0; border-radius: 4px;">
-                                <div style="height: 100%; width: {round(prog_vis, 1)}%; background-color: {prog_color}; border-radius: 4px;"></div>
-                            </div>
-                        </td>
-                        <td style="padding: 12px 15px; text-align: center; font-weight: bold; color: {reste_color};">
-                            {reste_text}
-                        </td>
-                    </tr>
-                """
+<tr style="background-color: {bg_color}; border-bottom: 1px solid #eee;">
+<td style="padding: 12px 15px; font-weight: 600; color: #333;">{row['Parcelle']}</td>
+<td style="padding: 12px 15px; color: #555;">{row['Culture']}</td>
+<td style="padding: 12px 15px;">
+<div style="font-size: 0.85em; margin-bottom: 5px; display: flex; justify-content: space-between; font-weight: 500;">
+<span>{row['N Apporté (U)']} / {row['Dose X Prévue (U)']} U</span>
+<span>{prog_text}%</span>
+</div>
+<div style="height: 8px; width: 100%; background-color: #e0e0e0; border-radius: 4px;">
+<div style="height: 100%; width: {round(prog_vis, 1)}%; background-color: {prog_color}; border-radius: 4px;"></div>
+</div>
+</td>
+<td style="padding: 12px 15px; text-align: center; font-weight: bold; color: {reste_color};">
+{reste_text}
+</td>
+</tr>
+"""
             
             html_table += "</tbody></table></div>"
             st.markdown(html_table, unsafe_allow_html=True)
