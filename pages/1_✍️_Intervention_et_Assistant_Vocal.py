@@ -76,72 +76,64 @@ else:
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
 # ═══════════════════════════════════════════════════════════════════
-# 🎙️ ASSISTANT VOCAL — SECTION EN HAUT
+# ASSISTANT VOCAL — SECTION EN HAUT
 # ═══════════════════════════════════════════════════════════════════
 if not is_edit_mode:
-    st.markdown('<div class="voice-box">', unsafe_allow_html=True)
-    col_mic_icon, col_mic_title = st.columns([1, 8])
-    with col_mic_icon:
-        st.markdown("<div style='font-size:2.2em; text-align:center; margin-top:4px;'>🎙️</div>", unsafe_allow_html=True)
-    with col_mic_title:
+    with st.container(border=True):
         st.markdown("### Assistant Vocal")
-        st.caption("Parlez naturellement pour pré-remplir le formulaire. Ex : *« J'ai traité les Buissons avec du Peak à 0.25 L/ha avec le 220 CVX »*")
+        st.caption("Dites par exemple : *« J'ai traité les Buissons avec du Peak à 0.25 L/ha avec le 220 CVX »*")
 
-    if not AUDIO_RECORDER_AVAILABLE:
-        st.warning("⚠️ Module `audio-recorder-streamlit` non installé. Redéployez l'application après la mise à jour des requirements.")
-    elif not VOICE_PROCESSOR_AVAILABLE:
-        st.warning("⚠️ Module `voice_processor` introuvable. Vérifiez que le fichier est bien dans le dossier de l'application.")
-    else:
-        # Récupérer la clé API
-        api_key = st.secrets.get("GEMINI_API_KEY", "")
-
-        if not api_key:
-            st.warning("⚠️ Clé GEMINI_API_KEY manquante dans les secrets Streamlit.")
+        if not AUDIO_RECORDER_AVAILABLE:
+            st.warning("⚠️ Module vocal non disponible.")
+        elif not VOICE_PROCESSOR_AVAILABLE:
+            st.warning("⚠️ Processeur vocal non disponible.")
         else:
-            # Bouton d'enregistrement (s'affiche uniquement si pas déjà un résultat en attente)
-            col_rec, col_status = st.columns([3, 5])
-            with col_rec:
-                audio_bytes = audio_recorder(
-                    text="🎤 Cliquez pour parler / stopper",
-                    recording_color="#e53935",
-                    neutral_color="#43a047",
-                    icon_name="microphone",
-                    icon_size="2x",
-                    pause_threshold=300.0,  # 5 minutes avant coupure auto (oblige le clic)
-                    sample_rate=16000,
-                    key="voice_audio_recorder"
-                )
-            with col_status:
+            api_key = st.secrets.get("GEMINI_API_KEY", "")
+            if not api_key:
+                st.warning("⚠️ Clé API manquante.")
+            else:
+                col_rec, col_status = st.columns([2, 5])
+                with col_rec:
+                    audio_bytes = audio_recorder(
+                        text="Cliquer pour enregistrer",
+                        recording_color="#e53935",
+                        neutral_color="#43a047",
+                        icon_size="2x",
+                        pause_threshold=300.0,
+                        sample_rate=16000,
+                        key="voice_audio_recorder"
+                    )
+                with col_status:
+                    if audio_bytes:
+                        st.success("✅ Audio capturé - Prêt pour analyse")
+                    elif "voice_result" in st.session_state and st.session_state.voice_result:
+                        st.info("💡 Analyse en mémoire")
+                    else:
+                        st.caption("Appuyez sur le micro pour commencer, puis réappuyez pour stopper. L'icône devient rouge pendant l'enregistrement.")
+
+                # Stocker les bytes audio en session pour pouvoir analyser
                 if audio_bytes:
-                    st.success(f"✅ Audio enregistré ({len(audio_bytes)//1000} Ko) — Cliquez sur **Analyser** ci-dessous")
-                elif "voice_result" in st.session_state and st.session_state.voice_result:
-                    st.info("💡 Un résultat est en mémoire. Enregistrez à nouveau pour recommencer.")
-                else:
-                    st.caption("🔴 **L'enregistrement ne s'arrêtera pas tout seul.** Appuyez sur le micro pour commencer, puis **réappuyez sur le micro pour stopper**. Pendant l'enregistrement, l'icône devient rouge.")
+                    st.session_state["voice_audio_bytes"] = audio_bytes
 
-            # Stocker les bytes audio en session pour pouvoir analyser
-            if audio_bytes:
-                st.session_state["voice_audio_bytes"] = audio_bytes
-
-            # Bouton Analyser
-            col_analyze, col_clear = st.columns([3, 2])
-            with col_analyze:
-                do_analyze = st.button(
-                    "✨ Analyser avec l'IA",
-                    type="primary",
-                    disabled="voice_audio_bytes" not in st.session_state,
-                    use_container_width=True,
-                    key="btn_analyze_voice"
-                )
-            with col_clear:
-                if st.button("🗑️ Effacer", use_container_width=True, key="btn_clear_voice"):
-                    for k in ["voice_audio_bytes", "voice_result", "voice_prefill"]:
-                        st.session_state.pop(k, None)
-                    st.rerun()
+                # Boutons d'action
+                col_analyze, col_clear = st.columns([1, 1])
+                with col_analyze:
+                    do_analyze = st.button(
+                        "✨ Analyser avec l'IA",
+                        type="primary",
+                        disabled="voice_audio_bytes" not in st.session_state,
+                        use_container_width=True,
+                        key="btn_analyze_voice"
+                    )
+                with col_clear:
+                    if st.button("🗑️ Effacer", use_container_width=True, key="btn_clear_voice"):
+                        for k in ["voice_audio_bytes", "voice_result", "voice_prefill"]:
+                            st.session_state.pop(k, None)
+                        st.rerun()
 
             # --- Analyse Gemini ---
-            if do_analyze and "voice_audio_bytes" in st.session_state:
-                with st.spinner("🤖 Analyse en cours avec Gemini 2.5 Flash..."):
+            if "do_analyze" in locals() and do_analyze and "voice_audio_bytes" in st.session_state:
+                with st.spinner("🤖 Analyse en cours..."):
                     try:
                         context = build_context_from_loader(active_loader, selected_campaign)
                         result = transcribe_audio_bytes(
@@ -151,12 +143,10 @@ if not is_edit_mode:
                             audio_format="wav"
                         )
                         st.session_state["voice_result"] = result
-                        # Pré-sélectionner les items INTERVENTION valides
                         prefill_list = [item for item in result if item.get("Type_Action", "INTERVENTION") == "INTERVENTION" and "error" not in item]
                         st.session_state["voice_prefill"] = prefill_list
                     except Exception as e:
-                        st.error(f"Erreur lors de l'analyse : {e}")
-                        st.session_state["voice_result"] = [{"error": "EXCEPTION", "raw": str(e)}]
+                        st.error(f"Erreur d'analyse : {e}")
                 st.rerun()
 
             # --- Résultat affiché ---
