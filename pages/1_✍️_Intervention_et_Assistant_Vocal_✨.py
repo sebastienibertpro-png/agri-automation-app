@@ -24,6 +24,7 @@ try:
         build_context_from_loader,
         transcribe_audio_bytes,
         transcribe_audio_followup,
+        transcribe_optional_fields_bulk,
         apply_updates_to_collected_data,
         check_collected_data,
         group_interventions_by_parcelle,
@@ -199,7 +200,9 @@ def get_index(options, value):
 
 
 def tts_speak(text: str):
-    """Injecte un composant JS pour lire le texte via la Web Speech API du navigateur."""
+    """Injecte un composant JS pour lire le texte via la Web Speech API du navigateur.
+    Sélectionne la meilleure voix française disponible (Google > Microsoft > défaut).
+    """
     if not text:
         return
     # Escape pour JS
@@ -213,14 +216,28 @@ def tts_speak(text: str):
     (function() {{
         if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
+        function pickBestFrVoice(voices) {{
+            // Priorité 1 : voix Google française (la plus naturelle dans Chrome)
+            var g = voices.find(function(v) {{
+                return v.lang && v.lang.startsWith('fr') && v.name.toLowerCase().indexOf('google') !== -1;
+            }});
+            if (g) return g;
+            // Priorité 2 : voix Microsoft française
+            var m = voices.find(function(v) {{
+                return v.lang && v.lang.startsWith('fr') && v.name.toLowerCase().indexOf('microsoft') !== -1;
+            }});
+            if (m) return m;
+            // Fallback : n'importe quelle voix fr
+            return voices.find(function(v) {{ return v.lang && v.lang.startsWith('fr'); }});
+        }}
         function doSpeak() {{
             var u = new SpeechSynthesisUtterance('{safe}');
             u.lang = 'fr-FR';
-            u.rate = 0.92;
-            u.pitch = 1.05;
+            u.rate = 0.88;
+            u.pitch = 1.0;
             var voices = window.speechSynthesis.getVoices();
-            var fr = voices.find(function(v) {{ return v.lang && v.lang.startsWith('fr'); }});
-            if (fr) u.voice = fr;
+            var best = pickBestFrVoice(voices);
+            if (best) u.voice = best;
             window.speechSynthesis.speak(u);
         }}
         if (window.speechSynthesis.getVoices().length > 0) {{
@@ -296,18 +313,27 @@ def transition_to_optional_or_confirm():
         st.session_state["va_tts_queue"] = tts_txt
         st.session_state["va_state"] = "confirming"
     else:
-        # Première question optionnelle
-        first_opt = optional[0]
-        field = first_opt["field"]
-        label = first_opt["label"]
-        question = f"{label} Vous pouvez aussi dire «passer» si vous ne souhaitez pas préciser."
-        ai_msg = f"Votre intervention est complète ! Une dernière chose facultative : {question}"
+        # UNE SEULE question globale pour tous les champs optionnels
+        nature = ""
+        if st.session_state.get("va_collected_data"):
+            nature = str(st.session_state["va_collected_data"][0].get("Nature_Intervention", ""))
+        extras = "tracteur, outil et stade de culture"
+        if "Traitement" in nature:
+            extras = "tracteur, outil, stade de culture et cible du traitement"
+        elif "colte" in nature or "Moisson" in nature:
+            extras = "tracteur, outil, humidité et poids spécifique"
+        elif "Semis" in nature:
+            extras = "tracteur, outil et PMG"
+        question = (
+            f"Voulez-vous ajouter des informations complémentaires comme {extras}, "
+            f"des observations ou des conditions météo ? "
+            f"Dites ce que vous voulez ajouter, ou dites \u00abrien\u00bb pour continuer."
+        )
+        ai_msg = f"Votre intervention est enregistrée ! {question}"
         add_message("ai", ai_msg)
         st.session_state["va_tts_queue"] = ai_msg
         st.session_state["va_current_question"] = question
-        st.session_state["va_current_field"] = field
-        st.session_state["va_current_field_idx"] = first_opt.get("item_index", 0)
-        st.session_state["va_question_idx"] = 0
+        st.session_state["va_current_field"] = "_optional_bulk"
         st.session_state["va_state"] = "questioning_optional"
 
 
@@ -356,10 +382,41 @@ def process_initial_audio(audio_bytes: bytes, context: dict, api_key: str):
 
 def process_followup_audio(audio_bytes: bytes, context: dict, api_key: str, optional_mode: bool = False):
     """Traite une réponse à une question de suivi."""
+    current_data = st.session_state.get("va_collected_data", [])
+
+    if optional_mode:
+        # ── Question optionnelle GLOBALE : une seule passe ──
+        with st.spinner("📝 Enregistrement des informations complémentaires…"):
+            result = transcribe_optional_fields_bulk(audio_bytes, current_data, context, api_key)
+
+        raw_text = result.get("raw_text", "…")
+        add_message("user", raw_text)
+
+        if result.get("error"):
+            add_message("system", f"⚠️ Transcription : {result['error'][:80]}")
+
+        if not result.get("skip") and result.get("updates"):
+            st.session_state["va_collected_data"] = apply_updates_to_collected_data(
+                current_data, result["updates"]
+            )
+            added = ", ".join(result["updates"].keys())
+            ai_msg = f"Parfait ! J'ai ajouté : {added}. Voici le résumé final."
+        else:
+            ai_msg = "Très bien, on continue sans informations supplémentaires. Voici le résumé."
+
+        add_message("ai", ai_msg)
+        # Générer le résumé vocal et passer à la confirmation
+        grouped = group_interventions_by_parcelle(st.session_state["va_collected_data"])
+        tts_txt = generate_tts_summary(grouped)
+        st.session_state["va_tts_queue"] = tts_txt
+        st.session_state["va_skip_optional_all"] = True
+        st.session_state["va_state"] = "confirming"
+        return
+
+    # ── Question critique classique ──
     question = st.session_state.get("va_current_question", "")
     field = st.session_state.get("va_current_field", "")
     field_idx = st.session_state.get("va_current_field_idx", 0)
-    current_data = st.session_state.get("va_collected_data", [])
 
     with st.spinner("📝 Mise à jour…"):
         result = transcribe_audio_followup(audio_bytes, question, field, current_data, context, api_key)
@@ -374,32 +431,19 @@ def process_followup_audio(audio_bytes: bytes, context: dict, api_key: str, opti
         updates = result.get("updates", {})
         if updates:
             st.session_state["va_collected_data"] = apply_updates_to_collected_data(
-                current_data, updates, field_idx if not optional_mode else None
+                current_data, updates, field_idx
             )
+    # Vérifier les champs critiques restants
+    completeness = check_collected_data(st.session_state["va_collected_data"])
+    st.session_state["va_missing_critical"] = completeness["critical_missing"]
+    st.session_state["va_missing_optional"] = completeness["optional_missing"]
 
-    if optional_mode:
-        # Passer à la question optionnelle suivante
-        optional = st.session_state.get("va_missing_optional", [])
-        current_idx = st.session_state.get("va_question_idx", 0)
-        next_idx = current_idx + 1
-
-        if next_idx < len(optional):
-            next_opt = optional[next_idx]
-            question2 = f"{next_opt['label']} Vous pouvez dire «passer» si vous ne souhaitez pas."
-            if result.get("skip"):
-                ai_msg = f"Très bien ! Autre chose de facultatif : {question2}"
-            else:
-                ai_msg = f"Noté ! Et {question2}"
+    if completeness["is_critical_complete"]:
+        if result.get("skip"):
+            ai_msg = "D'accord, je laisse ce champ vide. Passons à la suite."
             add_message("ai", ai_msg)
             st.session_state["va_tts_queue"] = ai_msg
-            st.session_state["va_current_question"] = question2
-            st.session_state["va_current_field"] = next_opt["field"]
-            st.session_state["va_current_field_idx"] = next_opt.get("item_index", 0)
-            st.session_state["va_question_idx"] = next_idx
-        else:
-            # Toutes les optionnelles traitées
-            st.session_state["va_skip_optional_all"] = True
-            transition_to_optional_or_confirm()
+        transition_to_optional_or_confirm()
     else:
         # Vérifier les champs critiques restants
         completeness = check_collected_data(st.session_state["va_collected_data"])
