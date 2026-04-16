@@ -476,18 +476,20 @@ with tab_voice:
         st.session_state["va_tts_queue"] = ""
 
     # ── Vérifications prérequis ───────────────────────────────────────────
+    _voice_ok = True
     if not AUDIO_RECORDER_AVAILABLE:
         st.error("⚠️ Module `audio_recorder_streamlit` non installé. Lancez : `pip install audio-recorder-streamlit`")
-        st.stop()
-    if not VOICE_PROCESSOR_AVAILABLE:
+        _voice_ok = False
+    elif not VOICE_PROCESSOR_AVAILABLE:
         st.error(f"⚠️ Module vocal non disponible : {_VP_ERROR}")
-        st.stop()
-    if not api_key:
+        _voice_ok = False
+    elif not api_key:
         st.error("⚠️ Clé API Gemini manquante dans les secrets.")
-        st.stop()
+        _voice_ok = False
 
-    # ── Chargement du contexte ────────────────────────────────────────────
-    context = build_context_from_loader(active_loader, selected_campaign)
+    # ── Chargement du contexte (uniquement si prérequis OK) ───────────────
+    if _voice_ok:
+        context = build_context_from_loader(active_loader, selected_campaign)
 
     # ── Panel principal ───────────────────────────────────────────────────
     st.markdown('<div class="voice-panel">', unsafe_allow_html=True)
@@ -757,7 +759,7 @@ with tab_voice:
         with col_consult:
             st.page_link("pages/2_📋_Consulter_Interventions.py", label="📋 Consulter les interventions", icon="📋")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════════════════════
