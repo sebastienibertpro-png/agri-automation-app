@@ -20,3 +20,4 @@ streamlit-js-eval
 PyMuPDF
 streamlit-lottie
 audio-recorder-streamlit
+gtts
