@@ -618,7 +618,7 @@ with tab_voice:
     }
     status_label = state_labels.get(va_state, va_state)
     
-    # Conteneur natif Streamlit pour éviter de casser le rendu HTML
+    # Conteneur natif Streamlit pour éviter de casser le rendu HTML (En-tête seulement)
     with st.container(border=True):
         col_ai_anim, col_ai_title = st.columns([1, 4])
         
@@ -635,27 +635,25 @@ with tab_voice:
             st.markdown(f'<span class="va-status">{status_label}</span>', unsafe_allow_html=True)
             st.markdown('<h3 class="va-title">Assistant de Saisie Vocal</h3>', unsafe_allow_html=True)
             st.markdown('<div style="font-size:0.95em; opacity:0.8; margin-top:4px;">Parlez, et je transcris intelligemment !</div>', unsafe_allow_html=True)
-            
-        st.divider()
 
-        # ── Accueil (premier lancement) ───────────────────────────────────────
-        if va_state == "welcome":
-            st.markdown("""
-            <div style="font-size:1.1em; line-height:1.6; padding:10px 0;">
-            👋 <b>Bonjour !</b><br>
-            Décrivez-moi votre intervention et j'enregistrerai tout pour vous.
-            </div>
-            """, unsafe_allow_html=True)
-    
-            if st.button("🎙️ Commencer la saisie vocale", type="primary", use_container_width=True, key="btn_start_va"):
-                welcome_msg = "Bonjour ! Décrivez-moi votre intervention et j'enregistrerai tout pour vous."
-                add_message("ai", welcome_msg)
-                st.session_state["va_tts_queue"] = welcome_msg
-                st.session_state["va_state"] = "idle"
-                st.rerun()
+    # ── Accueil (premier lancement) ───────────────────────────────────────
+    if va_state == "welcome":
+        st.markdown("""
+        <div style="font-size:1.1em; line-height:1.6; padding:10px 0;">
+        👋 <b>Bonjour !</b><br>
+        Décrivez-moi votre intervention et j'enregistrerai tout pour vous.
+        </div>
+        """, unsafe_allow_html=True)
 
-        # ── États actifs ──────────────────────────────────────────────────────
-        elif va_state in ["idle", "questioning_critical", "questioning_optional"]:
+        if st.button("🎙️ Commencer la saisie vocale", type="primary", use_container_width=True, key="btn_start_va"):
+            welcome_msg = "Bonjour ! Décrivez-moi votre intervention et j'enregistrerai tout pour vous."
+            add_message("ai", welcome_msg)
+            st.session_state["va_tts_queue"] = welcome_msg
+            st.session_state["va_state"] = "idle"
+            st.rerun()
+
+    # ── États actifs ──────────────────────────────────────────────────────
+    elif va_state in ["idle", "questioning_critical", "questioning_optional"]:
 
         # Afficher l'historique de conversation
         render_chat()
@@ -710,14 +708,14 @@ with tab_voice:
                 st.rerun()
 
         # Bouton reset
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🗑️ Recommencer", key="btn_reset_va", use_container_width=False):
-                for k in ["va_state","va_messages","va_collected_data","va_missing_critical",
-                          "va_missing_optional","va_question_idx","va_current_question",
-                          "va_current_field","va_current_field_idx","va_last_audio_hash",
-                          "va_tts_queue","va_edit_field","va_skip_optional_all"]:
-                    st.session_state.pop(k, None)
-                st.rerun()
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗑️ Recommencer", key="btn_reset_va", use_container_width=False):
+            for k in ["va_state","va_messages","va_collected_data","va_missing_critical",
+                      "va_missing_optional","va_question_idx","va_current_question",
+                      "va_current_field","va_current_field_idx","va_last_audio_hash",
+                      "va_tts_queue","va_edit_field","va_skip_optional_all"]:
+                st.session_state.pop(k, None)
+            st.rerun()
 
     # ── CONFIRMATION ──────────────────────────────────────────────────────
     elif va_state == "confirming":
