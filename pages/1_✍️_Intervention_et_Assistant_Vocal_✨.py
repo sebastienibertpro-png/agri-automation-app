@@ -199,23 +199,6 @@ st.markdown("""
     font-size: .93em;
 }
 
-/* ── Bouton micro custom ── */
-.rec-zone {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    background: rgba(255,255,255,0.04);
-    border-radius: 14px;
-    padding: 14px 18px;
-    margin: 12px 0;
-    border: 1px solid rgba(100,181,246,0.12);
-}
-.rec-hint {
-    font-size:.82em;
-    color:rgba(200,220,255,.55);
-    line-height:1.5;
-}
-
 /* ── Manual section ── */
 .manual-section-title {
     background: linear-gradient(90deg, #e8f5e9 0%, #f1f8f1 100%);
@@ -674,24 +657,23 @@ with tab_voice:
         if va_state == "idle":
             hint_txt = "🎤 Appuyez sur le micro, décrivez votre intervention, puis re-cliquez pour arrêter."
         elif va_state == "questioning_optional":
-            hint_txt = "💡 Champ <b>facultatif</b> &mdash; dites &laquo;&nbsp;rien&nbsp;&raquo; ou &laquo;&nbsp;c'est bon&nbsp;&raquo; pour passer."
+            hint_txt = "💡 Champ **facultatif** — dites « rien » ou « c'est bon » pour passer."
         else:
             hint_txt = "Répondez directement à la question de l'assistant."
 
-        st.markdown(
-            f'<div class="rec-zone"><span class="rec-hint">{hint_txt}</span></div>',
-            unsafe_allow_html=True
-        )
+        st.info(hint_txt)
 
-        audio_bytes = audio_recorder(
-            text="",
-            recording_color="#e53935",
-            neutral_color="#2979ff",
-            icon_size="3x",
-            pause_threshold=300.0,
-            sample_rate=16000,
-            key=f"va_rec_{va_state}"
-        )
+        # Conteneur pour s'assurer que le micro a son propre espace
+        with st.container():
+            audio_bytes = audio_recorder(
+                text=" 🎙️ Cliquer pour enregistrer",
+                recording_color="#e53935",
+                neutral_color="#1565c0",
+                icon_size="2x",
+                pause_threshold=300.0,
+                sample_rate=16000,
+                key=f"va_rec_{va_state}"
+            )
 
         # Traitement automatique si nouvel audio
         if audio_bytes:
