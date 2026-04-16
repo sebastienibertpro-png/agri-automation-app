@@ -393,8 +393,22 @@ def render_chat():
     for msg in messages:
         role = msg.get("role", "system")
         text = msg.get("text", "").replace("<", "&lt;").replace(">", "&gt;")
-        css = {"user": "bubble-user", "ai": "bubble-ai"}.get(role, "bubble-system")
-        html_parts.append(f'<div class="{css}">{text}</div>')
+        if role == "user":
+            html_parts.append(
+                f'<div class="bubble-user">'
+                f'<div class="avatar">👤</div>'
+                f'<div class="bubble-body">{text}</div>'
+                f'</div>'
+            )
+        elif role == "ai":
+            html_parts.append(
+                f'<div class="bubble-ai">'
+                f'<div class="ai-avatar">🤖</div>'
+                f'<div class="bubble-body">{text}</div>'
+                f'</div>'
+            )
+        else:
+            html_parts.append(f'<div class="bubble-system">{text}</div>')
     html_parts.append("</div>")
     html_parts.append("""
     <script>
@@ -551,31 +565,19 @@ def process_followup_audio(audio_bytes: bytes, context: dict, api_key: str, opti
             st.session_state["va_tts_queue"] = ai_msg
         transition_to_optional_or_confirm()
     else:
-        # Vérifier les champs critiques restants
-        completeness = check_collected_data(st.session_state["va_collected_data"])
-        st.session_state["va_missing_critical"] = completeness["critical_missing"]
-        st.session_state["va_missing_optional"] = completeness["optional_missing"]
-
-        if completeness["is_critical_complete"]:
-            if result.get("skip"):
-                ai_msg = "D'accord, je laisse ce champ vide. Passons à la suite."
-                add_message("ai", ai_msg)
-                st.session_state["va_tts_queue"] = ai_msg
-            transition_to_optional_or_confirm()
+        # Question critique suivante
+        remaining = completeness["critical_missing"]
+        next_missing = remaining[0]
+        next_question = next_missing["label"]
+        if result.get("skip"):
+            ai_msg = f"D'accord. Alors : {next_question}"
         else:
-            # Question critique suivante
-            remaining = completeness["critical_missing"]
-            next_missing = remaining[0]
-            next_question = next_missing["label"]
-            if result.get("skip"):
-                ai_msg = f"D'accord. Alors : {next_question}"
-            else:
-                ai_msg = f"Parfait, merci ! {next_question}"
-            add_message("ai", ai_msg)
-            st.session_state["va_tts_queue"] = ai_msg
-            st.session_state["va_current_question"] = next_question
-            st.session_state["va_current_field"] = next_missing["field"]
-            st.session_state["va_current_field_idx"] = next_missing.get("item_index", 0)
+            ai_msg = f"Parfait, merci ! {next_question}"
+        add_message("ai", ai_msg)
+        st.session_state["va_tts_queue"] = ai_msg
+        st.session_state["va_current_question"] = next_question
+        st.session_state["va_current_field"] = next_missing["field"]
+        st.session_state["va_current_field_idx"] = next_missing.get("item_index", 0)
 
 
 # ════════════════════════════════════════════════════════════════════════════
