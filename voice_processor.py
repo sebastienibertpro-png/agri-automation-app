@@ -536,6 +536,100 @@ def apply_updates_to_collected_data(collected_data: list, updates: dict,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  QUESTION UNIQUE – CHAMPS OPTIONNELS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def transcribe_optional_fields_bulk(
+    audio_bytes: bytes,
+    current_data: list,
+    context_data: dict,
+    api_key: str,
+) -> dict:
+    """
+    Transcrit la réponse globale de l'agriculteur à la question des champs optionnels.
+    Extrait en une seule passe : tracteur, outil, stade de culture, conditions météo,
+    cible, observations, et tout autre champ pertinent mentionné.
+    Retourne : {"raw_text": str, "updates": dict, "skip": bool, "error": str|None}
+    """
+    import tempfile, os
+
+    materiels = context_data.get("materiels", [])
+    parcelles = context_data.get("parcelles", [])
+    first = current_data[0] if current_data else {}
+    nature = str(first.get("Nature_Intervention", "")).strip()
+
+    prompt = f"""Tu es l'assistant vocal d'un agriculteur.
+Il vient de répondre à la question : "Souhaitez-vous ajouter des informations complémentaires ?"
+
+Interprète sa réponse et extrais les informations facultatives mentionnées.
+
+VALEURS DE RÉFÉRENCE :
+- Matériels disponibles : {json.dumps(materiels, ensure_ascii=False)}
+- Nature de l'intervention en cours : {nature}
+
+Règles :
+- Si l'agriculteur dit "non", "rien", "c'est bon", "continuer", "valider", "passer" ou similaire
+  => retourne {{"skip": true, "updates": {{}}}}
+- Sinon extrais tous les champs mentionnés parmi :
+  - "Tracteur" : ex. "130 CVX", "220 CVX", "Berthoud Raptor" (normalise avec les matériels disponibles)
+  - "Outil" : ex. "Agata", "DDI", "Rotative"
+  - "Stade_Culture" : ex. "2F", "tallage", "montaison", "6F"
+  - "Cible" : ex. "ray-grass", "vulpin", "blé", adventices
+  - "Observations" : toute remarque, condition météo, note libre
+  - "Humidite_recolte" : si mentionné en %
+  - "PS" : poids spécifique si mentionné
+
+Renvoie UNIQUEMENT ce JSON (pas de texte autour) :
+{{
+  "raw_text": "[verbatim]",
+  "skip": false,
+  "updates": {{
+    "Tracteur": "...",
+    "Outil": "...",
+    "Stade_Culture": "...",
+    "Cible": "...",
+    "Observations": "..."
+  }}
+}}
+N'inclure dans updates QUE les champs effectivement mentionnés (pas les champs vides).
+"""
+
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp.write(audio_bytes)
+            tmp_path = tmp.name
+
+        audio_file = genai.upload_file(path=tmp_path, mime_type="audio/wav")
+        response = model.generate_content([prompt, audio_file])
+        os.unlink(tmp_path)
+
+        raw = response.text.strip()
+        # Nettoyer markdown
+        for marker in ["```json", "```JSON", "```"]:
+            raw = raw.replace(marker, "")
+        raw = raw.strip()
+
+        data = json.loads(raw)
+        return {
+            "raw_text": data.get("raw_text", raw[:80]),
+            "updates": data.get("updates", {}),
+            "skip": bool(data.get("skip", False)),
+            "error": None,
+        }
+
+    except Exception as e:
+        return {
+            "raw_text": "[Transcription échouée]",
+            "updates": {},
+            "skip": False,
+            "error": str(e),
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  GROUPEMENT PAR PARCELLE
 # ─────────────────────────────────────────────────────────────────────────────
 
