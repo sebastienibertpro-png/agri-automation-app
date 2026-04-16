@@ -4,6 +4,7 @@ import pandas as pd
 import string
 import random
 import io
+import requests
 from datetime import datetime
 
 
@@ -15,6 +16,12 @@ except ImportError:
 from shared import init_campaign_selector, render_brand_page_header
 
 # ── Imports optionnels ───────────────────────────────────────────────────────
+try:
+    from streamlit_lottie import st_lottie
+    LOTTIE_AVAILABLE = True
+except ImportError:
+    LOTTIE_AVAILABLE = False
+
 try:
     from audio_recorder_streamlit import audio_recorder
     AUDIO_RECORDER_AVAILABLE = True
@@ -61,74 +68,34 @@ st.markdown("""
 /* ── Cache les widgets audio/iframe TTS et les iframes height=0 ── */
 .stAudio, .stAudio > div, iframe[height="0"] { display:none !important; height:0 !important; overflow:hidden !important; }
 
-/* ─── WAVE ANIMATION en-tête ─── */
-@keyframes va-wave {
-    0%,100% { transform: scaleY(0.25); opacity:.45; }
-    50%      { transform: scaleY(1.0);  opacity:1; }
-}
-.va-wave-bar {
-    display:inline-block;
-    width: 4px;
-    border-radius: 6px;
-    background: linear-gradient(180deg,#64ecf8 0%,#2979ff 100%);
-    animation: va-wave 1.1s ease-in-out infinite;
-    transform-origin: center;
-}
-.va-wave-bar.idle {
-    animation: none;
-    transform: scaleY(0.22);
-    opacity:.3;
-    background: linear-gradient(180deg,#90caf9 0%,#42a5f5 100%);
-}
-
-/* ── Panel principal vocal ── */
-.voice-panel {
-    background: linear-gradient(135deg,rgba(15,23,42,0.55) 0%,rgba(30,41,59,0.45) 100%);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(100,181,246,0.15);
-    border-radius: 20px;
-    padding: 24px 28px 22px;
-    margin-bottom: 18px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
-}
-
-/* ── En-tête panel (tout en HTML, pas de colonnes Streamlit) ── */
-.va-topbar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 18px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid rgba(100,181,246,0.12);
-}
-.va-wave-wrap {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    height: 44px;
-    flex-shrink: 0;
-}
-.va-topbar-text {
-    flex: 1;
-}
-.va-topbar-text h3 {
-    margin: 0 0 4px 0;
-    font-size: 1.12em;
-    font-weight: 600;
-    color: #e2e8f0;
+/* ── En-tête Assistant Vocal (Nouveau Style) ── */
+.va-header-container {
+    background: linear-gradient(135deg, rgba(30,60,114,0.4) 0%, rgba(42,82,152,0.2) 100%);
+    border: 1px solid rgba(144,202,249,0.3);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
 }
 .va-status {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(100,181,246,0.12);
-    border: 1px solid rgba(100,181,246,0.2);
+    background: rgba(100,181,246,0.15);
+    border: 1px solid rgba(100,181,246,0.3);
     border-radius: 20px;
-    padding: 2px 12px;
-    font-size: .76em;
-    color: #90caf9;
-    font-weight: 500;
+    padding: 4px 14px;
+    font-size: .85em;
+    color: #e3f2fd;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+.va-title {
+    margin: 0;
+    padding: 0;
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #ffffff;
 }
 
 /* ── Chat bubbles ── */
@@ -269,20 +236,15 @@ st.markdown("""
 #  HELPERS
 # ════════════════════════════════════════════════════════════════════════════
 
-def _wave_html(is_idle: bool = True) -> str:
-    """Génère les barres d'animation onde vocale (CSS pur, sans iframe)."""
-    # 11 barres, hauteurs et délais variés
-    bars_def = [
-        (14, 0.00), (22, 0.10), (34, 0.20), (44, 0.30), (50, 0.40),
-        (44, 0.50), (50, 0.30), (34, 0.20), (22, 0.10), (14, 0.00), (28, 0.35),
-    ]
-    cls = "va-wave-bar idle" if is_idle else "va-wave-bar"
-    bars = "".join(
-        f'<span class="{cls}" style="height:{h}px;animation-delay:{d}s;"></span>'
-        for h, d in bars_def
-    )
-    return f'<div class="va-wave-wrap">{bars}</div>'
-
+@st.cache_data(ttl=3600)
+def load_lottie_url(url: str):
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
 
 def generate_intervention_id():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
@@ -646,9 +608,7 @@ with tab_voice:
     if _voice_ok:
         context = build_context_from_loader(active_loader, selected_campaign)
 
-    # ── Panel principal (en-tête 100% HTML, pas de colonnes Streamlit) ──────
-    is_active = va_state not in ("welcome", "idle")
-    wave_html = _wave_html(is_idle=not is_active)
+    # ── Panel principal avec colonnes Streamlit ──────
     state_labels = {
         "welcome": "🟢 Prêt",
         "idle": "🟢 En attente",
@@ -661,38 +621,38 @@ with tab_voice:
         "done": "✅ Enregistré",
     }
     status_label = state_labels.get(va_state, va_state)
-    st.markdown(
-        f'<div class="voice-panel">'
-        f'<div class="va-topbar">'
-        f'{wave_html}'
-        f'<div class="va-topbar-text">'
-        f'<h3>🤖 Assistant de Saisie Vocal</h3>'
-        f'<span class="va-status">{status_label}</span>'
-        f'</div>'
-        f'</div>',
-        unsafe_allow_html=True
-    )
+    
+    st.markdown('<div class="va-header-container">', unsafe_allow_html=True)
+    col_ai_anim, col_ai_title = st.columns([1, 4])
+    
+    with col_ai_anim:
+        lottie_ai = load_lottie_url("https://assets-v2.lottiefiles.com/a/b37ba8ce-118a-11ee-8e0d-07358c4a8ac9/lsVmvnyDvw.json")
+        lottie_ai_fallback = load_lottie_url("https://assets-v2.lottiefiles.com/a/fe807c20-1183-11ee-a7e0-738836ffd98a/LVmAcqtb4Y.json")
+        ai_data = lottie_ai or lottie_ai_fallback
+        if LOTTIE_AVAILABLE and ai_data:
+            st_lottie(ai_data, height=120, key="lottie_assistant_va")
+        else:
+            st.markdown("<div style='font-size: 4em; text-align: center;'>🤖</div>", unsafe_allow_html=True)
+
+    with col_ai_title:
+        st.markdown(f'<span class="va-status">{status_label}</span>', unsafe_allow_html=True)
+        st.markdown('<h3 class="va-title">Assistant de Saisie Vocal</h3>', unsafe_allow_html=True)
+        st.markdown('<div style="color:rgba(255,255,255,0.7);font-size:0.95em;margin-top:4px;">Parlez, et je transcris intelligemment !</div>', unsafe_allow_html=True)
+        
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Accueil (premier lancement) ───────────────────────────────────────
     if va_state == "welcome":
         st.markdown("""
-        <div style="color:#90caf9; font-size:.95em; line-height:1.7; padding:10px 0">
-        👋 <b>Bienvenue dans l'assistant vocal !</b><br>
-        Décrivez votre intervention à voix haute — je m'occupe de tout enregistrer.<br>
-        <br>
-        Exemples de phrases :<br>
-        &nbsp;• <i>"J'ai traité les Buissons avec du Peak à 0,25 L/ha avec le 220 CVX"</i><br>
-        &nbsp;• <i>"Fongicide sur la Grande Plaine et la Petite, du Priori Xtra à 0,8 L/ha"</i><br>
-        &nbsp;• <i>"Semis de blé sur la Longue à 330 grains par m², PMG 45 grammes"</i>
+        <div style="color:#e3f2fd; font-size:1.05em; line-height:1.7; padding:10px 0">
+        👋 <b>Bonjour !</b><br>
+        Décrivez-moi votre intervention et j'enregistrerai tout pour vous.<br>
         </div>
         """, unsafe_allow_html=True)
 
         if st.button("🎙️ Commencer la saisie vocale", type="primary", use_container_width=True, key="btn_start_va"):
-            welcome_msg = (
-                "Bonjour ! Décrivez-moi votre intervention et j'enregistrerai tout pour vous. "
-                "Par exemple : j'ai traité les Buissons avec du Peak à zéro virgule vingt-cinq litres par hectare avec le 220 CVX !"
-            )
-            add_message("ai", "Bonjour ! Décrivez-moi votre intervention et j'enregistrerai tout pour vous.")
+            welcome_msg = "Bonjour ! Décrivez-moi votre intervention et j'enregistrerai tout pour vous."
+            add_message("ai", welcome_msg)
             st.session_state["va_tts_queue"] = welcome_msg
             st.session_state["va_state"] = "idle"
             st.rerun()
@@ -761,8 +721,6 @@ with tab_voice:
                       "va_tts_queue","va_edit_field","va_skip_optional_all"]:
                 st.session_state.pop(k, None)
             st.rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)  # ferme .voice-panel
 
     # ── CONFIRMATION ──────────────────────────────────────────────────────
     elif va_state == "confirming":
