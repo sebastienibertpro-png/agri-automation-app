@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import pandas as pd
 import string
 import random
+import io
 from datetime import datetime
 import requests
 try:
@@ -10,6 +11,11 @@ try:
     LOTTIE_AVAILABLE = True
 except ImportError:
     LOTTIE_AVAILABLE = False
+try:
+    from gtts import gTTS
+    GTTS_AVAILABLE = True
+except ImportError:
+    GTTS_AVAILABLE = False
 from shared import init_campaign_selector, render_brand_page_header
 
 # ── Imports optionnels ───────────────────────────────────────────────────────
@@ -56,63 +62,177 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* ── Cache les widgets audio/iframe TTS ── */
+.stAudio, .stAudio > div, iframe[height="0"] { display:none !important; height:0 !important; overflow:hidden !important; }
+
+/* ── Animation ondes sonores ── */
+@keyframes wave-bar {
+    0%, 100% { transform: scaleY(0.3); opacity:.5; }
+    50%       { transform: scaleY(1.0); opacity:1; }
+}
+.wave-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 48px;
+}
+.wave-wrap span {
+    display: inline-block;
+    width: 5px;
+    height: 38px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #64b5f6 0%, #1976d2 100%);
+    animation: wave-bar 0.9s ease-in-out infinite;
+    transform-origin: center bottom;
+}
+.wave-wrap span:nth-child(1) { animation-delay: 0.00s; height:20px; }
+.wave-wrap span:nth-child(2) { animation-delay: 0.12s; height:35px; }
+.wave-wrap span:nth-child(3) { animation-delay: 0.24s; height:48px; }
+.wave-wrap span:nth-child(4) { animation-delay: 0.36s; height:40px; }
+.wave-wrap span:nth-child(5) { animation-delay: 0.48s; height:28px; }
+.wave-wrap span:nth-child(6) { animation-delay: 0.36s; height:40px; }
+.wave-wrap span:nth-child(7) { animation-delay: 0.24s; height:48px; }
+.wave-wrap span:nth-child(8) { animation-delay: 0.12s; height:35px; }
+.wave-wrap span:nth-child(9) { animation-delay: 0.00s; height:20px; }
+
+.wave-wrap-idle span {
+    animation: none;
+    transform: scaleY(0.25);
+    opacity: .35;
+}
+
+/* ── Panel principal vocal ── */
+.voice-panel {
+    background: linear-gradient(135deg,
+        rgba(15,23,42,0.55) 0%,
+        rgba(30,41,59,0.45) 100%);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(100,181,246,0.15);
+    border-radius: 20px;
+    padding: 28px 28px 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* ── Header du panel vocal ── */
+.va-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(100,181,246,0.12);
+}
+.va-header-text h3 {
+    margin: 0 0 4px 0;
+    font-size: 1.15em;
+    font-weight: 600;
+    color: #e2e8f0;
+    letter-spacing: .01em;
+}
+
+/* ── Status badge ── */
+.va-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(100,181,246,0.12);
+    border: 1px solid rgba(100,181,246,0.2);
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: .78em;
+    color: #90caf9;
+    font-weight: 500;
+}
+
 /* ── Chat bubbles ── */
 .chat-wrap {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 10px 0;
+    gap: 10px;
+    padding: 12px 4px;
     max-height: 440px;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100,181,246,.2) transparent;
 }
+.chat-wrap::-webkit-scrollbar { width:5px; }
+.chat-wrap::-webkit-scrollbar-thumb { background:rgba(100,181,246,.2); border-radius:3px; }
+
+/* Agriculteur */
 .bubble-user {
     align-self: flex-end;
-    background: linear-gradient(135deg, #1b5e20 0%, #388e3c 100%);
-    color: #fff;
-    border-radius: 18px 18px 4px 18px;
-    padding: 11px 16px;
-    max-width: 72%;
-    font-size: .91em;
-    line-height: 1.45;
-    box-shadow: 0 2px 10px rgba(56,142,60,.35);
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    flex-direction: row-reverse;
 }
+.bubble-user .bubble-body {
+    background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+    color: #f0fdf4;
+    border-radius: 18px 18px 4px 18px;
+    padding: 11px 15px;
+    max-width: 72%;
+    font-size: .9em;
+    line-height: 1.5;
+    box-shadow: 0 3px 12px rgba(22,101,52,.4);
+}
+.bubble-user .avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: linear-gradient(135deg,#166534,#15803d);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1em; flex-shrink:0;
+}
+
+/* IA */
 .bubble-ai {
     align-self: flex-start;
-    background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
-    color: #fff;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+}
+.bubble-ai .ai-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
+    border: 2px solid rgba(100,181,246,0.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15em;
+    flex-shrink: 0;
+    box-shadow: 0 0 14px rgba(21,101,192,.5);
+}
+.bubble-ai .bubble-body {
+    background: linear-gradient(135deg, rgba(13,71,161,0.85) 0%, rgba(21,101,192,0.75) 100%);
+    backdrop-filter: blur(8px);
+    color: #e3f2fd;
     border-radius: 18px 18px 18px 4px;
-    padding: 11px 16px;
+    padding: 12px 16px;
     max-width: 78%;
     font-size: .91em;
-    line-height: 1.45;
-    box-shadow: 0 2px 10px rgba(21,101,192,.35);
+    line-height: 1.55;
+    box-shadow: 0 3px 14px rgba(13,71,161,.4);
+    border: 1px solid rgba(100,181,246,0.2);
 }
+
 .bubble-system {
     align-self: center;
-    background: rgba(255,255,255,.06);
-    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1);
     border-radius: 20px;
-    padding: 5px 14px;
-    font-size: .78em;
-    color: rgba(255,255,255,.55);
+    padding: 4px 14px;
+    font-size: .76em;
+    color: rgba(255,255,255,.45);
     text-align: center;
-}
-.bubble-user::before { content: "👨‍🌾  "; }
-.bubble-ai::before   { content: "🤖  "; }
-
-/* ── Voice section wrapper ── */
-.voice-panel {
-    background: linear-gradient(145deg, #0a1628 0%, #112240 50%, #0d1f3c 100%);
-    border: 1px solid rgba(100,181,246,.2);
-    border-radius: 18px;
-    padding: 24px;
-    margin-bottom: 18px;
 }
 
 /* ── Summary card ── */
 .summary-card {
-    background: linear-gradient(135deg, #0d2137 0%, #163554 100%);
-    border: 1px solid rgba(100,181,246,.3);
+    background: rgba(13,33,55,0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(100,181,246,.25);
     border-radius: 14px;
     padding: 20px 22px;
     margin: 14px 0;
@@ -121,32 +241,17 @@ st.markdown("""
     color: #e3f2fd;
 }
 
-/* ── Status badge ── */
-.va-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    background: rgba(255,255,255,.08);
-    border-radius: 20px;
-    padding: 4px 14px;
-    font-size: .82em;
-    color: rgba(255,255,255,.75);
-    margin-bottom: 10px;
-}
-
 /* ── Question highlight ── */
 .question-box {
-    background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
-    border-left: 4px solid #42a5f5;
-    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(26,35,126,0.7) 0%, rgba(40,53,147,0.6) 100%);
+    backdrop-filter: blur(8px);
+    border-left: 3px solid #42a5f5;
+    border-radius: 12px;
     padding: 14px 18px;
     margin: 10px 0;
-    color: #fff;
+    color: #e3f2fd;
     font-size: .93em;
 }
-
-/* ── Action buttons row ── */
-.action-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 
 /* ── Manual section ── */
 .manual-section-title {
@@ -155,15 +260,6 @@ st.markdown("""
     border-radius: 10px;
     border-left: 5px solid #43a047;
     margin-bottom: 20px;
-}
-.prefill-banner {
-    background: linear-gradient(135deg, #e8f5e9 0%, #dcedc8 100%);
-    border: 1px solid #81c784;
-    border-radius: 8px;
-    padding: 10px 16px;
-    margin-bottom: 12px;
-    font-size: .9em;
-    color: #2e7d32;
 }
 
 /* ── Recording pulse ── */
@@ -200,12 +296,31 @@ def get_index(options, value):
 
 
 def tts_speak(text: str):
-    """Injecte un composant JS pour lire le texte via la Web Speech API du navigateur.
-    Sélectionne la meilleure voix française disponible (Google > Microsoft > défaut).
+    """Lit un texte en français (gTTS en priorité, fallback Web Speech).
+    Dans les deux cas : aucun widget visible affiché.
     """
     if not text:
         return
-    # Escape pour JS
+
+    # ── Méthode A : gTTS — voix Google via base64 (invisible) ─────────────────
+    if GTTS_AVAILABLE:
+        try:
+            import base64 as _b64
+            tts = gTTS(text=text, lang='fr', slow=False)
+            fp = io.BytesIO()
+            tts.write_to_fp(fp)
+            b64 = _b64.b64encode(fp.getvalue()).decode()
+            components.html(
+                f'<audio autoplay style="display:none">'
+                f'<source src="data:audio/mp3;base64,{b64}" type="audio/mp3">'
+                f'</audio>',
+                height=0
+            )
+            return
+        except Exception:
+            pass  # Fallback ci-dessous
+
+    # ── Fallback : Web Speech API (navigateur) ─────────────────────────────
     safe = (text
             .replace("\\", "\\\\")
             .replace("'", "\\'")
@@ -217,34 +332,25 @@ def tts_speak(text: str):
         if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
         function pickBestFrVoice(voices) {{
-            // Priorité 1 : voix Google française (la plus naturelle dans Chrome)
             var g = voices.find(function(v) {{
                 return v.lang && v.lang.startsWith('fr') && v.name.toLowerCase().indexOf('google') !== -1;
             }});
             if (g) return g;
-            // Priorité 2 : voix Microsoft française
             var m = voices.find(function(v) {{
                 return v.lang && v.lang.startsWith('fr') && v.name.toLowerCase().indexOf('microsoft') !== -1;
             }});
             if (m) return m;
-            // Fallback : n'importe quelle voix fr
             return voices.find(function(v) {{ return v.lang && v.lang.startsWith('fr'); }});
         }}
         function doSpeak() {{
             var u = new SpeechSynthesisUtterance('{safe}');
-            u.lang = 'fr-FR';
-            u.rate = 0.88;
-            u.pitch = 1.0;
-            var voices = window.speechSynthesis.getVoices();
-            var best = pickBestFrVoice(voices);
+            u.lang = 'fr-FR'; u.rate = 0.88; u.pitch = 1.0;
+            var best = pickBestFrVoice(window.speechSynthesis.getVoices());
             if (best) u.voice = best;
             window.speechSynthesis.speak(u);
         }}
-        if (window.speechSynthesis.getVoices().length > 0) {{
-            doSpeak();
-        }} else {{
-            window.speechSynthesis.addEventListener('voiceschanged', doSpeak, {{once: true}});
-        }}
+        if (window.speechSynthesis.getVoices().length > 0) {{ doSpeak(); }}
+        else {{ window.speechSynthesis.addEventListener('voiceschanged', doSpeak, {{once:true}}); }}
     }})();
     </script>
     """
