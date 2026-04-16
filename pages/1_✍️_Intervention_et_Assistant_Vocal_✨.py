@@ -65,8 +65,7 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ── Cache les widgets audio/iframe TTS et les iframes height=0 ── */
-.stAudio, .stAudio > div, iframe[height="0"] { display:none !important; height:0 !important; overflow:hidden !important; }
+/* Suppression du cache brutal des iframes, cela cassait audio_recorder_streamlit sous certaines versions */
 
 /* ── En-tête Assistant Vocal (Nouveau Style) ── */
 .va-status {
