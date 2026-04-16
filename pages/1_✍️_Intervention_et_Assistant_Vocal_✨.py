@@ -69,14 +69,6 @@ st.markdown("""
 .stAudio, .stAudio > div, iframe[height="0"] { display:none !important; height:0 !important; overflow:hidden !important; }
 
 /* ── En-tête Assistant Vocal (Nouveau Style) ── */
-.va-header-container {
-    background: linear-gradient(135deg, rgba(30,60,114,0.4) 0%, rgba(42,82,152,0.2) 100%);
-    border: 1px solid rgba(144,202,249,0.3);
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 24px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-}
 .va-status {
     display: inline-flex;
     align-items: center;
@@ -84,18 +76,22 @@ st.markdown("""
     background: rgba(100,181,246,0.15);
     border: 1px solid rgba(100,181,246,0.3);
     border-radius: 20px;
-    padding: 4px 14px;
+    padding: 6px 14px;
     font-size: .85em;
-    color: #e3f2fd;
+    color: #1565c0;
     font-weight: 600;
     margin-bottom: 8px;
+}
+@media (prefers-color-scheme: dark) {
+    .va-status {
+        color: #e3f2fd;
+    }
 }
 .va-title {
     margin: 0;
     padding: 0;
     font-size: 1.5em;
     font-weight: 700;
-    color: #ffffff;
 }
 
 /* ── Chat bubbles ── */
@@ -608,11 +604,11 @@ with tab_voice:
     if _voice_ok:
         context = build_context_from_loader(active_loader, selected_campaign)
 
-    # ── Panel principal avec colonnes Streamlit ──────
+    # ── Panel principal ──────
     state_labels = {
-        "welcome": "🟢 Prêt",
+        "welcome": "🟢 Prêt à écouter",
         "idle": "🟢 En attente",
-        "processing": "⏳ Analyse…",
+        "processing": "⏳ Analyse en cours…",
         "questioning_critical": "❓ Question",
         "questioning_optional": "💡 Info facultative",
         "confirming": "✅ Confirmation",
@@ -622,43 +618,44 @@ with tab_voice:
     }
     status_label = state_labels.get(va_state, va_state)
     
-    st.markdown('<div class="va-header-container">', unsafe_allow_html=True)
-    col_ai_anim, col_ai_title = st.columns([1, 4])
-    
-    with col_ai_anim:
-        lottie_ai = load_lottie_url("https://assets-v2.lottiefiles.com/a/b37ba8ce-118a-11ee-8e0d-07358c4a8ac9/lsVmvnyDvw.json")
-        lottie_ai_fallback = load_lottie_url("https://assets-v2.lottiefiles.com/a/fe807c20-1183-11ee-a7e0-738836ffd98a/LVmAcqtb4Y.json")
-        ai_data = lottie_ai or lottie_ai_fallback
-        if LOTTIE_AVAILABLE and ai_data:
-            st_lottie(ai_data, height=120, key="lottie_assistant_va")
-        else:
-            st.markdown("<div style='font-size: 4em; text-align: center;'>🤖</div>", unsafe_allow_html=True)
-
-    with col_ai_title:
-        st.markdown(f'<span class="va-status">{status_label}</span>', unsafe_allow_html=True)
-        st.markdown('<h3 class="va-title">Assistant de Saisie Vocal</h3>', unsafe_allow_html=True)
-        st.markdown('<div style="color:rgba(255,255,255,0.7);font-size:0.95em;margin-top:4px;">Parlez, et je transcris intelligemment !</div>', unsafe_allow_html=True)
+    # Conteneur natif Streamlit pour éviter de casser le rendu HTML
+    with st.container(border=True):
+        col_ai_anim, col_ai_title = st.columns([1, 4])
         
-    st.markdown('</div>', unsafe_allow_html=True)
+        with col_ai_anim:
+            lottie_ai = load_lottie_url("https://assets-v2.lottiefiles.com/a/b37ba8ce-118a-11ee-8e0d-07358c4a8ac9/lsVmvnyDvw.json")
+            lottie_ai_fallback = load_lottie_url("https://assets-v2.lottiefiles.com/a/fe807c20-1183-11ee-a7e0-738836ffd98a/LVmAcqtb4Y.json")
+            ai_data = lottie_ai or lottie_ai_fallback
+            if LOTTIE_AVAILABLE and ai_data:
+                st_lottie(ai_data, height=120, key="lottie_assistant_va")
+            else:
+                st.markdown("<div style='font-size: 4em; text-align: center;'>🤖</div>", unsafe_allow_html=True)
+    
+        with col_ai_title:
+            st.markdown(f'<span class="va-status">{status_label}</span>', unsafe_allow_html=True)
+            st.markdown('<h3 class="va-title">Assistant de Saisie Vocal</h3>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size:0.95em; opacity:0.8; margin-top:4px;">Parlez, et je transcris intelligemment !</div>', unsafe_allow_html=True)
+            
+        st.divider()
 
-    # ── Accueil (premier lancement) ───────────────────────────────────────
-    if va_state == "welcome":
-        st.markdown("""
-        <div style="color:#e3f2fd; font-size:1.05em; line-height:1.7; padding:10px 0">
-        👋 <b>Bonjour !</b><br>
-        Décrivez-moi votre intervention et j'enregistrerai tout pour vous.<br>
-        </div>
-        """, unsafe_allow_html=True)
+        # ── Accueil (premier lancement) ───────────────────────────────────────
+        if va_state == "welcome":
+            st.markdown("""
+            <div style="font-size:1.1em; line-height:1.6; padding:10px 0;">
+            👋 <b>Bonjour !</b><br>
+            Décrivez-moi votre intervention et j'enregistrerai tout pour vous.
+            </div>
+            """, unsafe_allow_html=True)
+    
+            if st.button("🎙️ Commencer la saisie vocale", type="primary", use_container_width=True, key="btn_start_va"):
+                welcome_msg = "Bonjour ! Décrivez-moi votre intervention et j'enregistrerai tout pour vous."
+                add_message("ai", welcome_msg)
+                st.session_state["va_tts_queue"] = welcome_msg
+                st.session_state["va_state"] = "idle"
+                st.rerun()
 
-        if st.button("🎙️ Commencer la saisie vocale", type="primary", use_container_width=True, key="btn_start_va"):
-            welcome_msg = "Bonjour ! Décrivez-moi votre intervention et j'enregistrerai tout pour vous."
-            add_message("ai", welcome_msg)
-            st.session_state["va_tts_queue"] = welcome_msg
-            st.session_state["va_state"] = "idle"
-            st.rerun()
-
-    # ── États actifs ──────────────────────────────────────────────────────
-    elif va_state in ["idle", "questioning_critical", "questioning_optional"]:
+        # ── États actifs ──────────────────────────────────────────────────────
+        elif va_state in ["idle", "questioning_critical", "questioning_optional"]:
 
         # Afficher l'historique de conversation
         render_chat()
@@ -713,14 +710,14 @@ with tab_voice:
                 st.rerun()
 
         # Bouton reset
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🗑️ Recommencer", key="btn_reset_va", use_container_width=False):
-            for k in ["va_state","va_messages","va_collected_data","va_missing_critical",
-                      "va_missing_optional","va_question_idx","va_current_question",
-                      "va_current_field","va_current_field_idx","va_last_audio_hash",
-                      "va_tts_queue","va_edit_field","va_skip_optional_all"]:
-                st.session_state.pop(k, None)
-            st.rerun()
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🗑️ Recommencer", key="btn_reset_va", use_container_width=False):
+                for k in ["va_state","va_messages","va_collected_data","va_missing_critical",
+                          "va_missing_optional","va_question_idx","va_current_question",
+                          "va_current_field","va_current_field_idx","va_last_audio_hash",
+                          "va_tts_queue","va_edit_field","va_skip_optional_all"]:
+                    st.session_state.pop(k, None)
+                st.rerun()
 
     # ── CONFIRMATION ──────────────────────────────────────────────────────
     elif va_state == "confirming":
