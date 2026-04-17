@@ -133,22 +133,40 @@ with tab_phyto:
                 selected_usages = []
                 if usages:
                     st.markdown(f"#### 🌱 Usages homologués ({len(usages)} usage(s) trouvés)")
+                    st.caption("Cochez la case **Importer** pour les usages que vous pratiquez sur votre exploitation. Leurs caractéristiques (Dose, DAR, Stades...) seront récupérées automatiquement dans lors de vos saisies d'interventions.")
                     
-                    # Préparer les options de sélection pour l'utilisateur
-                    usage_options = []
-                    for idx, u in enumerate(usages):
-                        lbl = f"[{u.get('Culture', 'Culture')}] Cible : {u.get('Cible', 'Inconnue')} — {u.get('Dose_Max', '')} {u.get('Unite_Dose', '')}"
-                        usage_options.append(lbl)
+                    df_usages = pd.DataFrame(usages)
+                    df_usages.insert(0, "Importer", False)
                     
-                    selected_usages_labels = st.multiselect(
-                        "Quels usages pratiquez-vous sur votre exploitation ? (Sélectionnez ceux à importer dans votre base)",
-                        options=usage_options,
-                        default=[]
+                    if "Dose_Max" in df_usages.columns and "Unite_Dose" in df_usages.columns:
+                        df_usages["Dose"] = df_usages["Dose_Max"].astype(str) + " " + df_usages["Unite_Dose"].astype(str)
+                    else:
+                        df_usages["Dose"] = ""
+                        
+                    cols_to_show = ["Importer", "Culture", "Cible", "Dose", 
+                                    "Nb_Applications_Max", "Stades_Application", "Condition_Emploi", 
+                                    "DAR", "DVP", "ZNT_Aqua", "Etat_Usage", "Type_Cible"]
+                    
+                    # Remplir les colonnes manquantes
+                    for c in cols_to_show:
+                        if c not in df_usages.columns:
+                            df_usages[c] = ""
+                            
+                    edited_df = st.data_editor(
+                        df_usages[cols_to_show],
+                        column_config={
+                            "Importer": st.column_config.CheckboxColumn("Importer", default=False)
+                        },
+                        disabled=[c for c in cols_to_show if c != "Importer"],
+                        hide_index=True,
+                        use_container_width=True
                     )
-                    selected_usages = [usages[usage_options.index(lbl)] for lbl in selected_usages_labels]
+                    
+                    selected_indices = edited_df[edited_df["Importer"] == True].index.tolist()
+                    selected_usages = [usages[i] for i in selected_indices]
                     
                     if not selected_usages:
-                        st.warning("⚠️ Vous n'avez sélectionné aucun usage. Le produit sera importé de façon générique (sans cible).")
+                        st.warning("⚠️ Vous n'avez sélectionné aucun usage. Le produit sera importé de façon générique (sans cible, ni DAR, ni Dose pré-remplie).")
                 else:
                     st.info("ℹ️ Aucun usage détaillé disponible pour ce N°AMM dans E-Phy.")
 
@@ -183,7 +201,7 @@ with tab_phyto:
                     with st.spinner("Enregistrement dans REF_INTRANTS..."):
                         ok_all = True
                         count_saved = 0
-                        # Si l'utilisateur n'a coché aucun usage (ou s'il n'y en a pas), on sauvegarde la trame générique (Cible = vide)
+                        
                         if not selected_usages:
                             base_intrant["Cible"] = ""
                             ok_all = active_loader.update_intrant(base_intrant)
@@ -202,6 +220,14 @@ with tab_phyto:
                                     row_dict["ZNT_Aqua"] = str(u.get("ZNT_Aqua", ""))
                                 if u.get("Nb_Applications_Max"):
                                     row_dict["Nb_Applications_Max_An"] = str(u.get("Nb_Applications_Max", ""))
+                                if u.get("Stades_Application"):
+                                    row_dict["Stades_Application"] = str(u.get("Stades_Application", ""))
+                                if u.get("Condition_Emploi"):
+                                    row_dict["Condition_Emploi"] = str(u.get("Condition_Emploi", ""))
+                                if u.get("DVP"):
+                                    row_dict["DVP"] = str(u.get("DVP", ""))
+                                if u.get("Etat_Usage"):
+                                    row_dict["Etat_Usage"] = str(u.get("Etat_Usage", ""))
                                 
                                 if not active_loader.update_intrant(row_dict):
                                     ok_all = False
@@ -296,6 +322,12 @@ with tab_all:
         if not df_ref_current.empty:
             df_ref_current = df_ref_current.fillna("").replace("None", "", regex=False)
             
+            # S'assurer que les colonnes détaillées d'usage s'affichent même si la table GSheets ne les a pas encore créées
+            extended_cols = ["Cible", "Nb_Applications_Max_An", "Stades_Application", "Condition_Emploi", "DAR", "DVP", "ZNT_Aqua", "Etat_Usage"]
+            for col in extended_cols:
+                if col not in df_ref_current.columns:
+                    df_ref_current[col] = ""
+            
             type_filter = st.multiselect(
                 "Filtrer par Type :", 
                 options=df_ref_current["Type"].replace("", "Inconnu").unique().tolist(),
@@ -309,11 +341,26 @@ with tab_all:
             else:
                 df_display = df_ref_current
                 
+            cols = list(df_display.columns)
+            cols_to_hide = ["Prix_Unitaire_Moyen", "STOCK_ACTUEL", "Valeur_Stock"]
+            visible_cols = [c for c in cols if c not in cols_to_hide]
+            
+            if "Lien_Ephy" in visible_cols:
+                visible_cols.remove("Lien_Ephy")
+                if "Nom_Produit" in visible_cols:
+                    visible_cols.insert(visible_cols.index("Nom_Produit") + 1, "Lien_Ephy")
+                else:
+                    visible_cols.insert(0, "Lien_Ephy")
+                    
             edited_df = st.data_editor(
                 df_display, 
                 use_container_width=True, 
                 hide_index=True,
-                num_rows="dynamic"
+                num_rows="dynamic",
+                column_order=visible_cols,
+                column_config={
+                    "Lien_Ephy": st.column_config.LinkColumn("Lien E-Phy")
+                }
             )
             st.caption(f"{len(df_display)} intrants affichés sur un total de {len(df_ref_current)}. Vous pouvez supprimer des lignes, en ajouter, ou modifier les cases directement.")
             
