@@ -375,7 +375,7 @@ def transition_to_optional_or_confirm(warning_suffix: str = ""):
         tts_txt = generate_tts_summary(grouped)
         ai_msg = f"J'ai bien compris votre intervention !{warning_suffix} Voici le résumé de votre saisie."
         add_message("ai", ai_msg)
-        st.session_state["va_tts_queue"] = tts_txt
+        st.session_state["va_tts_queue"] = "Voilà le détail de votre intervention, vous pouvez valider, annuler ou modifier si vous le désirez."
         st.session_state["va_state"] = "confirming"
     else:
         # UNE SEULE question globale pour tous les champs optionnels manquants
@@ -485,10 +485,9 @@ def process_followup_audio(audio_bytes: bytes, context: dict, api_key: str, opti
             ai_msg = "Très bien, on continue sans informations supplémentaires. Voici le résumé."
 
         add_message("ai", ai_msg)
-        # Générer le résumé vocal et passer à la confirmation
+        # Passer à la confirmation
         grouped = group_interventions_by_parcelle(st.session_state["va_collected_data"])
-        tts_txt = generate_tts_summary(grouped)
-        st.session_state["va_tts_queue"] = tts_txt
+        st.session_state["va_tts_queue"] = "Voilà le détail de votre intervention, vous pouvez valider, annuler ou modifier si vous le désirez."
         st.session_state["va_skip_optional_all"] = True
         st.session_state["va_state"] = "confirming"
         return
@@ -778,15 +777,14 @@ with tab_voice:
             selected_label = st.selectbox("Champ à modifier", list(editable_fields.keys()), key="edit_field_sel")
             selected_field = editable_fields[selected_label]
             current_val = str(first_item.get(selected_field, ""))
-            new_val = st.text_input(f"Nouvelle valeur pour « {selected_label} »", value=current_val, key="edit_field_val")
+            new_val = st.text_input(f"Nouvelle valeur pour « {selected_label} »", value=current_val, key=f"editf_{selected_field}")
 
             col_ok, col_back = st.columns(2)
             with col_ok:
                 if st.button("✅ Appliquer la modification", type="primary", use_container_width=True, key="btn_apply_edit"):
-                    updates = {selected_field: new_val}
-                    st.session_state["va_collected_data"] = apply_updates_to_collected_data(
-                        collected, updates
-                    )
+                    for item in collected:
+                        item[selected_field] = new_val
+                    st.session_state["va_collected_data"] = collected
                     st.session_state["va_state"] = "confirming"
                     st.rerun()
             with col_back:
