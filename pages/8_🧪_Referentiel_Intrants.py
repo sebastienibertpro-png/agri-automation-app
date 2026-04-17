@@ -218,7 +218,7 @@ with tab_ferti:
                     "Element_P": f_p if f_p > 0 else "",
                     "Element_K": f_k if f_k > 0 else "",
                     "Element_S": f_s if f_s > 0 else "",
-                    "Element_Ca0": f_cao if f_cao > 0 else "", # Correct column name matching sheet
+                    "Element_CaO": f_cao if f_cao > 0 else "", # Correct column name matching sheet
                     "Unite_Achat": f_unite,
                     "Prix_Unitaire_Moyen": f_prix if f_prix > 0 else "",
                     "STOCK_ACTUEL": f_stock if f_stock > 0 else "0",
@@ -264,19 +264,39 @@ with tab_all:
     try:
         df_ref_current = active_loader.get_intrants()
         if not df_ref_current.empty:
+            df_ref_current = df_ref_current.fillna("").replace("None", "", regex=False)
+            
             type_filter = st.multiselect(
                 "Filtrer par Type :", 
-                options=df_ref_current["Type"].dropna().unique().tolist(),
-                default=df_ref_current["Type"].dropna().unique().tolist()
+                options=df_ref_current["Type"].replace("", "Inconnu").unique().tolist(),
+                default=df_ref_current["Type"].replace("", "Inconnu").unique().tolist()
             )
             
             if type_filter:
-                df_display = df_ref_current[df_ref_current["Type"].isin(type_filter)]
+                # Assuming empty string types map to "Inconnu" for filtering purposes
+                mask = df_ref_current["Type"].replace("", "Inconnu").isin(type_filter)
+                df_display = df_ref_current[mask]
             else:
                 df_display = df_ref_current
                 
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
-            st.caption(f"{len(df_display)} intrants affichés sur un total de {len(df_ref_current)}.")
+            edited_df = st.data_editor(
+                df_display, 
+                use_container_width=True, 
+                hide_index=True,
+                num_rows="dynamic"
+            )
+            st.caption(f"{len(df_display)} intrants affichés sur un total de {len(df_ref_current)}. Vous pouvez supprimer des lignes, en ajouter, ou modifier les cases directement.")
+            
+            if st.button("💾 Enregistrer les modifications du tableau", type="primary"):
+                # Isolate rows that were not in the filter (if any)
+                df_rest = df_ref_current.drop(df_display.index)
+                # Combine the untouched rows with the new edited dataframe
+                df_final = pd.concat([df_rest, edited_df], ignore_index=True)
+                
+                with st.spinner("Sauvegarde dans la base de données..."):
+                    if active_loader.overwrite_worksheet("REF_INTRANTS", df_final):
+                        st.success("Toutes les modifications ont été enregistrées avec succès !")
+                        st.rerun()
         else:
             st.info("ℹ️ REF_INTRANTS est vide.")
     except Exception as e:
