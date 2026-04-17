@@ -359,7 +359,7 @@ with tab_all:
                 num_rows="dynamic",
                 column_order=visible_cols,
                 column_config={
-                    "Lien_Ephy": st.column_config.LinkColumn("Lien E-Phy")
+                    "Lien_Ephy": st.column_config.LinkColumn("Lien E-Phy", display_text="🔗 Ouvrir")
                 }
             )
             st.caption(f"{len(df_display)} intrants affichés sur un total de {len(df_ref_current)}. Vous pouvez supprimer des lignes, en ajouter, ou modifier les cases directement.")
