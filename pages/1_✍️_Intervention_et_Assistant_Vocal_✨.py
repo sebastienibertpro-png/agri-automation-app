@@ -750,33 +750,62 @@ with tab_voice:
         st.caption("Sélectionnez le champ à modifier et saisissez la nouvelle valeur.")
 
         collected = st.session_state.get("va_collected_data", [])
-        first_item = collected[0] if collected else {}
-
-        # Construire les options de champs éditables
-        editable_fields = {}
+        
+        # Définir les champs "globaux" (qui s'appliquent à tous les produits/parcelles de la même saisie)
+        global_keys = {"Date", "Nature_Intervention", "Tracteur", "Outil", "Stade_Culture", "Observations", 
+                       "Campagne", "Statut_Intervention", "Volume_Bouillie_L_Ha", "Type_Intervention"}
+        
         skip_keys = {"Type_Action", "ID_Intervention", "ID_Irrigation", "Unité_Quantité",
                      "Quantité_Totale_Produit", "Volume_Total_Bouillie_L",
                      "Quantité_semence_totale", "Quantité_Récoltée_Totale",
                      "N/ha", "P/ha", "K/ha"}
-        for k, v in first_item.items():
-            if k not in skip_keys and not _is_empty(v):
-                label = FIELD_DISPLAY_NAMES_FR.get(k, k)
-                editable_fields[label] = k
-
-        # Ajouter les champs vides importants pour les compléter
+                     
         import_fields_to_add = [
             "Tracteur","Outil","Stade_Culture","Observations","Cible",
             "Volume_Bouillie_L_Ha","Humidité_récolte","PS"
         ]
-        for fld in import_fields_to_add:
-            label = FIELD_DISPLAY_NAMES_FR.get(fld, fld)
-            if label not in editable_fields:
-                editable_fields[label] = fld
 
-        if editable_fields:
-            selected_label = st.selectbox("Champ à modifier", list(editable_fields.keys()), key="edit_field_sel")
-            selected_field = editable_fields[selected_label]
-            current_val = str(first_item.get(selected_field, ""))
+        options = {}
+        
+        for i, item in enumerate(collected):
+            parcelle = item.get("ID_Parcelle", "")
+            produit = item.get("Nom_Produit", "")
+            
+            suffix = ""
+            if len(collected) > 1:
+                parts = []
+                if parcelle: parts.append(parcelle)
+                if produit: parts.append(produit)
+                if not parts: parts.append(f"Ligne {i+1}")
+                suffix = f" ({', '.join(parts)})"
+            
+            # Champs existants
+            for k, v in item.items():
+                if k in skip_keys: continue
+                if not _is_empty(v):
+                    label = FIELD_DISPLAY_NAMES_FR.get(k, k)
+                    if k in global_keys:
+                        if label not in options:
+                            options[label] = {"type": "global", "field": k, "val": v}
+                    else:
+                        opt_label = f"{label}{suffix}"
+                        options[opt_label] = {"type": "specific", "index": i, "field": k, "val": v}
+            
+            # Champs importants à ajouter s'ils sont vides
+            for fld in import_fields_to_add:
+                label = FIELD_DISPLAY_NAMES_FR.get(fld, fld)
+                if fld in global_keys:
+                    if label not in options:
+                        options[label] = {"type": "global", "field": fld, "val": item.get(fld, "")}
+                else:
+                    opt_label = f"{label}{suffix}"
+                    if opt_label not in options:
+                        options[opt_label] = {"type": "specific", "index": i, "field": fld, "val": item.get(fld, "")}
+
+        if options:
+            selected_label = st.selectbox("Champ à modifier", list(options.keys()), key="edit_field_sel")
+            target_info = options[selected_label]
+            current_val = str(target_info["val"])
             
             with st.form("form_edit_va"):
                 new_val = st.text_input(f"Saisissez la nouvelle valeur pour {selected_label}", value=current_val)
@@ -788,8 +817,13 @@ with tab_voice:
                     btn_back = st.form_submit_button("← Annuler et Retour", use_container_width=True)
 
             if btn_ok:
-                for item in collected:
-                    item[selected_field] = new_val
+                if target_info["type"] == "global":
+                    for item in collected:
+                        item[target_info["field"]] = new_val
+                else:
+                    idx = target_info["index"]
+                    collected[idx][target_info["field"]] = new_val
+                    
                 st.session_state["va_collected_data"] = collected
                 st.session_state["va_state"] = "confirming"
                 st.rerun()
