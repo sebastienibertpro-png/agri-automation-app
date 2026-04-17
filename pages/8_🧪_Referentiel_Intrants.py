@@ -13,9 +13,8 @@ inject_premium_css()
 
 active_loader = get_dataloader()
 
-tab_all, tab_usages, tab_phyto, tab_ferti, tab_semences = st.tabs([
+tab_all, tab_phyto, tab_ferti, tab_semences = st.tabs([
     "📊 Tableau des intrants",
-    "🍃 Usages Phytosanitaires",
     "🌿 Ajouter Phyto (E-Phy)", 
     "🚜 Ajouter Engrais", 
     "🌱 Ajouter Semences"
@@ -131,21 +130,33 @@ with tab_phyto:
                     if intrant.get('Lien_Ephy'):
                         st.markdown(f"[🔗 Fiche officielle E-Phy]({intrant['Lien_Ephy']})")
 
+                selected_usages = []
                 if usages:
-                    st.markdown(f"#### 🌱 Usages homologués ({len(usages)} usage(s))")
-                    df_usages_display = pd.DataFrame(usages)
-                    cols_display = [c for c in ["Culture", "Cible", "Type_Cible", "Dose_Max", "Unite_Dose",
-                                                 "Nb_Applications_Max", "Stades_Application", "Condition_Emploi", "DAR", "DVP", "ZNT_Aqua", "Etat_Usage"]
-                                    if c in df_usages_display.columns]
-                    st.dataframe(df_usages_display[cols_display], use_container_width=True, hide_index=True)
+                    st.markdown(f"#### 🌱 Usages homologués ({len(usages)} usage(s) trouvés)")
+                    
+                    # Préparer les options de sélection pour l'utilisateur
+                    usage_options = []
+                    for idx, u in enumerate(usages):
+                        lbl = f"[{u.get('Culture', 'Culture')}] Cible : {u.get('Cible', 'Inconnue')} — {u.get('Dose_Max', '')} {u.get('Unite_Dose', '')}"
+                        usage_options.append(lbl)
+                    
+                    selected_usages_labels = st.multiselect(
+                        "Quels usages pratiquez-vous sur votre exploitation ? (Sélectionnez ceux à importer dans votre base)",
+                        options=usage_options,
+                        default=[]
+                    )
+                    selected_usages = [usages[usage_options.index(lbl)] for lbl in selected_usages_labels]
+                    
+                    if not selected_usages:
+                        st.warning("⚠️ Vous n'avez sélectionné aucun usage. Le produit sera importé de façon générique (sans cible).")
                 else:
                     st.info("ℹ️ Aucun usage détaillé disponible pour ce N°AMM dans E-Phy.")
 
                 st.markdown("---")
 
-                # ─── BOUTON COMBINÉ : REF_INTRANTS + REF_USAGES_PHYTO ───────────────
-                if st.button("💾 Enregistrer dans REF_INTRANTS + REF_USAGES_PHYTO", key="btn_add_all", type="primary", use_container_width=True):
-                    intrant_to_write = {
+                # ─── BOUTON D'ENREGISTREMENT UNIFIÉ ───────────────
+                if st.button("💾 Enregistrer dans REF_INTRANTS", key="btn_add_all", type="primary", use_container_width=True):
+                    base_intrant = {
                         "Nom_Produit":       intrant.get("Nom_Produit", ""),
                         "Type":              intrant.get("Type", "Phytosanitaire"),
                         "N_AMM":             intrant.get("N_AMM", ""),
@@ -168,20 +179,39 @@ with tab_phyto:
                         "Lien_Ephy":         intrant.get("Lien_Ephy", ""),
                         "Date_MAJ_Ephy":     datetime.now().strftime("%d/%m/%Y"),
                     }
-                    # FIX: use the correct session_state key to avoid duplicates
-                    orig_search = st.session_state.get("ephy_search_query", "")
                     
                     with st.spinner("Enregistrement dans REF_INTRANTS..."):
-                        ok1 = active_loader.update_intrant(intrant_to_write, original_name=orig_search)
-                    
-                    ok2 = True
-                    if usages:
-                        n_amm = intrant.get("N_AMM", "")
-                        with st.spinner(f"Enregistrement de {len(usages)} usage(s) dans REF_USAGES_PHYTO..."):
-                            ok2 = active_loader.update_usages_phyto(n_amm, usages)
-                    
-                    if ok1 and ok2:
-                        st.success(f"✅ '{intrant_to_write['Nom_Produit']}' enregistré dans REF_INTRANTS + {len(usages)} usages dans REF_USAGES_PHYTO !")
+                        ok_all = True
+                        count_saved = 0
+                        # Si l'utilisateur n'a coché aucun usage (ou s'il n'y en a pas), on sauvegarde la trame générique (Cible = vide)
+                        if not selected_usages:
+                            base_intrant["Cible"] = ""
+                            ok_all = active_loader.update_intrant(base_intrant)
+                            count_saved = 1
+                        else:
+                            for u in selected_usages:
+                                row_dict = base_intrant.copy()
+                                row_dict["Cible"] = str(u.get("Cible", ""))
+                                if u.get("Culture"):
+                                    row_dict["Culture"] = str(u.get("Culture", ""))
+                                if u.get("Dose_Max"):
+                                    row_dict["Dose_Max_Homologuee"] = f"{u.get('Dose_Max', '')} {u.get('Unite_Dose', '')}".strip()
+                                if u.get("DAR"):
+                                    row_dict["DAR"] = str(u.get("DAR", ""))
+                                if u.get("ZNT_Aqua"):
+                                    row_dict["ZNT_Aqua"] = str(u.get("ZNT_Aqua", ""))
+                                if u.get("Nb_Applications_Max"):
+                                    row_dict["Nb_Applications_Max_An"] = str(u.get("Nb_Applications_Max", ""))
+                                
+                                if not active_loader.update_intrant(row_dict):
+                                    ok_all = False
+                                else:
+                                    count_saved += 1
+                                    
+                        if ok_all:
+                            st.success(f"✅ Produit importé ! {count_saved} ligne(s) enregistrée(s) dans REF_INTRANTS.")
+                        else:
+                            st.warning(f"⚠️ Terminé, mais {count_saved} succès seulement.")
 
 with tab_ferti:
     st.subheader("➕ Ajouter un Engrais / Amendement")
@@ -302,14 +332,4 @@ with tab_all:
     except Exception as e:
         st.error(f"Erreur de chargement : {e}")
 
-with tab_usages:
-    render_premium_header("🍃 Usages Phytosanitaires", "Vue détaillée des usages homologués", color="blue")
-    try:
-        df_usages = active_loader.get_usages_phyto()
-        if not df_usages.empty:
-            st.dataframe(df_usages, use_container_width=True, hide_index=True)
-            st.caption(f"{len(df_usages)} usages affichés.")
-        else:
-            st.info("ℹ️ Aucun usage phytosanitaire disponible.")
-    except Exception as e:
-        st.error(f"Erreur de chargement : {e}")
+
