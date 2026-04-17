@@ -658,15 +658,6 @@ with tab_voice:
         render_chat()
 
         # ── Zone de capture audio ──────────────────────────────────────────
-        if va_state == "idle":
-            hint_txt = "🎤 Appuyez sur le micro, décrivez votre intervention, puis re-cliquez pour arrêter."
-        elif va_state == "questioning_optional":
-            hint_txt = "💡 Champ **facultatif** — répondez, ou dites « non » / « c'est bon » pour passer."
-        else:
-            hint_txt = "🎤 Répondez directement à la question de l'assistant."
-
-        st.info(hint_txt)
-
         # Conteneur pour s'assurer que le micro a son propre espace
         with st.container():
             audio_bytes = audio_recorder(
@@ -678,6 +669,15 @@ with tab_voice:
                 sample_rate=16000,
                 key=f"va_rec_{va_state}"
             )
+
+        if va_state == "idle":
+            hint_txt = "💡 Appuyez sur le micro, décrivez votre intervention, puis re-cliquez pour arrêter."
+        elif va_state == "questioning_optional":
+            hint_txt = "💡 Champ **facultatif** — répondez, ou dites « non » / « c'est bon » pour passer."
+        else:
+            hint_txt = "💡 Répondez directement à la question de l'assistant."
+
+        st.info(hint_txt)
 
         # Traitement automatique si nouvel audio
         if audio_bytes:
