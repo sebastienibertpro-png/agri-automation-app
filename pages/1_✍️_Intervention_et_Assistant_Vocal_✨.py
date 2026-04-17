@@ -435,7 +435,7 @@ def process_initial_audio(audio_bytes: bytes, context: dict, api_key: str):
         else:
             warning_suffix = f" Attention, le produit {prod_list_str} n'est pas dans le référentiel de la base."
 
-    completeness = check_collected_data(result)
+    completeness = check_collected_data(result, context_data=context)
     st.session_state["va_missing_critical"] = completeness["critical_missing"]
     st.session_state["va_missing_optional"] = completeness["optional_missing"]
 
@@ -513,7 +513,7 @@ def process_followup_audio(audio_bytes: bytes, context: dict, api_key: str, opti
                 current_data, updates, field_idx
             )
     # Vérifier les champs critiques restants
-    completeness = check_collected_data(st.session_state["va_collected_data"])
+    completeness = check_collected_data(st.session_state["va_collected_data"], context_data=context)
     st.session_state["va_missing_critical"] = completeness["critical_missing"]
     st.session_state["va_missing_optional"] = completeness["optional_missing"]
 
@@ -1016,49 +1016,37 @@ with tab_manual:
         raw_products = df_raw[mask].to_dict('records')
 
     if nature_interv == "Traitement":
-        liste_produits = []
+        liste_produits_lbl = []
+        ref_p_dict = {}
+        
         if not df_intrants.empty and 'Nom_Produit' in df_intrants.columns:
             if 'Type' in df_intrants.columns:
-                phyto_df = df_intrants[~df_intrants['Type'].str.contains('Engrais', na=False, case=False)]
-                liste_produits = sorted(phyto_df['Nom_Produit'].dropna().unique().tolist())
+                phyto_df = df_intrants[~df_intrants['Type'].str.contains('Engrais|Semence', na=False, case=False)]
             else:
-                liste_produits = sorted(df_intrants['Nom_Produit'].dropna().unique().tolist())
-        if not liste_produits:
-            liste_produits = ["(Saisir manuellement)"]
+                phyto_df = df_intrants
+                
+            for _, row in phyto_df.iterrows():
+                p = str(row['Nom_Produit']).strip()
+                c = str(row.get('Cible', '')).replace('nan', '').strip()
+                lbl = f"{p} - Cible : {c}" if c else p
+                liste_produits_lbl.append(lbl)
+                ref_p_dict[lbl] = str(row.get('Dose_Max_Homologuee', ''))
+                
+        liste_produits_lbl = sorted(list(set(liste_produits_lbl)))
 
-        try:
-            df_usages_ref = active_loader.get_usages_phyto()
-        except:
-            df_usages_ref = pd.DataFrame()
-
-        def get_cibles_for_product(nom_produit):
-            if df_usages_ref.empty or 'Nom_Produit' not in df_usages_ref.columns:
-                return []
-            sub = df_usages_ref[df_usages_ref['Nom_Produit'].astype(str).str.upper() == str(nom_produit).upper()]
-            return sorted([str(c) for c in sub['Cible'].dropna().unique().tolist() if str(c).strip()])
-
-        def get_dose_for_cible(nom_produit, cible):
-            if df_usages_ref.empty:
-                return None, None
-            sub = df_usages_ref[
-                (df_usages_ref['Nom_Produit'].astype(str).str.upper() == str(nom_produit).upper()) &
-                (df_usages_ref['Cible'].astype(str) == str(cible))
-            ]
-            if sub.empty:
-                return None, None
-            dose_raw = str(sub['Dose_Max'].iloc[0]).replace(',', '.')
-            dose = pd.to_numeric(dose_raw, errors='coerce')
-            unite = sub['Unite_Dose'].iloc[0] if 'Unite_Dose' in sub.columns else None
-            return (float(dose) if not pd.isna(dose) else None), unite
+        if not liste_produits_lbl:
+            liste_produits_lbl = ["(Saisir manuellement)"]
 
         for i in range(1, 6):
-            c1, c2, c3, c4 = st.columns([2, 1.5, 1, 1])
-            p_val = "- Aucun -"; c_val = ""; d_val = 0.0; u_val = "L/ha"
+            c1, c3, c4 = st.columns([3.5, 1, 1])
+            p_val = "- Aucun -"; d_val = 0.0; u_val = "L/ha"
 
             if is_edit_mode and (i - 1) < len(raw_products):
                 row_p = raw_products[i - 1]
-                p_val = row_p.get('Nom_Produit', "- Aucun -")
-                c_val = row_p.get('Cible', "")
+                saved_p = row_p.get('Nom_Produit', "- Aucun -")
+                saved_c = row_p.get('Cible', "").strip()
+                p_val_base = f"{saved_p} - Cible : {saved_c}" if saved_c else saved_p
+                p_val = p_val_base if p_val_base in liste_produits_lbl else saved_p
                 try:
                     d_val = float(row_p.get('Dose_Ha', 0.0))
                 except:
@@ -1066,48 +1054,54 @@ with tab_manual:
                 u_val = row_p.get('Unité_Dose', "L/ha")
 
             with c1:
-                prod = st.selectbox(f"Produit {i}", ["- Aucun -"] + liste_produits,
-                                    key=f"man_prod_name_{i}",
-                                    index=get_index(["- Aucun -"] + liste_produits, p_val))
-            cible_val = ""
-            if prod != "- Aucun -":
-                cibles_dispo = get_cibles_for_product(prod)
-                with c2:
-                    if cibles_dispo:
-                        cible_val = st.selectbox(f"Cible {i}", [""] + cibles_dispo,
-                                                 key=f"man_prod_cible_{i}",
-                                                 index=get_index([""] + cibles_dispo, c_val))
-                    else:
-                        cible_val = st.text_input(f"Cible {i}", key=f"man_prod_cible_txt_{i}", value=c_val)
-                auto_dose, auto_unite = get_dose_for_cible(prod, cible_val) if cible_val else (None, None)
-            else:
-                with c2:
-                    st.text_input(f"Cible {i}", key=f"man_cible_dis_{i}", disabled=True)
-                auto_dose, auto_unite = None, None
+                options_p = ["- Aucun -"] + liste_produits_lbl
+                if p_val not in options_p and p_val != "- Aucun -":
+                    options_p.append(p_val)
+                prod_lbl = st.selectbox(f"Produit + Cible {i}", options_p, key=f"man_prod_label_{i}", index=get_index(options_p, p_val))
 
-            ck_prod = f"man_lp_{i}"; ck_cible = f"man_lc_{i}"
+            # Auto dose
+            auto_dose, auto_unite = None, None
+            if prod_lbl != "- Aucun -":
+                raw_dose_str = ref_p_dict.get(prod_lbl, "")
+                if raw_dose_str:
+                    import re
+                    match = re.search(r"([\d\.,]+)\s*(.*)", raw_dose_str)
+                    if match:
+                        try:
+                            auto_dose = float(match.group(1).replace(',', '.'))
+                            auto_unite = match.group(2).strip()
+                        except:
+                            pass
+
+            ck_prod = f"man_lp_{i}"
             if ck_prod not in st.session_state:
                 st.session_state[ck_prod] = p_val
-            if ck_cible not in st.session_state:
-                st.session_state[ck_cible] = c_val
-
+                
             unite_options = ["L/ha", "Kg/ha", "g/ha"]
-            if st.session_state[ck_prod] != prod or st.session_state[ck_cible] != cible_val:
-                st.session_state[ck_prod] = prod
-                st.session_state[ck_cible] = cible_val
+            if st.session_state[ck_prod] != prod_lbl:
+                st.session_state[ck_prod] = prod_lbl
                 st.session_state[f"man_prod_dose_{i}"] = float(auto_dose) if auto_dose is not None else 0.0
-                st.session_state[f"man_prod_unite_{i}"] = auto_unite if auto_unite in unite_options else "L/ha"
+                if auto_unite and auto_unite in unite_options:
+                    st.session_state[f"man_prod_unite_{i}"] = auto_unite
+                elif auto_unite and '/' in auto_unite:
+                    # sometimes the unit is L/ha but spelled l/ha
+                    st.session_state[f"man_prod_unite_{i}"] = "L/ha" if 'l' in auto_unite.lower() else "Kg/ha"
             elif is_edit_mode and f"man_first_load_{i}" not in st.session_state:
                 st.session_state[f"man_prod_dose_{i}"] = d_val
-                st.session_state[f"man_prod_unite_{i}"] = u_val
+                st.session_state[f"man_prod_unite_{i}"] = u_val if u_val in unite_options else "L/ha"
                 st.session_state[f"man_first_load_{i}"] = True
 
             with c3:
                 dose = st.number_input(f"Dose/ha", min_value=0.0, step=0.1, key=f"man_prod_dose_{i}")
             with c4:
                 unite = st.selectbox("Unité", unite_options, key=f"man_prod_unite_{i}")
-            if prod != "- Aucun -":
-                produits_data.append({'nom': prod, 'cible': cible_val, 'dose': dose, 'unite': unite})
+                
+            if prod_lbl != "- Aucun -":
+                if " - Cible : " in prod_lbl:
+                    real_prod, real_cible = prod_lbl.split(" - Cible : ", 1)
+                else:
+                    real_prod, real_cible = prod_lbl, ""
+                produits_data.append({'nom': real_prod, 'cible': real_cible, 'dose': dose, 'unite': unite})
 
     elif nature_interv == "Fertilisation":
         liste_engrais = []
