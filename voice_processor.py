@@ -158,9 +158,15 @@ def build_context_from_loader(active_loader, selected_campaign) -> dict:
     try:
         df_intrants = active_loader._get_data("REF_INTRANTS")
         if not df_intrants.empty and 'Nom_Produit' in df_intrants.columns:
-            context["intrants"] = sorted(
-                df_intrants['Nom_Produit'].dropna().astype(str).str.strip().tolist()
-            )
+            grouped = df_intrants.groupby("Nom_Produit")
+            intrants_context = []
+            for name, group in grouped:
+                cibles = sorted(list(set([str(c).strip() for c in group.get("Cible", []).dropna().tolist() if str(c).strip() and str(c).lower() != "nan"])))
+                if cibles:
+                     intrants_context.append(f"{name} (Cibles disponibles : {', '.join(cibles)})")
+                else:
+                     intrants_context.append(str(name).strip())
+            context["intrants"] = sorted(intrants_context)
     except Exception as e:
         print(f"[VP] Erreur intrants: {e}")
 
@@ -226,9 +232,10 @@ CONSIGNES :
 6. Quantité_Totale_Produit = Dose_Ha × Surface_Travaillée_Ha (calcule automatiquement).
 7. Tracteur : seulement si c'est un engin motorisé (130_CVX, 220_CVX, Berthoud_Raptor, Axial_5140). Sinon → Outil.
 8. Si plusieurs produits ou parcelles → une entrée JSON par produit ET par parcelle.
-9. Culture : inscris la culture indiquée entre crochets [Culture: ...] de la parcelle concernée.
-10. Statut : "Prévu" si intention future, sinon "Réalisé". Par défaut : "Réalisé".
-11. ID_Intervention : génère un ID unique aléatoire de 8 caractères (majuscules + chiffres).
+9. Cible : Si le Produit identifié possède des (Cibles disponibles) dans la liste de référence, extrais la Cible UNIQUEMENT si l'agriculteur la précise explicitement à voix haute. S'il n'en précise aucune, laisse expressément le champ Cible VIDE (N'invente pas la cible, l'application s'en chargera).
+10. Culture : inscris la culture indiquée entre crochets [Culture: ...] de la parcelle concernée.
+11. Statut : "Prévu" si intention future, sinon "Réalisé". Par défaut : "Réalisé".
+12. ID_Intervention : génère un ID unique aléatoire de 8 caractères (majuscules + chiffres).
 
 FORMAT DE SORTIE — liste JSON uniquement (commence par [ et finit par ]) :
 [
@@ -341,7 +348,7 @@ def transcribe_audio_bytes(audio_bytes: bytes, context_data: dict, api_key: str,
 #  DÉTECTION DES CHAMPS MANQUANTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def check_collected_data(collected_data: list) -> dict:
+def check_collected_data(collected_data: list, context_data: dict = None) -> dict:
     """
     Analyse les données collectées et identifie les champs manquants.
     Returns: {
@@ -401,6 +408,30 @@ def check_collected_data(collected_data: list) -> dict:
                     'field': field, 'item_index': idx,
                     'label': FIELD_QUESTIONS_FR.get(field, field)
                 })
+        
+        # Rend "Cible" critique dynamiquement si plusieurs cibles existent pour ce produit
+        if nature == "Traitement" and "Cible" not in seen_critical:
+            prod = str(item.get("Nom_Produit", "")).strip()
+            cible = str(item.get("Cible", "")).strip()
+            if prod and _is_empty(cible) and context_data:
+                matched_cibles = []
+                for entry in context_data.get("intrants", []):
+                    entry_str = str(entry)
+                    if entry_str.startswith(prod) and "(Cibles disponibles :" in entry_str:
+                        try:
+                            choices = entry_str.split("Cibles disponibles :")[1].replace(")", "").strip()
+                            matched_cibles = [c.strip() for c in choices.split(", ") if c.strip()]
+                        except:
+                            pass
+                        break
+                
+                if matched_cibles and len(matched_cibles) > 1:
+                    seen_critical.add("Cible")
+                    lbl = f"Plusieurs cibles existent pour le {prod}. Laquelle choisissez-vous parmi : {', '.join(matched_cibles)} ?"
+                    critical_missing.append({
+                        'field': "Cible", 'item_index': idx,
+                        'label': lbl
+                    })
 
         # Optional fields
         opt_fields = OPTIONAL_FIELDS_MAP.get("base", []) + OPTIONAL_FIELDS_MAP.get(nature, [])
