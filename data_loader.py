@@ -774,6 +774,8 @@ class DataLoader:
             for col in intrant_dict:
                 if col not in df.columns:
                     df[col] = ""
+            # Cast safe to object pour éviter 'Invalid value X for dtype float64' lors de df.at
+            df = df.astype(object)
 
             # Unicité par Nom_Produit ET Cible
             if "Cible" not in df.columns:
