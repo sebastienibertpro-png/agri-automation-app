@@ -253,13 +253,9 @@ def tts_speak(text: str):
             b64 = _b64.b64encode(fp.getvalue()).decode()
             audio_id = f"gtts_{random.randint(1000, 9999)}"
             components.html(
-                f'<audio id="{audio_id}" autoplay style="display:none">'
+                f'<audio id="{audio_id}" autoplay style="display:none" oncanplay="this.playbackRate=1.35; this.play();">'
                 f'<source src="data:audio/mp3;base64,{b64}" type="audio/mp3">'
-                f'</audio>'
-                f'<script>'
-                f'  var aud = document.getElementById("{audio_id}");'
-                f'  if(aud) aud.playbackRate = 1.15;'
-                f'</script>',
+                f'</audio>',
                 height=0
             )
             return
@@ -368,7 +364,7 @@ def render_chat():
     )
 
 
-def transition_to_optional_or_confirm():
+def transition_to_optional_or_confirm(warning_suffix: str = ""):
     """Passe aux questions optionnelles ou à la confirmation."""
     optional = st.session_state.get("va_missing_optional", [])
     skip_all = st.session_state.get("va_skip_optional_all", False)
@@ -377,7 +373,7 @@ def transition_to_optional_or_confirm():
         # Passe directement à la confirmation
         grouped = group_interventions_by_parcelle(st.session_state["va_collected_data"])
         tts_txt = generate_tts_summary(grouped)
-        ai_msg = "Parfait, j'ai toutes les informations ! Voici le résumé de votre intervention :"
+        ai_msg = f"J'ai bien compris votre intervention !{warning_suffix} Voici le résumé de votre saisie."
         add_message("ai", ai_msg)
         st.session_state["va_tts_queue"] = tts_txt
         st.session_state["va_state"] = "confirming"
@@ -389,11 +385,11 @@ def transition_to_optional_or_confirm():
             extras = ", ".join(labels)
             question = (
                 f"Voulez-vous ajouter des informations complémentaires manquantes comme : {extras} ? "
-                f"Dites ce que vous voulez ajouter, ou dites \u00ab rien \u00bb pour terminer."
+                f"Dites ce que vous voulez ajouter, ou dites \u00ab non \u00bb ou \u00ab c'est bon \u00bb pour terminer."
             )
         else:
-            question = "Voulez-vous ajouter des observations particulières ? Dites \u00ab rien \u00bb pour terminer."
-        ai_msg = f"Votre intervention est enregistrée ! {question}"
+            question = "Voulez-vous ajouter des observations particulières ? Dites \u00ab non \u00bb ou \u00ab c'est bon \u00bb pour terminer."
+        ai_msg = f"J'ai bien compris votre intervention.{warning_suffix} {question}"
         add_message("ai", ai_msg)
         st.session_state["va_tts_queue"] = ai_msg
         st.session_state["va_current_question"] = question
@@ -420,21 +416,40 @@ def process_initial_audio(audio_bytes: bytes, context: dict, api_key: str):
         return
 
     st.session_state["va_collected_data"] = result
+    
+    # -- Vérifier si les produits sont dans le référentiel --
+    unknown_products = []
+    known_products = [str(p).strip().lower() for p in context.get("intrants", [])]
+    
+    for item in result:
+        prod = str(item.get("Nom_Produit", "")).strip()
+        if prod and prod.lower() not in ['null', 'none']:
+            if prod.lower() not in known_products:
+                unknown_products.append(prod)
+    
+    warning_suffix = ""
+    if unknown_products:
+        prod_list_str = ", ".join(list(set(unknown_products)))
+        if len(set(unknown_products)) > 1:
+            warning_suffix = f" Attention, les produits suivants ne sont pas dans le référentiel de la base : {prod_list_str}."
+        else:
+            warning_suffix = f" Attention, le produit {prod_list_str} n'est pas dans le référentiel de la base."
+
     completeness = check_collected_data(result)
     st.session_state["va_missing_critical"] = completeness["critical_missing"]
     st.session_state["va_missing_optional"] = completeness["optional_missing"]
 
     if completeness["is_critical_complete"]:
-        transition_to_optional_or_confirm()
+        transition_to_optional_or_confirm(warning_suffix)
     else:
         # Première question critique
         first_missing = completeness["critical_missing"][0]
         question = first_missing["label"]
         nb_missing = len(completeness["critical_missing"])
         if nb_missing == 1:
-            ai_msg = f"J'ai bien compris votre intervention. Une seule chose manque : {question}"
+            ai_msg = f"J'ai bien compris votre intervention.{warning_suffix} Une seule chose manque : {question}"
         else:
-            ai_msg = f"J'ai bien noté ! Il me manque quelques informations. D'abord : {question}"
+            ai_msg = f"J'ai bien noté votre intervention.{warning_suffix} Il me manque quelques informations. D'abord : {question}"
         add_message("ai", ai_msg)
         st.session_state["va_tts_queue"] = ai_msg
         st.session_state["va_current_question"] = question
@@ -642,35 +657,23 @@ with tab_voice:
         # Afficher l'historique de conversation
         render_chat()
 
-        # Question en cours (highlighting)
-        if va_state in ["questioning_critical", "questioning_optional"] and st.session_state.get("va_current_question"):
-            q_color = "#1a237e" if va_state == "questioning_critical" else "#1b3a2d"
-            q_border = "#42a5f5" if va_state == "questioning_critical" else "#66bb6a"
-            q_label = "❓ Question" if va_state == "questioning_critical" else "💡 Info facultative"
-            st.markdown(
-                f'<div class="question-box" style="background:linear-gradient(135deg,{q_color},#283593);border-left-color:{q_border};">'
-                f'<b>{q_label} :</b> {st.session_state["va_current_question"]}'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-
         # ── Zone de capture audio ──────────────────────────────────────────
         if va_state == "idle":
             hint_txt = "🎤 Appuyez sur le micro, décrivez votre intervention, puis re-cliquez pour arrêter."
         elif va_state == "questioning_optional":
-            hint_txt = "💡 Champ **facultatif** — dites « rien » ou « c'est bon » pour passer."
+            hint_txt = "💡 Champ **facultatif** — répondez, ou dites « non » / « c'est bon » pour passer."
         else:
-            hint_txt = "Répondez directement à la question de l'assistant."
+            hint_txt = "🎤 Répondez directement à la question de l'assistant."
 
         st.info(hint_txt)
 
         # Conteneur pour s'assurer que le micro a son propre espace
         with st.container():
             audio_bytes = audio_recorder(
-                text=" 🎙️ Cliquer pour enregistrer",
-                recording_color="#e53935",
+                text="",
+                recording_color="#4CAF50",
                 neutral_color="#1565c0",
-                icon_size="2x",
+                icon_size="3x",
                 pause_threshold=300.0,
                 sample_rate=16000,
                 key=f"va_rec_{va_state}"
