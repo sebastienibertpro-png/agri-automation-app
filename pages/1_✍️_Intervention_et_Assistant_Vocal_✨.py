@@ -777,20 +777,25 @@ with tab_voice:
             selected_label = st.selectbox("Champ à modifier", list(editable_fields.keys()), key="edit_field_sel")
             selected_field = editable_fields[selected_label]
             current_val = str(first_item.get(selected_field, ""))
-            new_val = st.text_input(f"Nouvelle valeur pour « {selected_label} »", value=current_val, key=f"editf_{selected_field}")
+            
+            with st.form("form_edit_va"):
+                new_val = st.text_input(f"Saisissez la nouvelle valeur pour {selected_label}", value=current_val)
+                
+                col_ok, col_back = st.columns(2)
+                with col_ok:
+                    btn_ok = st.form_submit_button("✅ Appliquer la modification", type="primary", use_container_width=True)
+                with col_back:
+                    btn_back = st.form_submit_button("← Annuler et Retour", use_container_width=True)
 
-            col_ok, col_back = st.columns(2)
-            with col_ok:
-                if st.button("✅ Appliquer la modification", type="primary", use_container_width=True, key="btn_apply_edit"):
-                    for item in collected:
-                        item[selected_field] = new_val
-                    st.session_state["va_collected_data"] = collected
-                    st.session_state["va_state"] = "confirming"
-                    st.rerun()
-            with col_back:
-                if st.button("← Retour au résumé", use_container_width=True, key="btn_back_confirm"):
-                    st.session_state["va_state"] = "confirming"
-                    st.rerun()
+            if btn_ok:
+                for item in collected:
+                    item[selected_field] = new_val
+                st.session_state["va_collected_data"] = collected
+                st.session_state["va_state"] = "confirming"
+                st.rerun()
+            elif btn_back:
+                st.session_state["va_state"] = "confirming"
+                st.rerun()
 
     # ── ENREGISTREMENT ────────────────────────────────────────────────────
     elif va_state == "saving":
