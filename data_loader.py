@@ -757,8 +757,8 @@ class DataLoader:
 
     def update_intrant(self, intrant_dict: dict, original_name: str = None) -> bool:
         """
-        Ajoute ou met à jour un produit dans REF_INTRANTS (upsert par Nom_Produit).
-        Si le produit existe déjà (même Nom_Produit ou original_name), sa ligne est écrasée avec les nouvelles données.
+        Ajoute ou met à jour un produit dans REF_INTRANTS (upsert par Nom_Produit + Cible).
+        Si le produit + cible existe déjà, la ligne est écrasée avec les nouvelles données.
         Sinon, la ligne est ajoutée en bas.
         Fonctionne uniquement en mode Cloud.
         """
@@ -768,18 +768,24 @@ class DataLoader:
         try:
             df = self.conn.read(worksheet="REF_INTRANTS", ttl=0, spreadsheet="MASTER_EXPLOITATION")
             nom = str(intrant_dict.get("Nom_Produit", "")).strip().upper()
+            cible = str(intrant_dict.get("Cible", "")).strip().upper()
 
             # S'assurer que toutes les colonnes du dict existent dans le df
             for col in intrant_dict:
                 if col not in df.columns:
                     df[col] = ""
 
-            # Chercher une ligne existante par le nouveau nom ou l'ancien nom recherché
-            mask = df["Nom_Produit"].astype(str).str.strip().str.upper() == nom
+            # Unicité par Nom_Produit ET Cible
+            if "Cible" not in df.columns:
+                df["Cible"] = ""
+                
+            mask = (df["Nom_Produit"].astype(str).str.strip().str.upper() == nom) & (df["Cible"].astype(str).str.strip().str.upper() == cible)
+            
+            # Enlever l'association de original_name qui ne s'applique plus avec la Cible, sauf si c'est strictement la même cible
             if original_name:
                 orig_nom = str(original_name).strip().upper()
                 if orig_nom:
-                    mask = mask | (df["Nom_Produit"].astype(str).str.strip().str.upper() == orig_nom)
+                    mask = mask | ((df["Nom_Produit"].astype(str).str.strip().str.upper() == orig_nom) & (df["Cible"].astype(str).str.strip().str.upper() == cible))
 
             new_row = pd.DataFrame([intrant_dict])
 
