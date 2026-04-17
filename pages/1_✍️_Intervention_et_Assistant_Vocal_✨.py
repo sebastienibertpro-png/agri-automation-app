@@ -246,14 +246,20 @@ def tts_speak(text: str):
     if GTTS_AVAILABLE:
         try:
             import base64 as _b64
+            import random
             tts = gTTS(text=text, lang='fr', slow=False)
             fp = io.BytesIO()
             tts.write_to_fp(fp)
             b64 = _b64.b64encode(fp.getvalue()).decode()
+            audio_id = f"gtts_{random.randint(1000, 9999)}"
             components.html(
-                f'<audio autoplay style="display:none">'
+                f'<audio id="{audio_id}" autoplay style="display:none">'
                 f'<source src="data:audio/mp3;base64,{b64}" type="audio/mp3">'
-                f'</audio>',
+                f'</audio>'
+                f'<script>'
+                f'  var aud = document.getElementById("{audio_id}");'
+                f'  if(aud) aud.playbackRate = 1.15;'
+                f'</script>',
                 height=0
             )
             return
@@ -376,22 +382,17 @@ def transition_to_optional_or_confirm():
         st.session_state["va_tts_queue"] = tts_txt
         st.session_state["va_state"] = "confirming"
     else:
-        # UNE SEULE question globale pour tous les champs optionnels
-        nature = ""
-        if st.session_state.get("va_collected_data"):
-            nature = str(st.session_state["va_collected_data"][0].get("Nature_Intervention", ""))
-        extras = "tracteur, outil et stade de culture"
-        if "Traitement" in nature:
-            extras = "tracteur, outil, stade de culture et cible du traitement"
-        elif "colte" in nature or "Moisson" in nature:
-            extras = "tracteur, outil, humidité et poids spécifique"
-        elif "Semis" in nature:
-            extras = "tracteur, outil et PMG"
-        question = (
-            f"Voulez-vous ajouter des informations complémentaires comme {extras}, "
-            f"des observations ou des conditions météo ? "
-            f"Dites ce que vous voulez ajouter, ou dites \u00abrien\u00bb pour continuer."
-        )
+        # UNE SEULE question globale pour tous les champs optionnels manquants
+        missing_opt = st.session_state.get("va_missing_optional", [])
+        if missing_opt:
+            labels = [m["label"].replace(" ?", "").lower() for m in missing_opt]
+            extras = ", ".join(labels)
+            question = (
+                f"Voulez-vous ajouter des informations complémentaires manquantes comme : {extras} ? "
+                f"Dites ce que vous voulez ajouter, ou dites \u00ab rien \u00bb pour terminer."
+            )
+        else:
+            question = "Voulez-vous ajouter des observations particulières ? Dites \u00ab rien \u00bb pour terminer."
         ai_msg = f"Votre intervention est enregistrée ! {question}"
         add_message("ai", ai_msg)
         st.session_state["va_tts_queue"] = ai_msg
@@ -449,8 +450,9 @@ def process_followup_audio(audio_bytes: bytes, context: dict, api_key: str, opti
 
     if optional_mode:
         # ── Question optionnelle GLOBALE : une seule passe ──
+        question_asked = st.session_state.get("va_current_question", "")
         with st.spinner("📝 Enregistrement des informations complémentaires…"):
-            result = transcribe_optional_fields_bulk(audio_bytes, current_data, context, api_key)
+            result = transcribe_optional_fields_bulk(audio_bytes, current_data, context, api_key, question_asked)
 
         raw_text = result.get("raw_text", "…")
         add_message("user", raw_text)
