@@ -235,7 +235,7 @@ FORMAT DE SORTIE — liste JSON uniquement (commence par [ et finit par ]) :
   {{
     "Type_Action": "INTERVENTION",
     "ID_Intervention": "XXXXXXXX",
-    "Date": "JJ/MM/AAAA",
+    "Date": "{today_date}",
     "Statut_Intervention": "Réalisé",
     "Campagne": {campagne_courante},
     "ID_Parcelle": "",
@@ -544,6 +544,7 @@ def transcribe_optional_fields_bulk(
     current_data: list,
     context_data: dict,
     api_key: str,
+    question_asked: str = "Souhaitez-vous ajouter des informations complémentaires ?"
 ) -> dict:
     """
     Transcrit la réponse globale de l'agriculteur à la question des champs optionnels.
@@ -559,7 +560,7 @@ def transcribe_optional_fields_bulk(
     nature = str(first.get("Nature_Intervention", "")).strip()
 
     prompt = f"""Tu es l'assistant vocal d'un agriculteur.
-Il vient de répondre à la question : "Souhaitez-vous ajouter des informations complémentaires ?"
+Il vient de répondre à la question : "{question_asked}"
 
 Interprète sa réponse et extrais les informations facultatives mentionnées.
 
@@ -873,6 +874,8 @@ ALL_SHEET_COLS = [
 
 def convert_collected_data_to_rows(extracted_data: list) -> list:
     """Convertit les données extraites en lignes DataFrame pour insertion dans Google Sheets."""
+    import string
+    import random
     rows = []
 
     for item in extracted_data:
@@ -886,6 +889,12 @@ def convert_collected_data_to_rows(extracted_data: list) -> list:
             val = item.get(col, '')
             if val is not None and str(val).lower() not in ['null', 'none']:
                 row[col] = val
+
+        # Fix missing or generic Identifiers
+        if not row.get("ID_Intervention") or row.get("ID_Intervention") == "XXXXXXXX":
+            row["ID_Intervention"] = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        if row.get("Date") == "JJ/MM/AAAA" or not row.get("Date"):
+            row["Date"] = datetime.date.today().strftime("%d/%m/%Y")
 
         # Recalculate quantities
         try:
