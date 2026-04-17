@@ -188,6 +188,15 @@ def inject_premium_css():
         margin-top: 0px !important;
     }
     
+    /* Multiselect Tags (Filtres) : Passer en vert au lieu du rouge par défaut */
+    span[data-baseweb="tag"] {
+        background-color: #5E9E47 !important;
+        color: white !important;
+    }
+    span[data-baseweb="tag"] svg {
+        fill: white !important;
+    }
+    
     /* Dedicated Header Styling - AgriDiA Colors */
     .p-header {
         color: white !important;
