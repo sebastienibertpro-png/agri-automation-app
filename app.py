@@ -102,7 +102,7 @@ with col_hbtn:
     st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
     st.markdown("""
 <style>
-a.btn-vocal {
+div[data-testid="stPageLink"] a {
     background: linear-gradient(135deg, #2F6D89 0%, #5E9E47 100%) !important;
     color: white !important;
     border-radius: 50px !important;
@@ -116,18 +116,33 @@ a.btn-vocal {
     justify-content: center !important;
     display: flex !important;
     text-decoration: none !important;
-    align-items: center !important;
 }
-a.btn-vocal:hover {
+div[data-testid="stPageLink"] a:hover {
     transform: translateY(-4px) !important;
     box-shadow: 0 10px 25px rgba(94, 158, 71, 0.45) !important;
     filter: brightness(1.1) !important;
 }
+div[data-testid="stPageLink"] a p {
+    font-size: 1.1em !important;
+    font-weight: 800 !important;
+    color: white !important;
+    margin: 0 !important;
+}
 </style>
-<a href="Intervention_et_Assistant_Vocal" target="_self" class="btn-vocal">
-    <span style="font-size: 1.3em; margin-right: 8px;">🎙️</span> Saisie Vocale Rapide
-</a>
 """, unsafe_allow_html=True)
+    
+    # Recherche dynamique du vrai chemin du fichier sur le serveur pour éviter le bug des emojis (Git/Linux)
+    voice_page_path = None
+    if os.path.exists("pages"):
+        for f in os.listdir("pages"):
+            if "Intervention_et_Assistant" in f and f.endswith(".py"):
+                voice_page_path = f"pages/{f}"
+                break
+                
+    if voice_page_path:
+        st.page_link(voice_page_path, label="Saisie Vocale Rapide", icon="🎙️")
+    else:
+        st.info("Module vocal introuvable")
 
 # --- Météus Weather Module (Désactivé temporairement pour futur Bilan Hydrique) ---
 # try:
