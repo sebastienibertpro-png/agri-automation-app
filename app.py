@@ -102,7 +102,7 @@ with col_hbtn:
     st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
     st.markdown("""
 <style>
-div[data-testid="stPageLink"] a {
+a.btn-vocal {
     background: linear-gradient(135deg, #2F6D89 0%, #5E9E47 100%) !important;
     color: white !important;
     border-radius: 50px !important;
@@ -116,21 +116,18 @@ div[data-testid="stPageLink"] a {
     justify-content: center !important;
     display: flex !important;
     text-decoration: none !important;
+    align-items: center !important;
 }
-div[data-testid="stPageLink"] a:hover {
+a.btn-vocal:hover {
     transform: translateY(-4px) !important;
     box-shadow: 0 10px 25px rgba(94, 158, 71, 0.45) !important;
     filter: brightness(1.1) !important;
 }
-div[data-testid="stPageLink"] a p {
-    font-size: 1.1em !important;
-    font-weight: 800 !important;
-    color: white !important;
-    margin: 0 !important;
-}
 </style>
+<a href="Intervention_et_Assistant_Vocal" target="_self" class="btn-vocal">
+    <span style="font-size: 1.3em; margin-right: 8px;">🎙️</span> Saisie Vocale Rapide
+</a>
 """, unsafe_allow_html=True)
-    st.page_link("pages/1_✍️_Intervention_et_Assistant_Vocal.py", label="Saisie Vocale Rapide", icon="🎙️")
 
 # --- Météus Weather Module (Désactivé temporairement pour futur Bilan Hydrique) ---
 # try:
