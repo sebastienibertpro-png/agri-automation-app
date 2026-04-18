@@ -88,18 +88,20 @@ logo_path = os.path.join(base_dir, "LOGO.png")
 
 try:
     if os.path.exists(logo_path):
-        st.image(logo_path, use_column_width=True)
+        col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
+        with col_logo2:
+            st.image(logo_path, use_column_width=True)
 except Exception as e:
     st.warning(f"Erreur d'image: {e}")
 
 # ─── HEADER ──────────────────────────────────────────────────────────────
 render_brand_page_header("Tableau de Bord", "L'intelligence de la donnée au service du champ ✨", icon="🚜")
 
-# --- Météus Weather Module ---
-try:
-    display_meteo_module()
-except Exception as e:
-    st.error(f"Erreur module météo: {e}")
+# --- Météus Weather Module (Désactivé temporairement pour futur Bilan Hydrique) ---
+# try:
+#     display_meteo_module()
+# except Exception as e:
+#     st.error(f"Erreur module météo: {e}")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
@@ -131,7 +133,7 @@ if intervention_id:
     st.divider()
 
 # --- Dashboard View ---
-st.markdown(f"<h2 style='color:#1c5f85; font-family:\"Outfit\", sans-serif; margin-bottom: 20px;'>🌾 Assolement {selected_campaign}</h2>", unsafe_allow_html=True)
+st.markdown(f"<h2 style='color:#1c5f85; font-family:\"Outfit\", sans-serif; margin-bottom: 20px; font-size: 1.6em;'>🌾 Assolement {selected_campaign}</h2>", unsafe_allow_html=True)
 
 df_asso = active_loader.get_assolement(selected_campaign)
 if not df_asso.empty:
@@ -198,7 +200,7 @@ st.divider()
 col_left, col_right = st.columns(2)
 
 with col_left:
-    st.subheader("⏱️ Dernière Intervention")
+    st.markdown("<h2 style='color:#1c5f85; font-family:\"Outfit\", sans-serif; margin-bottom: 20px; font-size: 1.6em;'>⏱️ Dernière Intervention</h2>", unsafe_allow_html=True)
     # Get last "Réalisé" intervention
     df_realised = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.contains('réalisé')].copy()
     if not df_realised.empty:
@@ -231,7 +233,7 @@ with col_left:
         st.info("Aucune intervention réalisée trouvée.")
 
 with col_right:
-    st.subheader("📅 Interventions Prévues")
+    st.markdown("<h2 style='color:#1c5f85; font-family:\"Outfit\", sans-serif; margin-bottom: 20px; font-size: 1.6em;'>📅 Interventions Prévues</h2>", unsafe_allow_html=True)
     df_planned = df_campaign[df_campaign['Statut_Intervention'].astype(str).str.lower().str.contains('prév')].copy()
     if not df_planned.empty:
         # Display top 5 planned
@@ -250,7 +252,7 @@ st.divider()
 # 3. NOUVEAUX WIDGETS : Dernier Entretien, Dernier Plein GNR, Factures à Traiter
 # ═══════════════════════════════════════════════════════════════════════════════
 
-st.subheader("🔔 Alertes & Suivi Rapide")
+st.markdown("<h2 style='color:#1c5f85; font-family:\"Outfit\", sans-serif; margin-bottom: 20px; font-size: 1.6em;'>🔔 Alertes & Suivi Rapide</h2>", unsafe_allow_html=True)
 
 col_maint, col_gnr, col_factures = st.columns(3)
 
@@ -419,7 +421,7 @@ with col_factures:
 st.divider()
 
 # 4. SUIVI FERTILISATION (Bilan Azoté / Suivi PPF)
-st.markdown("<h3 style='color:#1c5f85; font-family:\"Outfit\", sans-serif;'>🌾 Suivi Fertilisation (Bilan Azoté)</h3>", unsafe_allow_html=True)
+st.markdown("<h2 style='color:#1c5f85; font-family:\"Outfit\", sans-serif; margin-bottom: 20px; font-size: 1.6em;'>🌾 Suivi Fertilisation (Bilan Azoté)</h2>", unsafe_allow_html=True)
 try:
     df_ppf = active_loader.get_ppf(selected_campaign)
     if df_ppf.empty:
