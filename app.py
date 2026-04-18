@@ -88,7 +88,7 @@ logo_path = os.path.join(base_dir, "LOGO.png")
 
 try:
     if os.path.exists(logo_path):
-        col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
+        col_logo1, col_logo2, col_logo3 = st.columns([1, 4, 1])
         with col_logo2:
             st.image(logo_path, use_column_width=True)
 except Exception as e:
