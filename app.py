@@ -95,7 +95,42 @@ except Exception as e:
     st.warning(f"Erreur d'image: {e}")
 
 # ─── HEADER ──────────────────────────────────────────────────────────────
-render_brand_page_header("Tableau de Bord", "L'intelligence de la donnée au service du champ ✨", icon="🚜")
+col_htitle, col_hbtn = st.columns([2.5, 1], gap="medium")
+with col_htitle:
+    render_brand_page_header("Tableau de Bord", "L'intelligence de la donnée au service du champ ✨", icon="🚜")
+with col_hbtn:
+    st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
+    st.markdown("""
+<style>
+div[data-testid="stPageLink"] a {
+    background: linear-gradient(135deg, #2F6D89 0%, #5E9E47 100%) !important;
+    color: white !important;
+    border-radius: 50px !important;
+    padding: 16px 20px !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 800 !important;
+    font-size: 1.2em !important;
+    border: none !important;
+    box-shadow: 0 6px 20px rgba(47, 109, 137, 0.35) !important;
+    transition: all 0.3s ease !important;
+    justify-content: center !important;
+    display: flex !important;
+    text-decoration: none !important;
+}
+div[data-testid="stPageLink"] a:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 10px 25px rgba(94, 158, 71, 0.45) !important;
+    filter: brightness(1.1) !important;
+}
+div[data-testid="stPageLink"] a p {
+    font-size: 1.1em !important;
+    font-weight: 800 !important;
+    color: white !important;
+    margin: 0 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+    st.page_link("pages/1_✍️_Intervention_et_Assistant_Vocal.py", label="Saisie Vocale Rapide", icon="🎙️")
 
 # --- Météus Weather Module (Désactivé temporairement pour futur Bilan Hydrique) ---
 # try:
