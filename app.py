@@ -92,20 +92,8 @@ try:
 except Exception as e:
     st.warning(f"Erreur d'image: {e}")
 
-# ─── LOTTIE ANIMATION HEADER ───────────────────────────────────────────────────
-# Animation type "Creative Squad"
-lottie_url = load_lottie_url("https://lottie.host/8ba6acd2-1170-11ee-8035-d7294cb8dec8/GRFYx53Tz9.json") # Alternative gratuite "Creative Squad"
-
-col_title_l, col_title_c, col_title_r = st.columns([1, 4, 1])
-with col_title_l:
-    if LOTTIE_AVAILABLE and lottie_url:
-        st_lottie(lottie_url, height=100, key="lottie_cs")
-    else:
-        st.markdown("<div style='font-size: 3.5em; text-align: center; padding: 10px;'>💡</div>", unsafe_allow_html=True)
-with col_title_c:
-    render_brand_page_header("Tableau de Bord", "L'intelligence de la donnée au service du champ ✨", icon="🚜")
-with col_title_r:
-    st.write("") # Espace vide pour équilibrer le titre centré
+# ─── HEADER ──────────────────────────────────────────────────────────────
+render_brand_page_header("Tableau de Bord", "L'intelligence de la donnée au service du champ ✨", icon="🚜")
 
 # --- Météus Weather Module ---
 try:
@@ -143,27 +131,64 @@ if intervention_id:
     st.divider()
 
 # --- Dashboard View ---
-st.markdown(f"## 📋 Vue d'ensemble — Campagne {selected_campaign}")
+st.markdown(f"<h2 style='color:#1c5f85; font-family:\"Outfit\", sans-serif; margin-bottom: 20px;'>🌾 Assolement {selected_campaign}</h2>", unsafe_allow_html=True)
 
-# 1. ASSOLEMENT (Quick Glance)
-st.subheader("🌾 Assolement synthétique")
 df_asso = active_loader.get_assolement(selected_campaign)
 if not df_asso.empty:
-    # Filter for specific crops requested or all
-    # Maïs, Maïs Pop corn, Blé
-    crops_to_show = ["Maïs", "Maïs Pop corn", "Blé"]
-    
-    # Calculate totals
+    # Palette de couleurs Agridia : Verts vibrants, Bleus profonds
+    colors = ['#6fa33c', '#1c5f85', '#7bb841', '#267b93', '#cda341', '#5E9E47']
     asso_summary = df_asso.groupby('Culture')['Surface_Référence_Ha'].sum().reset_index()
+    asso_summary = asso_summary[asso_summary['Surface_Référence_Ha'] > 0].sort_values('Surface_Référence_Ha', ascending=False)
+    total_ha = asso_summary['Surface_Référence_Ha'].sum()
     
-    m_cols = st.columns(len(crops_to_show))
-    for i, crop in enumerate(crops_to_show):
-        if crop == "Maïs":
-            row = asso_summary[asso_summary['Culture'].str.contains("Maïs", case=False, na=False) & ~asso_summary['Culture'].str.contains("Pop", case=False, na=False)]
-        else:
-            row = asso_summary[asso_summary['Culture'].str.contains(crop, case=False, na=False)]
-        surf = row['Surface_Référence_Ha'].sum() if not row.empty else 0.0
-        m_cols[i].metric(label=crop, value=f"{surf:.1f} ha")
+    if not asso_summary.empty:
+        html_asso = """
+        <style>
+        .agridia-card-container { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; }
+        .agridia-card { 
+            flex: 1 1 calc(25% - 20px); min-width: 160px; 
+            background: linear-gradient(135deg, #ffffff 0%, #f8fbf9 100%);
+            border-radius: 16px; padding: 22px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border-top: 5px solid #6fa33c;
+            position: relative; overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .agridia-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(28, 95, 133, 0.12); }
+        .agridia-card-bg {
+            position: absolute; right: -15px; bottom: -20px; font-size: 6em; opacity: 0.04;
+            color: #1c5f85; pointer-events: none;
+        }
+        .agridia-card-title { font-family: 'Outfit', sans-serif; font-size: 1.1em; color: #444; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;}
+        .agridia-card-value { font-family: 'Inter', sans-serif; font-size: 2.2em; font-weight: 800; color: #1c5f85; line-height: 1.1;}
+        .agridia-card-unit { font-size: 0.45em; color: #777; font-weight: 500; }
+        .agridia-card-percent { font-size: 0.9em; font-weight: 700; margin-top: 12px; display: inline-block; padding: 4px 10px; border-radius: 20px; background: rgba(111, 163, 60, 0.12); color: #5e9e47; }
+        </style>
+        <div class="agridia-card-container">
+        """
+        for i, row in asso_summary.iterrows():
+            culture = row['Culture']
+            surf = row['Surface_Référence_Ha']
+            pct = (surf / total_ha) * 100 if total_ha > 0 else 0
+            border_color = colors[i % len(colors)]
+            text_color = "#1c5f85" if i % 2 == 0 else "#6fa33c"
+            
+            icon = "🌾" 
+            if "maïs" in culture.lower() or "mais" in culture.lower(): icon = "🌽"
+            elif "tournesol" in culture.lower(): icon = "🌻"
+            elif "soja" in culture.lower(): icon = "🌱"
+            
+            html_asso += f"""
+            <div class="agridia-card" style="border-top-color: {border_color};">
+                <div class="agridia-card-bg">{icon}</div>
+                <div class="agridia-card-title">{icon} {culture}</div>
+                <div class="agridia-card-value">{surf:,.1f}<span class="agridia-card-unit"> ha</span></div>
+                <div class="agridia-card-percent">{pct:.1f} %</div>
+            </div>
+            """
+        html_asso += "</div>"
+        
+        st.markdown(html_asso, unsafe_allow_html=True)
 else:
     st.info("Aucune donnée d'assolement trouvée pour cette campagne.")
 
@@ -394,13 +419,17 @@ with col_factures:
 st.divider()
 
 # 4. SUIVI FERTILISATION (Bilan Azoté / Suivi PPF)
-st.subheader("🌾 Suivi Fertilisation (Bilan Azoté)")
+st.markdown("<h3 style='color:#1c5f85; font-family:\"Outfit\", sans-serif;'>🌾 Suivi Fertilisation (Bilan Azoté)</h3>", unsafe_allow_html=True)
 try:
     df_ppf = active_loader.get_ppf(selected_campaign)
     if df_ppf.empty:
         st.info(f"Aucune donnée dans l'onglet PPF pour la campagne {selected_campaign}.")
     else:
-        df_ferti_realized = df_campaign[df_campaign['Nature_Intervention'] == "Fertilisation"].copy()
+        # Filtre STRICT : Ne calculer que les Unités effectivement APPORTÉES (Statut = Réalisé)
+        mask_ferti = (df_campaign['Nature_Intervention'] == "Fertilisation")
+        mask_realise = (df_campaign['Statut_Intervention'].astype(str).str.lower().str.contains('réalisé', na=False))
+        df_ferti_realized = df_campaign[mask_ferti & mask_realise].copy()
+        
         realized_n_by_parcel = {}
         if not df_ferti_realized.empty:
             df_ferti_realized['N/ha'] = pd.to_numeric(df_ferti_realized['N/ha'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
@@ -451,7 +480,7 @@ try:
 <tr style="background: linear-gradient(90deg, #2F6D89 0%, #5E9E47 100%); color: white; text-align: left;">
 <th style="padding: 15px;">📍 Parcelle</th>
 <th style="padding: 15px;">🌾 Culture</th>
-<th style="padding: 15px; width: 250px;">📊 Progression N (Unités)</th>
+<th style="padding: 15px; width: 250px;">📊 Réalisé</th>
 <th style="padding: 15px; text-align: center;">⏳ Reste</th>
 </tr>
 </thead>
