@@ -224,7 +224,7 @@ def render_brand_page_header(title, subtitle="", icon=""):
     st.markdown(f"""
         <div style="margin-bottom: 25px;">
             <div style="display: flex; align-items: center;">
-                <h1 style="color: #2F6D89; font-family: 'Outfit', sans-serif; font-weight: 700; margin: 0; font-size: 1.8em; line-height: 1.2;">
+                <h1 style="color: #2F6D89; font-family: 'Outfit', sans-serif; font-weight: 700; margin: 0; font-size: 2.8em; line-height: 1.2;">
                     {icon_html}{title}
                 </h1>
             </div>
