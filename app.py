@@ -142,30 +142,29 @@ if not df_asso.empty:
     total_ha = asso_summary['Surface_Référence_Ha'].sum()
     
     if not asso_summary.empty:
-        html_asso = """
-        <style>
-        .agridia-card-container { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; }
-        .agridia-card { 
-            flex: 1 1 calc(25% - 20px); min-width: 160px; 
-            background: linear-gradient(135deg, #ffffff 0%, #f8fbf9 100%);
-            border-radius: 16px; padding: 22px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            border-top: 5px solid #6fa33c;
-            position: relative; overflow: hidden;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .agridia-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(28, 95, 133, 0.12); }
-        .agridia-card-bg {
-            position: absolute; right: -15px; bottom: -20px; font-size: 6em; opacity: 0.04;
-            color: #1c5f85; pointer-events: none;
-        }
-        .agridia-card-title { font-family: 'Outfit', sans-serif; font-size: 1.1em; color: #444; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;}
-        .agridia-card-value { font-family: 'Inter', sans-serif; font-size: 2.2em; font-weight: 800; color: #1c5f85; line-height: 1.1;}
-        .agridia-card-unit { font-size: 0.45em; color: #777; font-weight: 500; }
-        .agridia-card-percent { font-size: 0.9em; font-weight: 700; margin-top: 12px; display: inline-block; padding: 4px 10px; border-radius: 20px; background: rgba(111, 163, 60, 0.12); color: #5e9e47; }
-        </style>
-        <div class="agridia-card-container">
-        """
+        html_asso = """<style>
+.agridia-card-container { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; }
+.agridia-card { 
+    flex: 1 1 calc(25% - 20px); min-width: 160px; 
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbf9 100%);
+    border-radius: 16px; padding: 22px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    border-top: 5px solid #6fa33c;
+    position: relative; overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.agridia-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(28, 95, 133, 0.12); }
+.agridia-card-bg {
+    position: absolute; right: -15px; bottom: -20px; font-size: 6em; opacity: 0.04;
+    color: #1c5f85; pointer-events: none;
+}
+.agridia-card-title { font-family: 'Outfit', sans-serif; font-size: 1.1em; color: #444; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;}
+.agridia-card-value { font-family: 'Inter', sans-serif; font-size: 2.2em; font-weight: 800; color: #1c5f85; line-height: 1.1;}
+.agridia-card-unit { font-size: 0.45em; color: #777; font-weight: 500; }
+.agridia-card-percent { font-size: 0.9em; font-weight: 700; margin-top: 12px; display: inline-block; padding: 4px 10px; border-radius: 20px; background: rgba(111, 163, 60, 0.12); color: #5e9e47; }
+</style>
+<div class="agridia-card-container">
+"""
         for i, row in asso_summary.iterrows():
             culture = row['Culture']
             surf = row['Surface_Référence_Ha']
@@ -179,14 +178,15 @@ if not df_asso.empty:
             elif "soja" in culture.lower(): icon = "🌱"
             
             html_asso += f"""
-            <div class="agridia-card" style="border-top-color: {border_color};">
-                <div class="agridia-card-bg">{icon}</div>
-                <div class="agridia-card-title">{icon} {culture}</div>
-                <div class="agridia-card-value">{surf:,.1f}<span class="agridia-card-unit"> ha</span></div>
-                <div class="agridia-card-percent">{pct:.1f} %</div>
-            </div>
-            """
+<div class="agridia-card" style="border-top-color: {border_color};">
+    <div class="agridia-card-bg">{icon}</div>
+    <div class="agridia-card-title">{icon} {culture}</div>
+    <div class="agridia-card-value">{surf:,.1f}<span class="agridia-card-unit"> ha</span></div>
+    <div class="agridia-card-percent">{pct:.1f} %</div>
+</div>
+"""
         html_asso += "</div>"
+
         
         st.markdown(html_asso, unsafe_allow_html=True)
 else:
