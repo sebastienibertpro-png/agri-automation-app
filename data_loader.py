@@ -116,18 +116,41 @@ class DataLoader:
     def clear_cache(self):
         """Vide le cache Streamlit ET le cache RAM interne."""
         st.cache_data.clear()
-        self._cache.clear()  # CRITICAL: vide aussi le cache RAM de l'instance
+        self._cache.clear()  # Vide aussi le cache RAM de l'instance
 
     def get_interventions(self, force_fresh=False):
-        """Charge JOURNAL_INTERVENTION. Si force_fresh=True, bypass le cache (ttl=0)."""
-        if force_fresh and self.conn:
+        """
+        Charge JOURNAL_INTERVENTION.
+        TOUJOURS avec ttl=0 car c'est la table la plus fréquemment écrite.
+        Le param force_fresh est conservé pour compatibilité mais n'est plus
+        nécessaire.
+        """
+        SPREADSHEET_NAME = "MASTER_EXPLOITATION"
+        if self.conn:
             try:
-                df = self.conn.read(worksheet="JOURNAL_INTERVENTION", spreadsheet="MASTER_EXPLOITATION", ttl=0)
+                # ttl=0 = toujours lire en direct (pas de cache de la connexion)
+                df = self.conn.read(
+                    worksheet="JOURNAL_INTERVENTION",
+                    spreadsheet=SPREADSHEET_NAME,
+                    ttl=0
+                )
                 self._cache["JOURNAL_INTERVENTION"] = df.copy()
                 return df
             except Exception as e:
-                st.warning(f"Lecture fraiche echouee : {e}")
-        return self._get_data("JOURNAL_INTERVENTION")
+                err_str = str(e)
+                if '429' in err_str or 'Quota' in err_str:
+                    if "JOURNAL_INTERVENTION" in self._cache:
+                        st.warning("⚠️ Quota Google atteint — affichage des données en cache.")
+                        return self._cache["JOURNAL_INTERVENTION"]
+                    else:
+                        st.error("⚠️ Quota Google atteint et aucun cache disponible.")
+                        return pd.DataFrame()
+                else:
+                    st.error(f"Erreur lecture JOURNAL_INTERVENTION : {e}")
+                    return pd.DataFrame()
+        elif self.xl:
+            return pd.read_excel(self.file_path, sheet_name="JOURNAL_INTERVENTION")
+        return pd.DataFrame()
 
     def get_cartographie_ref(self):
         """Loads REF_CARTOGRAPHIE for Telepac GeoJSON storage."""
