@@ -10,6 +10,7 @@ from shared import (
     inject_premium_css,
     render_premium_header,
     get_fresh_loader,
+    brand_spinner,
 )
 
 st.set_page_config(page_title="🌱 Observations Cultures", page_icon="🌱", layout="wide")
@@ -200,7 +201,7 @@ if diag_photo:
         if not api_key:
             st.error("⚠️ Clé GEMINI_API_KEY introuvable dans .streamlit/secrets.toml.")
         else:
-            with st.spinner("Analyse Gemini Vision en cours…"):
+            with brand_spinner("Analyse Gemini Vision en cours…"):
                 try:
                     import google.generativeai as genai
                     import PIL.Image
@@ -358,7 +359,7 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=open_form):
         else:
             photo_url_saved = ""
             if obs_photo:
-                with st.spinner("Upload de la photo…"):
+                with brand_spinner("Upload de la photo…"):
                     try:
                         import requests, base64
 
@@ -395,7 +396,7 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=open_form):
                 "Statut_Intervention": "Réalisé",
             }
 
-            with st.spinner("Enregistrement dans Google Sheets…"):
+            with brand_spinner("Enregistrement dans Google Sheets…"):
                 ok = active_loader.bulk_insert_interventions(pd.DataFrame([new_obs]))
 
             if ok:
