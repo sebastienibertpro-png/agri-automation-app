@@ -8,6 +8,167 @@ APP_BASE_URL = "https://agri-automation-app-kwz7hjkyb8hjxwhe9w7rsv.streamlit.app
 EPHY_DRIVE_FOLDER_ID = "1fMnmAMoGWVTIFaR2yOTbD7EMdBNuyH3Z"
 OBSERVATION_DRIVE_FOLDER_ID = "1_oaKK3W_YfgAQ9UPS9AkcmmIH-eZEfci"
 
+def inject_premium_css():
+    st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+    /* Typographie : Ciblage chirurgical pour éviter de casser les ligatures des icônes Material Symbols */
+    
+    /* Titres principaux (Toutes les tailles) */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Paragraphes standards et libellés (sans toucher aux span ou summary internes de Streamlit) */
+    .stMarkdown p, label, .stMetricValue > div, .stMetricLabel > div {
+        font-family: 'Outfit', sans-serif !important;
+    }
+
+    div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {
+        border-radius: 0 0 12px 12px !important;
+        border: 1px solid #e0e0e0 !important;
+        border-top: none !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
+        padding: 4px !important;
+        background-color: white !important;
+        margin-top: 0px !important;
+    }
+    
+    /* Multiselect Tags (Filtres) : Passer en vert au lieu du rouge par défaut */
+    span[data-baseweb="tag"] {
+        background-color: #5E9E47 !important;
+        color: white !important;
+    }
+    span[data-baseweb="tag"] svg {
+        fill: white !important;
+    }
+    
+    /* Dedicated Header Styling - AgriDiA Colors */
+    .p-header {
+        color: white !important;
+        padding: 12px 18px !important;
+        font-weight: 600 !important;
+        font-size: 1.15em !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        border-radius: 12px 12px 0 0 !important;
+        margin-bottom: 0 !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+        font-family: 'Outfit', sans-serif !important;
+    }
+    .p-green { background: linear-gradient(135deg, #5E9E47 0%, #4a8037 100%) !important; }
+    .p-blue { background: linear-gradient(135deg, #2F6D89 0%, #1a4153 100%) !important; }
+
+    /* ── Masquage "NUCLÉAIRE" des indicateurs système ── */
+    /* On cible tout ce qui ressemble à un widget de statut, notification ou toast */
+    [data-testid="stStatusWidget"],
+    [data-testid="stEventStatusItem"],
+    [data-testid="stToastContainer"],
+    [data-testid="stStatusWidgetSpinner"],
+    [data-testid="stNotification"],
+    .stStatusWidget,
+    .stNotification,
+    .stToast,
+    header [data-testid="stStatusWidget"],
+    .stApp > header,
+    .stDecoration {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transform: scale(0) !important;
+        position: fixed !important;
+    }
+    
+    /* Ciblage spécifique du texte de "Running..." qui affiche le code */
+    div:has(code), div:has(samp) {
+        /* On ne masque pas tout, seulement ce qui est dans un widget de statut */
+    }
+    
+    [data-testid="stStatusWidget"] code {
+        display: none !important;
+    }
+    
+    /* ── Animation de Chargement Premium AgriDiA ── */
+    .agridia-loader-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        background: transparent;
+        border-radius: 20px;
+        margin: 20px auto;
+        text-align: center;
+        z-index: 9999;
+    }
+
+    .agridia-pulse {
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, #2F6D89 0%, #5E9E47 100%);
+        border-radius: 50%;
+        margin-bottom: 25px;
+        animation: agridiaPulse 1.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 0 30px rgba(94, 158, 71, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 40px;
+        color: white;
+    }
+
+    @keyframes agridiaPulse {
+        0% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(94, 158, 71, 0.4); }
+        50% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 25px rgba(94, 158, 71, 0); }
+        100% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(94, 158, 71, 0); }
+    }
+
+    .loader-text {
+        font-family: 'Outfit', sans-serif;
+        color: #2F6D89;
+        font-weight: 700;
+        font-size: 1.4em;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        animation: agridiaFade 1.5s infinite ease-in-out;
+    }
+
+    @keyframes agridiaFade {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+    }
+</style>
+""", unsafe_allow_html=True)
+
+import contextlib
+
+@contextlib.contextmanager
+def brand_spinner(text="Chargement Agridia..."):
+    """
+    Un spinner premium aux couleurs de la marque qui remplace le st.spinner par défaut.
+    """
+    placeholder = st.empty()
+    with placeholder.container():
+        st.markdown(f"""
+            <div class="agridia-loader-container">
+                <div class="agridia-pulse">🌱</div>
+                <div class="loader-text">{text}</div>
+            </div>
+        """, unsafe_allow_html=True)
+    try:
+        yield
+    finally:
+        placeholder.empty()
+
+
 def get_dataloader():
     """Crée un DataLoader frais. Pas de cache_resource pour que le TTL de conn.read() fonctionne."""
     credentials_dict = None
@@ -172,165 +333,6 @@ def init_campaign_selector():
         st.error(f"Erreur lecture campagnes: {e}")
         st.stop()
 
-def inject_premium_css():
-    st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
-
-    /* Typographie : Ciblage chirurgical pour éviter de casser les ligatures des icônes Material Symbols */
-    
-    /* Titres principaux (Toutes les tailles) */
-    h1, h2, h3, h4, h5, h6 {
-        font-family: 'Outfit', sans-serif !important;
-        font-weight: 700 !important;
-    }
-    
-    /* Paragraphes standards et libellés (sans toucher aux span ou summary internes de Streamlit) */
-    .stMarkdown p, label, .stMetricValue > div, .stMetricLabel > div {
-        font-family: 'Outfit', sans-serif !important;
-    }
-
-    div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {
-        border-radius: 0 0 12px 12px !important;
-        border: 1px solid #e0e0e0 !important;
-        border-top: none !important;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
-        padding: 4px !important;
-        background-color: white !important;
-        margin-top: 0px !important;
-    }
-    
-    /* Multiselect Tags (Filtres) : Passer en vert au lieu du rouge par défaut */
-    span[data-baseweb="tag"] {
-        background-color: #5E9E47 !important;
-        color: white !important;
-    }
-    span[data-baseweb="tag"] svg {
-        fill: white !important;
-    }
-    
-    /* Dedicated Header Styling - AgriDiA Colors */
-    .p-header {
-        color: white !important;
-        padding: 12px 18px !important;
-        font-weight: 600 !important;
-        font-size: 1.15em !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        border-radius: 12px 12px 0 0 !important;
-        margin-bottom: 0 !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
-        font-family: 'Outfit', sans-serif !important;
-    }
-    .p-green { background: linear-gradient(135deg, #5E9E47 0%, #4a8037 100%) !important; }
-    .p-blue { background: linear-gradient(135deg, #2F6D89 0%, #1a4153 100%) !important; }
-
-    /* ── Masquage "NUCLÉAIRE" des indicateurs système ── */
-    /* On cible tout ce qui ressemble à un widget de statut, notification ou toast */
-    [data-testid="stStatusWidget"],
-    [data-testid="stEventStatusItem"],
-    [data-testid="stToastContainer"],
-    [data-testid="stStatusWidgetSpinner"],
-    [data-testid="stNotification"],
-    .stStatusWidget,
-    .stNotification,
-    .stToast,
-    header [data-testid="stStatusWidget"],
-    .stApp > header,
-    .stDecoration {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        width: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        transform: scale(0) !important;
-        position: fixed !important;
-    }
-    
-    /* Ciblage spécifique du texte de "Running..." qui affiche le code */
-    div:has(code), div:has(samp) {
-        /* On ne masque pas tout, seulement ce qui est dans un widget de statut */
-    }
-    
-    [data-testid="stStatusWidget"] code {
-        display: none !important;
-    }
-    
-    /* ── Animation de Chargement Premium AgriDiA ── */
-    .agridia-loader-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 40px;
-        background: transparent;
-        border-radius: 20px;
-        margin: 20px auto;
-        text-align: center;
-        z-index: 9999;
-    }
-
-    .agridia-pulse {
-        width: 100px;
-        height: 100px;
-        background: linear-gradient(135deg, #2F6D89 0%, #5E9E47 100%);
-        border-radius: 50%;
-        margin-bottom: 25px;
-        animation: agridiaPulse 1.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 0 30px rgba(94, 158, 71, 0.2);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 40px;
-        color: white;
-    }
-
-    @keyframes agridiaPulse {
-        0% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(94, 158, 71, 0.4); }
-        50% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 25px rgba(94, 158, 71, 0); }
-        100% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(94, 158, 71, 0); }
-    }
-
-    .loader-text {
-        font-family: 'Outfit', sans-serif;
-        color: #2F6D89;
-        font-weight: 700;
-        font-size: 1.4em;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        animation: agridiaFade 1.5s infinite ease-in-out;
-    }
-
-    @keyframes agridiaFade {
-        0%, 100% { opacity: 0.6; }
-        50% { opacity: 1; }
-    }
-</style>
-""", unsafe_allow_html=True)
-
-import contextlib
-
-@contextlib.contextmanager
-def brand_spinner(text="Chargement Agridia..."):
-    """
-    Un spinner premium aux couleurs de la marque qui remplace le st.spinner par défaut.
-    """
-    placeholder = st.empty()
-    with placeholder.container():
-        st.markdown(f"""
-            <div class="agridia-loader-container">
-                <div class="agridia-pulse">🌱</div>
-                <div class="loader-text">{text}</div>
-            </div>
-        """, unsafe_allow_html=True)
-    try:
-        yield
-    finally:
-        placeholder.empty()
 
 
 def render_brand_page_header(title, subtitle="", icon=""):
