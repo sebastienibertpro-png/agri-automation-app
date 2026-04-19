@@ -279,6 +279,15 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=open_form):
         unsafe_allow_html=True,
     )
 
+    col_o0, col_o0b = st.columns(2)
+    with col_o0:
+        st.text_input(
+            "🌾 Campagne",
+            value=selected_campaign,
+            disabled=True,
+            help="Campagne automatiquement déduite du filtre sélectionné dans le menu latéral gauche.",
+        )
+
     col_o1, col_o2 = st.columns(2)
     with col_o1:
         obs_parcelle = st.selectbox("Parcelle", available_parcelles, key="obs_p")
