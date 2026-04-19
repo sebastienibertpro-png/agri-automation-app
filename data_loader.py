@@ -114,10 +114,19 @@ class DataLoader:
         return df
 
     def clear_cache(self):
-        """Clears the local session cache."""
+        """Vide le cache Streamlit ET le cache RAM interne."""
         st.cache_data.clear()
+        self._cache.clear()  # CRITICAL: vide aussi le cache RAM de l'instance
 
-    def get_interventions(self):
+    def get_interventions(self, force_fresh=False):
+        """Charge JOURNAL_INTERVENTION. Si force_fresh=True, bypass le cache (ttl=0)."""
+        if force_fresh and self.conn:
+            try:
+                df = self.conn.read(worksheet="JOURNAL_INTERVENTION", spreadsheet="MASTER_EXPLOITATION", ttl=0)
+                self._cache["JOURNAL_INTERVENTION"] = df.copy()
+                return df
+            except Exception as e:
+                st.warning(f"Lecture fraiche echouee : {e}")
         return self._get_data("JOURNAL_INTERVENTION")
 
     def get_cartographie_ref(self):
@@ -737,19 +746,28 @@ class DataLoader:
             st.error(f"Erreur update_assolement : {e}")
             return False
 
-    def get_observations(self, campagne=None):
+    def get_observations(self, campagne=None, force_fresh=False):
         """
         Retrieves field observations from JOURNAL_INTERVENTION.
+        force_fresh=True contourne le TTL et lit directement depuis GSheets.
         """
-        df = self.get_interventions()
+        df = self.get_interventions(force_fresh=force_fresh)
         if df.empty:
             return df
-        
-        mask = df['Nature_Intervention'].astype(str).str.upper() == 'OBSERVATION'
+
+        # Normalisation de la colonne Nature_Intervention
+        df['Nature_Intervention'] = df['Nature_Intervention'].astype(str).str.strip()
+        mask = df['Nature_Intervention'].str.upper() == 'OBSERVATION'
+
         if campagne:
-            mask = mask & (df['Campagne'].astype(str) == str(campagne))
-            
-        return df[mask].copy()
+            # Comparaison robuste campagne (int ou str)
+            df['_camp_str'] = df['Campagne'].astype(str).str.strip()
+            mask = mask & (df['_camp_str'] == str(campagne).strip())
+
+        result = df[mask].copy()
+        if '_camp_str' in result.columns:
+            result = result.drop(columns=['_camp_str'])
+        return result
 
     # -----------------------------------------------------------------------
     # RÉFÉRENTIEL PHYTO — Écriture REF_INTRANTS + REF_USAGES_PHYTO
