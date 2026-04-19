@@ -5,16 +5,42 @@ import tempfile
 import zipfile
 import os
 from report_gen import ReportGenerator
-from shared import init_campaign_selector, APP_BASE_URL, render_brand_page_header
+from shared import (
+    init_campaign_selector, 
+    APP_BASE_URL, 
+    render_brand_page_header,
+    inject_premium_css,
+    render_premium_header
+)
 
-st.set_page_config(page_title="Édition de Documents", page_icon="📄", layout="wide")
+st.set_page_config(page_title="Editions de documents", page_icon="📄", layout="wide")
+inject_premium_css()
 
-render_brand_page_header("Édition de Documents Réglementaires", "Générez vos registres, bilans et fiches de préparation en quelques clics ✨", icon="📄")
+render_brand_page_header(
+    "Editions de documents", 
+    "Générez vos registres, bilans et fiches de préparation en quelques clics ✨", 
+    icon="📄"
+)
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
-options = ["Toutes"] + list(available_parcelles)
-selected_parcelle = st.selectbox("🌾 Sélectionner la Parcelle cible :", options)
+# Récupération des métadonnées pour enrichir le sélecteur (standard Agridia)
+parcel_meta = active_loader.get_parcel_metadata(selected_campaign)
+
+def get_parcelle_label(p_id):
+    if p_id == "Toutes":
+        return "🌍 Toutes les parcelles"
+    meta = parcel_meta.get(p_id, {})
+    surf = meta.get('Surface', 0.0)
+    cult = meta.get('Culture', 'Inconnu')
+    return f"{p_id} ({surf} ha - {cult})"
+
+options_raw = ["Toutes"] + list(available_parcelles)
+labels = [get_parcelle_label(p) for p in options_raw]
+label_to_id = dict(zip(labels, options_raw))
+
+selected_label = st.selectbox("🌾 Sélectionner la Parcelle cible :", labels)
+selected_parcelle = label_to_id[selected_label]
 
 target_parcelles = []
 if selected_parcelle == "Toutes":
@@ -192,34 +218,47 @@ def handle_pdf_action(report_type, btn_label):
             use_container_width=True
         )
 
-st.divider()
-
-st.subheader("📚 Choix du Document")
-
-doc_options = {
-    "📄 Itinéraire Technique": "ITK",
-    "🛡️ Registre Phytosanitaire": "PHYTO",
-    "🧪 Bilan de Fertilisation": "FERTI", 
-    "💧 Bilan Irrigation Parcelle": "IRRIG_PARCELLE"
-}
-
-selected_doc_label = st.radio(
-    "Spécifiez le type de document réglementaire à générer pour votre sélection :", 
-    list(doc_options.keys()),
-    horizontal=True
+render_premium_header(
+    "📚 Choix du Document", 
+    "Sélectionnez le type de registre réglementaire à exporter", 
+    color="green"
 )
 
-st.write("") # Espace
-handle_pdf_action(doc_options[selected_doc_label], f"🚀 Générer : {selected_doc_label}")
+with st.container():
+    st.markdown('<div style="padding: 20px; background-color: #f8f9fb; border-radius: 0 0 12px 12px; border: 1px solid #e0e0e0; border-top: none; margin-bottom: 25px;">', unsafe_allow_html=True)
+    
+    doc_options = {
+        "📄 Itinéraire Technique": "ITK",
+        "🛡️ Registre Phytosanitaire": "PHYTO",
+        "🧪 Bilan de Fertilisation": "FERTI", 
+        "💧 Bilan Irrigation Parcelle": "IRRIG_PARCELLE"
+    }
 
-st.divider()
+    selected_doc_label = st.radio(
+        "Type de document à générer :", 
+        list(doc_options.keys()),
+        horizontal=True
+    )
+
+    st.write("") # Espace
+    handle_pdf_action(doc_options[selected_doc_label], f"🚀 Générer : {selected_doc_label}")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.write("<br>", unsafe_allow_html=True)
 
 # --- FICHE PREPARATION PHYTO ---
-st.header("🧪 Fiche de Préparation Phyto")
-try:
-    df_planned = active_loader.get_planned_treatments(selected_campaign)
-    
-    if not df_planned.empty:
+render_premium_header(
+    "🧪 Fiche de Préparation Phyto", 
+    "Générez vos fiches de mélange pour le terrain", 
+    color="blue"
+)
+
+with st.container():
+    st.markdown('<div style="padding: 20px; background-color: #f8f9fb; border-radius: 0 0 12px 12px; border: 1px solid #e0e0e0; border-top: none;">', unsafe_allow_html=True)
+    try:
+        df_planned = active_loader.get_planned_treatments(selected_campaign)
+        
+        if not df_planned.empty:
         interventions_by_dp = {}
         for _, row in df_planned.iterrows():
             d_val = row['Date']
@@ -323,10 +362,12 @@ try:
                 gen = ReportGenerator(fpath)
                 gen.generate_prep_sheet(selected_campaign, payload, base_url=APP_BASE_URL)
                 with open(fpath, "rb") as f:
-                   st.download_button(label="⬇️ Télécharger Fiche", data=f, file_name=fname, mime="application/pdf", key="dl_prep_sheet")
-            st.success("Fiche générée !")
+                   st.download_button(label="⬇️ Télécharger Fiche", data=f, file_name=fname, mime="application/pdf", key="dl_prep_sheet", use_container_width=True)
+            st.success("✅ Fiche de préparation générée avec succès !")
             
     else:
-        st.info("Pas d'interventions planifiées trouvées pour cette campagne.")
+        st.info("ℹ️ Aucune intervention planifiée trouvée pour cette campagne.")
 except Exception as e:
-    st.error(f"Erreur chargement planning: {e}")
+    st.error(f"❌ Erreur lors du chargement du planning : {e}")
+
+st.markdown('</div>', unsafe_allow_html=True)
