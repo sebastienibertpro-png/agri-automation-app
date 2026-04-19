@@ -22,17 +22,25 @@ render_brand_page_header(
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# GPS : capturé ICI, hors de tout expander, pour être toujours actif
+# GPS : capturé hors de tout expander — actif à chaque rendu de page
 # ─────────────────────────────────────────────────────────────────────────────
-loc = get_geolocation()
-if loc:
+loc = get_geolocation()  # Retourne None au 1er rendu, coords au 2e
+if loc and isinstance(loc, dict) and "coords" in loc:
     try:
-        new_gps = f"{loc['coords']['latitude']:.6f},{loc['coords']['longitude']:.6f}"
-        st.session_state["cached_gps"] = new_gps
-    except Exception:
-        pass
+        lat_raw = loc["coords"]["latitude"]
+        lon_raw = loc["coords"]["longitude"]
+        new_gps = f"{float(lat_raw):.6f},{float(lon_raw):.6f}"
+        # Stocker dans session_state — source unique de vérité
+        st.session_state["gps_lat"] = float(lat_raw)
+        st.session_state["gps_lon"] = float(lon_raw)
+        st.session_state["gps_str"] = new_gps
+    except Exception as gps_err:
+        st.session_state["gps_error"] = str(gps_err)
 
-cached_gps = st.session_state.get("cached_gps", "")
+# Lecture depuis session_state (survit aux reruns)
+gps_lat = st.session_state.get("gps_lat")
+gps_lon = st.session_state.get("gps_lon")
+gps_str = st.session_state.get("gps_str", "")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. CARTE DES OBSERVATIONS
@@ -235,11 +243,17 @@ render_premium_header(
     color="green",
 )
 
-# Afficher statut GPS AVANT le formulaire (toujours visible)
-if cached_gps:
-    st.success(f"📍 Position GPS prête : **{cached_gps}** — sera automatiquement attachée à l'observation.")
-else:
-    st.warning("⚠️ GPS non détecté. Autorisez la localisation dans votre navigateur ou saisissez les coordonnées manuellement.")
+# ── Bandeau GPS permanent (hors expander) ──
+gps_col1, gps_col2 = st.columns([3, 1])
+with gps_col1:
+    if gps_str:
+        st.success(f"📍 Position GPS capturée : **{gps_str}**  ← sera sauvegardée avec l'observation")
+    else:
+        st.warning("⚠️ GPS non encore capturé — autorisez la localisation dans le navigateur. La page rafraîchit automatiquement.")
+with gps_col2:
+    if st.button("🔄 Rafraîchir GPS", use_container_width=True):
+        # Force rerun pour que get_geolocation() refasse un tour
+        st.rerun()
 
 open_form = st.session_state.get("expand_obs_form", False)
 
@@ -283,17 +297,26 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=open_form):
         height=120,
     )
 
-    # Coordonnées GPS éditables, pré-remplies avec la valeur capturée
-    gps_coords = st.text_input(
-        "Coordonnées GPS (lat,lon)",
-        value=cached_gps,
-        help="Format : 48.123456,2.345678 — rempli automatiquement si le GPS est actif.",
-        key="obs_gps_input",
+    # ── GPS : pas de widget avec key pour éviter le conflit de valeur ──
+    # On lit depuis session_state + on permet la saisie manuelle
+    st.markdown("**📍 Coordonnées GPS**")
+    gps_from_session = st.session_state.get("gps_str", "")
+    gps_manual = st.text_input(
+        "Coordonnées GPS (lat,lon) — modifiables",
+        value=gps_from_session,  # Pas de key= pour éviter conflit
+        help="Format : 48.123456,2.345678 · Rempli automatiquement depuis le GPS du navigateur.",
+        placeholder="ex: 48.123456,2.345678",
     )
+    # Synchroniser manuellement la saisie dans session_state
+    if gps_manual and gps_manual != gps_from_session:
+        st.session_state["gps_str"] = gps_manual.strip().replace(" ", "")
 
-    st.caption(
-        "💡 **Astuce :** Si le GPS n'est pas détecté, ouvrez cette page sur mobile avec la localisation activée."
-    )
+    # Affichage de confirmation visuelle de ce qui sera sauvegardé
+    gps_final = st.session_state.get("gps_str", "").strip()
+    if gps_final:
+        st.caption(f"✅ GPS à enregistrer : `{gps_final}`")
+    else:
+        st.caption("⚠️ Aucune coordonnée GPS — l'observation ne sera pas visible sur la carte.")
 
     # ── Bouton Enregistrer ──
     if st.button("🚀 Enregistrer l'observation", type="primary", use_container_width=True):
@@ -322,8 +345,9 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=open_form):
                     except Exception as exc:
                         st.error(f"Erreur upload photo : {exc}")
 
-            # Nettoyage coordonnées GPS
-            gps_to_save = gps_coords.strip().replace(" ", "")
+            # GPS : lire depuis session_state (source unique de vérité)
+            # On préfère session_state["gps_str"] mis à jour par la saisie manuelle
+            gps_to_save = st.session_state.get("gps_str", "").strip().replace(" ", "")
 
             new_obs = {
                 "ID_Intervention": f"OBS_{selected_campaign}_{obs_parcelle}_{pd.Timestamp.now().strftime('%H%M%S')}",
