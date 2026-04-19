@@ -225,8 +225,13 @@ def inject_premium_css():
 
     /* ── Masquer le widget de statut natif Streamlit ("Google Sheets...") ── */
     /* Les st.spinner() dans le code restent visibles (composant différent : stSpinner) */
-    [data-testid="stStatusWidget"] {
+    [data-testid="stStatusWidget"],
+    [data-testid="stEventStatusItem"],
+    [data-testid="stToastContainer"],
+    .stApp > header [data-testid="stStatusWidget"] {
         display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
     }
 
 </style>
