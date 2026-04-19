@@ -168,27 +168,6 @@ with col_info2:
 
 st_folium(m_map, height=480, use_container_width=True, returned_objects=[])
 
-# ── PANNEAU DIAGNOSTIC : voir les données brutes lues depuis GSheets ──
-with st.expander("🔍 Diagnostic — Données brutes lues depuis Google Sheets", expanded=False):
-    # Relecture totale de JOURNAL_INTERVENTION (ttl=0 garanti via get_interventions)
-    df_all_raw = active_loader.get_interventions()
-    obs_raw = df_all_raw[df_all_raw.get('Nature_Intervention', pd.Series(dtype=str)).astype(str).str.strip().str.upper() == 'OBSERVATION'] if not df_all_raw.empty and 'Nature_Intervention' in df_all_raw.columns else pd.DataFrame()
-
-    st.markdown(f"""
-    - **Lignes totales dans JOURNAL_INTERVENTION :** `{len(df_all_raw)}`  
-    - **Lignes 'Observation' filtrées :** `{len(obs_raw)}`  
-    - **Colonnes disponibles :** `{', '.join(df_all_raw.columns.tolist()) if not df_all_raw.empty else 'aucune'}`
-    """)
-
-    if not obs_raw.empty:
-        cols_diag = [c for c in ["Date", "ID_Parcelle", "Nature_Intervention", "Localisation_GPS", "Observations", "Campagne"] if c in obs_raw.columns]
-        st.dataframe(obs_raw[cols_diag].tail(10), use_container_width=True)
-    else:
-        st.warning("Aucune ligne 'Observation' trouvée. Vérifiez que la colonne **Nature_Intervention** contient bien 'Observation'.")
-        if not df_all_raw.empty:
-            st.markdown("**5 dernières lignes brutes :**")
-            st.dataframe(df_all_raw.tail(5), use_container_width=True)
-
 st.divider()
 
 # ─────────────────────────────────────────────────────────────────────────────
