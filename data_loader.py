@@ -783,13 +783,19 @@ class DataLoader:
         mask = df['Nature_Intervention'].str.upper() == 'OBSERVATION'
 
         if campagne:
-            # Comparaison robuste campagne (int ou str)
-            df['_camp_str'] = df['Campagne'].astype(str).str.strip()
-            mask = mask & (df['_camp_str'] == str(campagne).strip())
+            # Comparaison robuste campagne : normaliser en int les deux côtés
+            # pour éviter le mismatch "2025.0" (GSheets float) vs 2025 (int sidebar)
+            df['_camp_norm'] = pd.to_numeric(df['Campagne'], errors='coerce').fillna(0).astype(int)
+            try:
+                camp_int = int(float(str(campagne).strip()))
+            except (ValueError, TypeError):
+                camp_int = -1
+            mask = mask & (df['_camp_norm'] == camp_int)
 
         result = df[mask].copy()
-        if '_camp_str' in result.columns:
-            result = result.drop(columns=['_camp_str'])
+        for tmp_col in ['_camp_str', '_camp_norm']:
+            if tmp_col in result.columns:
+                result = result.drop(columns=[tmp_col])
         return result
 
     # -----------------------------------------------------------------------
