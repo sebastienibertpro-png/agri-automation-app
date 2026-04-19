@@ -37,6 +37,9 @@ def get_drive_uploader():
 def get_active_loader():
     """Retourne un DataLoader. Utilise session_state pour éviter une recréation totale à chaque widget,
     mais sans bloquer le rafraîchissement des données (TTL géré par st.connection en interne)."""
+    # On injecte le CSS immédiatement pour masquer les "Running" de la connexion GSheets
+    inject_premium_css()
+    
     if "_dataloader" not in st.session_state or st.session_state["_dataloader"] is None:
         st.session_state["_dataloader"] = get_dataloader()
     return st.session_state["_dataloader"]
@@ -223,15 +226,19 @@ def inject_premium_css():
     .p-green { background: linear-gradient(135deg, #5E9E47 0%, #4a8037 100%) !important; }
     .p-blue { background: linear-gradient(135deg, #2F6D89 0%, #1a4153 100%) !important; }
 
-    /* ── Masquer TOTALEMENT les indicateurs de statut natifs Streamlit ── */
+    /* ── Masquage "NUCLÉAIRE" des indicateurs système ── */
+    /* On cible tout ce qui ressemble à un widget de statut, notification ou toast */
     [data-testid="stStatusWidget"],
     [data-testid="stEventStatusItem"],
     [data-testid="stToastContainer"],
     [data-testid="stStatusWidgetSpinner"],
+    [data-testid="stNotification"],
+    .stStatusWidget,
+    .stNotification,
+    .stToast,
     header [data-testid="stStatusWidget"],
     .stApp > header,
-    .stDecoration,
-    [data-testid="stStatusWidget"] div {
+    .stDecoration {
         display: none !important;
         visibility: hidden !important;
         height: 0 !important;
@@ -239,6 +246,18 @@ def inject_premium_css():
         margin: 0 !important;
         padding: 0 !important;
         opacity: 0 !important;
+        pointer-events: none !important;
+        transform: scale(0) !important;
+        position: fixed !important;
+    }
+    
+    /* Ciblage spécifique du texte de "Running..." qui affiche le code */
+    div:has(code), div:has(samp) {
+        /* On ne masque pas tout, seulement ce qui est dans un widget de statut */
+    }
+    
+    [data-testid="stStatusWidget"] code {
+        display: none !important;
     }
     
     /* ── Animation de Chargement Premium AgriDiA ── */
