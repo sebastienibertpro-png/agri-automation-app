@@ -127,10 +127,10 @@ try:
                 df_display = df_agg.copy()
                 df_display['Total m3'] = df_display['Total m3'].apply(lambda x: f"{x:.1f}")
                 df_display['Volume (mm/ha)'] = df_display['Volume (mm/ha)'].apply(lambda x: f"{x:.1f}")
-                
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+                st.dataframe(df_display, use_container_width=True, hide_index=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
+            
             if st.button("📄 Exporter Synthèse Multiannuelle PDF", key="btn_global_irr_export"):
                 with st.spinner("Génération de la synthèse globale en cours..."):
                     df_releves = active_loader.get_releves_compteurs()
@@ -149,7 +149,7 @@ try:
                                 if not df_camp_agg.empty:
                                     campaign_summaries[camp] = df_camp_agg
                     
-                if campaign_summaries:
+                    if campaign_summaries:
                         with tempfile.TemporaryDirectory() as tmpdirname:
                             global_fname = "Synthese_Globale_Irrigation.pdf"
                             global_fpath = os.path.join(tmpdirname, global_fname)
@@ -159,7 +159,7 @@ try:
                             with open(global_fpath, "rb") as f:
                                 st.download_button(
                                     label="⬇️ Télécharger Synthèse Multiannuelle",
-                                    data=f,
+                                    data=f.read(),
                                     file_name=global_fname,
                                     mime="application/pdf",
                                     key="dl_global_irr",
@@ -167,6 +167,7 @@ try:
                                 )
                     else:
                         st.warning("Aucune donnée d'irrigation à exporter pour les filtres actuels.")
+            
             st.markdown("<br>", unsafe_allow_html=True)
             
             for net in sorted(selected_nets):
@@ -185,7 +186,7 @@ try:
                                 gen = ReportGenerator(fpath)
                                 gen.generate_irrigation_report(selected_campaign, net, net_data)
                                 with open(fpath, "rb") as f:
-                                    st.download_button(label=f"⬇️ Télécharger PDF Campagne", data=f, file_name=fname, mime="application/pdf", key=f"dl_camp_{net}")
+                                    st.download_button(label=f"⬇️ Télécharger PDF Campagne", data=f.read(), file_name=fname, mime="application/pdf", key=f"dl_camp_{net}")
 
                     with col_irr2:
                         if net in ["CUMA_Irrigation", "ASA_SaintLoup"]:
@@ -208,8 +209,7 @@ try:
                                                 try:
                                                     sender_email = st.secrets["connections"]["gsheets"]["GMAIL_USER"]
                                                     sender_app_password = st.secrets["connections"]["gsheets"]["GMAIL_PASSWORD"]
-                                                except Exception:
-                                                    pass
+                                                except: pass
                                                 
                                             if not sender_email or not sender_app_password:
                                                 st.error("Identifiants d'envoi d'email introuvables (GMAIL_USER, GMAIL_PASSWORD).")
@@ -245,7 +245,7 @@ try:
                                 gen = ReportGenerator(fpath)
                                 gen.generate_monthly_network_report(selected_campaign, conso_month_name, net, monthly_data)
                                 with open(fpath, "rb") as f:
-                                    st.download_button(label=f"⬇️ Télécharger PDF Mensuel", data=f, file_name=fname, mime="application/pdf", key=f"dl_month_{net}")
+                                    st.download_button(label=f"⬇️ Télécharger PDF Mensuel", data=f.read(), file_name=fname, mime="application/pdf", key=f"dl_month_{net}")
                                     
                     with col_irr_m2:
                         if net in ["CUMA_Irrigation", "ASA_SaintLoup"]:
@@ -268,8 +268,7 @@ try:
                                                 try:
                                                     sender_email = st.secrets["connections"]["gsheets"]["GMAIL_USER"]
                                                     app_password = st.secrets["connections"]["gsheets"]["GMAIL_PASSWORD"]
-                                                except:
-                                                    pass
+                                                except: pass
                                             
                                             if not sender_email or not app_password:
                                                 st.error("Identifiants Gmail manquants.")
@@ -284,7 +283,7 @@ try:
                                                 else: st.error("Échec de l'envoi.")
                                             if os.path.exists(fpath): os.remove(fpath)
                         else:
-                            st.info("Privé : Email non requis.")
+                            st.info("ℹ️ Privé : Email non requis.")
 
 except Exception as e:
     st.error(f"Erreur lors du traitement de l'irrigation : {e}")
