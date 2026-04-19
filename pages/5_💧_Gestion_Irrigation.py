@@ -8,7 +8,8 @@ from shared import (
     init_campaign_selector, 
     render_brand_page_header,
     inject_premium_css,
-    render_premium_header
+    render_premium_header,
+    brand_spinner,
 )
 
 st.set_page_config(page_title="Gestion Irrigation", page_icon="💧", layout="wide")
@@ -69,7 +70,7 @@ def calculate_summary_table(df_filtered, selected_nets):
     return df_agg
 
 try:
-    with st.spinner("Chargement des données d'irrigation..."):
+    with brand_spinner("Chargement des données d'irrigation..."):
         df_conso = active_loader.get_consumption_data(selected_campaign)
 
     if df_conso.empty:
@@ -132,7 +133,7 @@ try:
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.button("📄 Exporter Synthèse Multiannuelle PDF", key="btn_global_irr_export"):
-                with st.spinner("Génération de la synthèse globale en cours..."):
+                with brand_spinner("Génération de la synthèse globale en cours..."):
                     df_releves = active_loader.get_releves_compteurs()
                     df_releves['Date_Relevé'] = pd.to_datetime(df_releves['Date_Relevé'], errors='coerce', dayfirst=True)
                     all_camps = [int(x) for x in df_releves['Date_Relevé'].dt.year.dropna().unique()]
@@ -196,7 +197,7 @@ try:
                                 if not recipient:
                                     st.error(f"Aucune adresse email trouvée pour le réseau {net}.")
                                 else:
-                                    with st.spinner(f"Envoi du bilan campagne à : {recipient}..."):
+                                    with brand_spinner(f"Envoi du bilan campagne à : {recipient}..."):
                                         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                                             fpath = tmp_file.name
                                             gen = ReportGenerator(fpath)
@@ -255,7 +256,7 @@ try:
                                 if not recipient:
                                     st.error(f"Aucune adresse email trouvée pour le réseau {net}.")
                                 else:
-                                    with st.spinner(f"Envoi du bilan mensuel à : {recipient}..."):
+                                    with brand_spinner(f"Envoi du bilan mensuel à : {recipient}..."):
                                         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                                             fpath = tmp_file.name
                                             gen = ReportGenerator(fpath)
