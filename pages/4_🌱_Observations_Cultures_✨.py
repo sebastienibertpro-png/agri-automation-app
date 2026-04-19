@@ -159,7 +159,7 @@ with col_info2:
             for err in gps_errors:
                 st.caption(err)
 
-st_folium(m_map, width=None, height=480, use_container_width=True)
+st_folium(m_map, height=480, use_container_width=True, returned_objects=[])
 
 # ── PANNEAU DIAGNOSTIC : voir les données brutes lues depuis GSheets ──
 with st.expander("🔍 Diagnostic — Données brutes lues depuis Google Sheets", expanded=False):
