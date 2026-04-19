@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import folium
+from folium.plugins import Fullscreen, MiniMap
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 from shared import (
@@ -23,22 +24,25 @@ render_brand_page_header(
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# GPS : capturé hors de tout expander — actif à chaque rendu de page
+# GPS : uniquement déclenché sur demande explicite (bouton) — évite les reruns infinis
 # ─────────────────────────────────────────────────────────────────────────────
-loc = get_geolocation()  # Retourne None au 1er rendu, coords au 2e
-if loc and isinstance(loc, dict) and "coords" in loc:
-    try:
-        lat_raw = loc["coords"]["latitude"]
-        lon_raw = loc["coords"]["longitude"]
-        new_gps = f"{float(lat_raw):.6f},{float(lon_raw):.6f}"
-        # Stocker dans session_state — source unique de vérité
-        st.session_state["gps_lat"] = float(lat_raw)
-        st.session_state["gps_lon"] = float(lon_raw)
-        st.session_state["gps_str"] = new_gps
-    except Exception as gps_err:
-        st.session_state["gps_error"] = str(gps_err)
+if st.session_state.get("gps_requested", False):
+    loc = get_geolocation()  # Appel JS → Python (déclenche 1 seul rerun supplémentaire)
+    if loc and isinstance(loc, dict) and "coords" in loc:
+        try:
+            lat_raw = loc["coords"]["latitude"]
+            lon_raw = loc["coords"]["longitude"]
+            new_gps = f"{float(lat_raw):.6f},{float(lon_raw):.6f}"
+            st.session_state["gps_lat"] = float(lat_raw)
+            st.session_state["gps_lon"] = float(lon_raw)
+            st.session_state["gps_str"] = new_gps
+        except Exception as gps_err:
+            st.session_state["gps_error"] = str(gps_err)
+        finally:
+            # Désactiver le flag pour ne plus relancer get_geolocation au prochain rendu
+            st.session_state["gps_requested"] = False
 
-# Lecture depuis session_state (survit aux reruns)
+# Lecture depuis session_state (valeurs persistantes entre les reruns)
 gps_lat = st.session_state.get("gps_lat")
 gps_lon = st.session_state.get("gps_lon")
 gps_str = st.session_state.get("gps_str", "")
@@ -52,8 +56,8 @@ render_premium_header(
     color="green",
 )
 
-# Lecture TOUJOURS fraîche pour afficher les derniers enregistrements
-df_obs = active_loader.get_observations(selected_campaign, force_fresh=True)
+# Lecture des observations (get_interventions utilise déjà ttl=0 — pas de quota inutile)
+df_obs = active_loader.get_observations(selected_campaign)
 
 # Initialisation de la carte satellite
 m_map = folium.Map(
@@ -64,6 +68,22 @@ m_map = folium.Map(
     name="Satellite (Esri)",
 )
 folium.LayerControl().add_to(m_map)
+
+# ── Plugin Plein Écran ──
+Fullscreen(
+    position="topleft",
+    title="Plein écran",
+    title_cancel="Quitter le plein écran",
+    force_separate_button=True,
+).add_to(m_map)
+
+# ── Mini-carte de repérage (coin bas-gauche) ──
+MiniMap(
+    tile_layer="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attr="Esri",
+    zoom_level_offset=-5,
+    toggle_display=True,
+).add_to(m_map)
 
 markers_added = 0
 gps_errors = []
@@ -261,10 +281,11 @@ with gps_col1:
     if gps_str:
         st.success(f"📍 Position GPS capturée : **{gps_str}**  ← sera sauvegardée avec l'observation")
     else:
-        st.warning("⚠️ GPS non encore capturé — autorisez la localisation dans le navigateur. La page rafraîchit automatiquement.")
+        st.info("ℹ️ GPS non capturé — cliquez sur 'Capturer GPS' pour obtenir votre position.")
 with gps_col2:
-    if st.button("🔄 Rafraîchir GPS", use_container_width=True):
-        # Force rerun pour que get_geolocation() refasse un tour
+    if st.button("📍 Capturer GPS", use_container_width=True):
+        # Activer le flag : get_geolocation() sera appelé au prochain rendu uniquement
+        st.session_state["gps_requested"] = True
         st.rerun()
 
 open_form = st.session_state.get("expand_obs_form", False)
