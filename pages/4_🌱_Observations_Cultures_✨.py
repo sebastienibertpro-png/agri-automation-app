@@ -129,11 +129,18 @@ if not df_obs.empty:
                     photo_url = photo_id
                 else:
                     photo_url = f"https://drive.google.com/uc?id={photo_id}"
-                popup_html += f"<br><img src='{photo_url}' width='200'>"
+                
+                # Image intégrée avec un lien pour agrandir
+                popup_html += f"<br><br><a href='{photo_url}' target='_blank'><img src='{photo_url}' style='width: 100%; max-height: 180px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);' alt='Photo Observation'></a>"
+                popup_html += f"<br><div style='text-align: center; margin-top: 4px;'><a href='{photo_url}' target='_blank' style='font-size: 11px; color: #2F6D89; text-decoration: none;'>🔍 Agrandir la photo</a></div>"
+
+            # Intégrer dans un IFrame pour garantir l'affichage propre dans Mapbox/Folium
+            iframe = folium.IFrame(popup_html, width=280, height=320 if photo_id else 180)
+            popup_obj = folium.Popup(iframe, max_width=300)
 
             folium.Marker(
                 [lat, lon],
-                popup=folium.Popup(popup_html, max_width=320),
+                popup=popup_obj,
                 tooltip=f"📍 {row.get('ID_Parcelle','?')} — {row.get('Date','')}",
                 icon=folium.Icon(color="green", icon="leaf", prefix="fa"),
             ).add_to(m_map)
