@@ -223,49 +223,9 @@ def inject_premium_css():
     .p-green { background: linear-gradient(135deg, #5E9E47 0%, #4a8037 100%) !important; }
     .p-blue { background: linear-gradient(135deg, #2F6D89 0%, #1a4153 100%) !important; }
 
-    /* ── Spinner de chargement premium (remplace le texte "Google Sheets...") ── */
-
-    /* Masquer tout le texte et icônes du widget de statut natif */
-    [data-testid="stStatusWidget"] > div > span,
-    [data-testid="stStatusWidget"] > div > svg,
-    [data-testid="stStatusWidget"] > div > div > span {
-        display: none !important;
-    }
-
-    /* Remplacer par un spinner animé */
-    [data-testid="stStatusWidget"] > div::before {
-        content: "";
-        display: inline-block;
-        width: 22px;
-        height: 22px;
-        border: 3px solid rgba(94, 158, 71, 0.25);
-        border-top-color: #5E9E47;
-        border-right-color: #2F6D89;
-        border-radius: 50%;
-        animation: agridia-spin 0.75s linear infinite;
-        vertical-align: middle;
-        margin-right: 6px;
-    }
-
-    /* Texte "Chargement..." à côté du spinner */
-    [data-testid="stStatusWidget"] > div::after {
-        content: "Chargement…";
-        font-family: 'Outfit', sans-serif;
-        font-size: 0.78rem;
-        font-weight: 500;
-        color: #2F6D89;
-        vertical-align: middle;
-        letter-spacing: 0.02em;
-    }
-
-    @keyframes agridia-spin {
-        0%   { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    /* Masquer complètement quand Streamlit est en état "idle" (non en train de charger) */
-    [data-testid="stStatusWidget"][aria-label=""] > div::before,
-    [data-testid="stStatusWidget"][aria-label=""] > div::after {
+    /* ── Masquer le widget de statut natif Streamlit ("Google Sheets...") ── */
+    /* Les st.spinner() dans le code restent visibles (composant différent : stSpinner) */
+    [data-testid="stStatusWidget"] {
         display: none !important;
     }
 
