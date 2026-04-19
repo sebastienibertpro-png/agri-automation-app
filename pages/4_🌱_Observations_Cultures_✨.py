@@ -79,8 +79,11 @@ Fullscreen(
 
 # ── Mini-carte de repérage (coin bas-gauche) ──
 MiniMap(
-    tile_layer="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attr="Esri",
+    tile_layer=folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri World Imagery",
+        name="Satellite",
+    ),
     zoom_level_offset=-5,
     toggle_display=True,
 ).add_to(m_map)
