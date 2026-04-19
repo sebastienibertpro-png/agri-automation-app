@@ -6,16 +6,17 @@ import folium
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 from report_gen import ReportGenerator
-from shared import init_campaign_selector, APP_BASE_URL, OBSERVATION_DRIVE_FOLDER_ID, get_drive_uploader, render_brand_page_header
+from shared import init_campaign_selector, APP_BASE_URL, OBSERVATION_DRIVE_FOLDER_ID, get_drive_uploader, render_brand_page_header, inject_premium_css, render_premium_header
 
 st.set_page_config(page_title="🌱 Observations Cultures", page_icon="🌱", layout="wide")
+inject_premium_css()
 
 render_brand_page_header("Observations au Champ", "Gérez vos tours de plaine et diagnostics IA ✨", icon="🌱")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
 # 1. VISUALISATION (CARTE)
-st.subheader("📍 Carte des Observations")
+render_premium_header("📍 Carte des Observations", "Consultez les relevés géolocalisés sur votre parcellaire", color="green")
 
 df_obs = active_loader.get_observations(selected_campaign)
 
@@ -64,7 +65,7 @@ st_folium(m_map, width=None, height=500, use_container_width=True)
 st.divider()
 
 # --- DIAGNOSTIC IA ---
-st.subheader("🤖 Diagnostic IA (Maladies & Adventices)")
+render_premium_header("🤖 Diagnostic IA", "Maladies, ravageurs & adventices", color="blue")
 st.markdown("Prenez une photo d'une plante malade, d'un symptôme ou d'une adventice pour obtenir un diagnostic instantané par l'Intelligence Artificielle.")
 
 diag_col1, diag_col2 = st.columns([1, 1])
@@ -128,9 +129,14 @@ if "diag_result_text" in st.session_state:
 st.divider()
 
 # 2. SAISIE D'OBSERVATION
-st.subheader("📝 Nouvelle Observation")
+render_premium_header("📝 Nouvelle Observation", "Enregistrez vos relevés au champ", color="green")
 
 with st.expander("Ouvrir le formulaire de saisie", expanded=False):
+    st.markdown("""
+    <div style="background-color: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+        <h4 style="color: #1e293b; margin-top:0;">Informations Générales</h4>
+    </div>
+    """, unsafe_allow_html=True)
     col_o1, col_o2 = st.columns(2)
     with col_o1:
         obs_parcelle = st.selectbox("Parcelle", available_parcelles, key="obs_p")
@@ -139,6 +145,12 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=False):
         obs_stade = st.selectbox("Stade Culture", ["Levée", "3F", "6F", "10F", "Floraison", "Maturité", "Récolte"], key="obs_s")
         obs_photo = st.file_uploader("Prendre une photo (ou charger)", type=["jpg", "jpeg", "png"], key="obs_img")
 
+    st.markdown("""
+    <div style="background-color: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; margin-top: 20px;">
+        <h4 style="color: #1e293b; margin-top:0;">Détails & Géolocalisation</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
     default_obs_text = st.session_state.get("auto_fill_obs_text", "")
     obs_text = st.text_area("Observations au champ", value=default_obs_text, placeholder="Saisir vos remarques ici...")
 
