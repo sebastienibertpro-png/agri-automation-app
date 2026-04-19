@@ -231,16 +231,18 @@ if diag_photo:
                     img = PIL.Image.open(diag_photo)
 
                     prompt = """
-Tu es un expert agronome hautement qualifié spécialisé dans la protection des cultures.
-Analyse cette photo fournie par un agriculteur et fournis un diagnostic détaillé :
+Tu es un expert agronome français de haut niveau. L'utilisateur est un agriculteur professionnel ; va droit au but.
+N'explique JAMAIS comment tu reconnais la plante ou la culture, donne simplement son nom (c'est évident pour un agriculteur).
 
-1. **IDENTIFICATION** : Identifie la culture ou la plante présente (si c'est une adventice, donne son nom commun et scientifique).
-2. **DIAGNOSTIC** : Identifie les symptômes visibles (maladie fongique, bactérie, virus, carence, insecte, stress abiotique, etc.).
-3. **RECOMMANDATIONS** : Propose des solutions concrètes, des produits homologués ou des pratiques agronomiques.
+Analyse cette photo et fournis un diagnostic structuré :
 
-Si la photo n'est pas claire, précise-le. Sois précis, professionnel et structure ta réponse.
+1. **CULTURE / PLANTE** : Nomme la culture ou l'adventice, sans aucune justification.
+2. **DIAGNOSTIC PRÉCIS** : Analyse finement les symptômes. Sois très rigoureux sur les confusions fréquentes (ex: ne confonds pas une Septoriose avec de simples nécroses physiologiques, tâche de distinguer les différentes rouilles, etc.). Identifie précisément le problème (maladie fongique, ravageur, carence, etc.).
+3. **RECOMMANDATIONS ET PRODUITS (E-Phy France)** : Propose la meilleure solution agronomique. Si un traitement est nécessaire, tu DOIS citer des EXEMPLES DE PRODUITS COMMERCIAUX homologués en France (références de la base E-Phy) adaptés à cette cible, en précisant la DOSE HOMOLOGUÉE habituelle (ex: "Produit X à 0.8 L/ha" ou "Produit Y à 1.2 kg/ha").
 
-IMPORTANT : À la toute fin de ta réponse, ajoute la balise ---RESUME--- puis, en 1 ou 2 phrases maximum, un résumé très clair du diagnostic et de la solution. Ce résumé sera utilisé comme note géolocalisée et doit apporter une plus-value technique immédiate à l'agriculteur.
+Sois ultra-pragmatique, direct et professionnel.
+
+IMPORTANT : À la toute fin de ta réponse, ajoute la balise ---RESUME--- puis rédige un résumé extrêmement court de 1 à 2 phrases contenant uniquement le problème identifié et la préconisation terrain (ex: "Forte présence de Septoriose sur blé. Recommandation : Traitement fongicide type [Nom Produit] à [Dose]").
 """
 
                     response = model.generate_content([prompt, img])
