@@ -4,11 +4,21 @@ import tempfile
 import os
 from report_gen import ReportGenerator
 from email_utils import send_email_with_attachment
-from shared import init_campaign_selector, render_brand_page_header
+from shared import (
+    init_campaign_selector, 
+    render_brand_page_header,
+    inject_premium_css,
+    render_premium_header
+)
 
 st.set_page_config(page_title="Gestion Irrigation", page_icon="💧", layout="wide")
+inject_premium_css()
 
-render_brand_page_header("Gestion de l'Irrigation", "Optimisez vos apports en eau et gérez vos relevés ✨", icon="💧")
+render_brand_page_header(
+    "Gestion de l'Irrigation", 
+    "Optimisez vos apports en eau et gérez vos relevés ✨", 
+    icon="💧"
+)
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 
@@ -67,15 +77,18 @@ try:
     else:
         networks = sorted(df_conso['Reseau_type'].unique())
         
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            selected_nets = st.multiselect("Filtre Réseau", networks, default=networks)
-        
-        df_net_filtered = df_conso[df_conso['Reseau_type'].isin(selected_nets)]
-        available_meters = sorted(df_net_filtered['ID_Compteur'].unique()) if not df_net_filtered.empty else []
-        
-        with col_f2:
-            selected_meters = st.multiselect("Filtre Compteurs", available_meters, default=available_meters)
+        with st.container():
+            st.markdown('<div style="padding: 20px; background-color: #f8f9fb; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 25px;">', unsafe_allow_html=True)
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                selected_nets = st.multiselect("🌊 Filtre Réseau", networks, default=networks)
+            
+            df_net_filtered = df_conso[df_conso['Reseau_type'].isin(selected_nets)]
+            available_meters = sorted(df_net_filtered['ID_Compteur'].unique()) if not df_net_filtered.empty else []
+            
+            with col_f2:
+                selected_meters = st.multiselect("🔢 Filtre Compteurs", available_meters, default=available_meters)
+            st.markdown('</div>', unsafe_allow_html=True)
             
         df_filtered = df_net_filtered[df_net_filtered['ID_Compteur'].isin(selected_meters)]
         
@@ -100,9 +113,13 @@ try:
             conso_month_name = selected_month_label.split(" (")[0] if selected_month_label else ""
         
         if df_filtered.empty:
-            st.warning("Veuillez sélectionner au moins un réseau.")
+            st.warning("⚠️ Veuillez sélectionner au moins un réseau.")
         else:
-            st.markdown(f"#### 📊 Consommation Campagne {selected_campaign}")
+            render_premium_header(
+                f"📊 Consommation Campagne {selected_campaign}", 
+                "Synthèse des volumes par réseau",
+                color="green"
+            )
             
             df_agg = calculate_summary_table(df_filtered, selected_nets)
             
@@ -132,7 +149,7 @@ try:
                                 if not df_camp_agg.empty:
                                     campaign_summaries[camp] = df_camp_agg
                     
-                    if campaign_summaries:
+                if campaign_summaries:
                         with tempfile.TemporaryDirectory() as tmpdirname:
                             global_fname = "Synthese_Globale_Irrigation.pdf"
                             global_fpath = os.path.join(tmpdirname, global_fname)
@@ -145,7 +162,8 @@ try:
                                     data=f,
                                     file_name=global_fname,
                                     mime="application/pdf",
-                                    key="dl_global_irr"
+                                    key="dl_global_irr",
+                                    use_container_width=True
                                 )
                     else:
                         st.warning("Aucune donnée d'irrigation à exporter pour les filtres actuels.")
@@ -155,8 +173,8 @@ try:
                 net_data = df_filtered[df_filtered['Reseau_type'] == net]
                 if net_data.empty: continue
                 
-                with st.expander(f"Action pour le réseau : {net}"):
-                    st.markdown("#### 📜 Bilan Campagne")
+                with st.expander(f"⚙️ Actions pour le réseau : {net}", expanded=False):
+                    render_premium_header("📜 Bilan Campagne", "Exporter ou envoyer les données annuelles", color="green")
                     col_irr1, col_irr2 = st.columns(2)
                 
                     with col_irr1:
@@ -209,12 +227,12 @@ try:
                                                 )
                                                 
                                                 if success:
-                                                    st.success("Email envoyé avec succès !")
+                                                    st.success("✅ Email envoyé avec succès !")
                                                 else:
-                                                    st.error("L'envoi a échoué. Consultez les logs locaux.")
+                                                    st.error("❌ L'envoi a échoué. Consultez les logs locaux.")
 
                     st.divider()
-                    st.markdown(f"#### 📅 Bilan Mensuel : {conso_month_name}")
+                    render_premium_header(f"📅 Bilan Mensuel : {conso_month_name}", "Données du mois sélectionné", color="blue")
                     col_irr_m1, col_irr_m2 = st.columns(2)
                     
                     monthly_data = net_data[net_data['Date_Relevé'].dt.month == selected_reading_month]
