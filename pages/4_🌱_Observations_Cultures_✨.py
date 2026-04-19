@@ -8,6 +8,7 @@ from shared import (
     render_brand_page_header,
     inject_premium_css,
     render_premium_header,
+    get_fresh_loader,
 )
 
 st.set_page_config(page_title="🌱 Observations Cultures", page_icon="🌱", layout="wide")
@@ -121,31 +122,42 @@ if not df_obs.empty:
         except Exception as exc:
             gps_errors.append(f"Ligne {row.get('ID_Intervention','?')} — Erreur parsing GPS '{gps_raw}' : {exc}")
 
-# Bandeau synthèse sous la carte
+# Bandeau synthèse
 obs_count = len(df_obs) if not df_obs.empty else 0
 col_info1, col_info2 = st.columns([3, 1])
 with col_info1:
     if obs_count == 0:
         st.info("ℹ️ Aucune observation enregistrée pour cette campagne.")
     else:
-        st.success(f"✅ {obs_count} observation(s) trouvée(s) — {markers_added} affichée(s) sur la carte.")
+        st.success(f"✅ {obs_count} observation(s) en base — {markers_added} affichée(s) sur la carte ({obs_count - markers_added} sans GPS valide).")
 with col_info2:
     if gps_errors:
-        with st.expander(f"⚠️ {len(gps_errors)} obs. sans GPS"):
+        with st.expander(f"⚠️ {len(gps_errors)} sans GPS"):
             for err in gps_errors:
                 st.caption(err)
 
 st_folium(m_map, width=None, height=480, use_container_width=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# DEBUG PANEL (optionnel — à activer si besoin)
-# ─────────────────────────────────────────────────────────────────────────────
-with st.expander("🔍 Données brutes des observations (debug)", expanded=False):
-    if df_obs.empty:
-        st.write("Aucune donnée.")
+# ── PANNEAU DIAGNOSTIC : voir les données brutes lues depuis GSheets ──
+with st.expander("🔍 Diagnostic — Données brutes lues depuis Google Sheets", expanded=False):
+    # Relecture totale de JOURNAL_INTERVENTION (ttl=0 garanti via get_interventions)
+    df_all_raw = active_loader.get_interventions()
+    obs_raw = df_all_raw[df_all_raw.get('Nature_Intervention', pd.Series(dtype=str)).astype(str).str.strip().str.upper() == 'OBSERVATION'] if not df_all_raw.empty and 'Nature_Intervention' in df_all_raw.columns else pd.DataFrame()
+
+    st.markdown(f"""
+    - **Lignes totales dans JOURNAL_INTERVENTION :** `{len(df_all_raw)}`  
+    - **Lignes 'Observation' filtrées :** `{len(obs_raw)}`  
+    - **Colonnes disponibles :** `{', '.join(df_all_raw.columns.tolist()) if not df_all_raw.empty else 'aucune'}`
+    """)
+
+    if not obs_raw.empty:
+        cols_diag = [c for c in ["Date", "ID_Parcelle", "Nature_Intervention", "Localisation_GPS", "Observations", "Campagne"] if c in obs_raw.columns]
+        st.dataframe(obs_raw[cols_diag].tail(10), use_container_width=True)
     else:
-        cols_to_show = [c for c in ["Date", "ID_Parcelle", "Observations", "Localisation_GPS", "Localisation GPS", "GPS", "Campagne", "Nature_Intervention"] if c in df_obs.columns]
-        st.dataframe(df_obs[cols_to_show].tail(20), use_container_width=True)
+        st.warning("Aucune ligne 'Observation' trouvée. Vérifiez que la colonne **Nature_Intervention** contient bien 'Observation'.")
+        if not df_all_raw.empty:
+            st.markdown("**5 dernières lignes brutes :**")
+            st.dataframe(df_all_raw.tail(5), use_container_width=True)
 
 st.divider()
 
@@ -372,8 +384,9 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=open_form):
                 # Nettoyage session state
                 for key in ["auto_fill_obs_text", "expand_obs_form"]:
                     st.session_state.pop(key, None)
-                # Vider les caches pour forcer la re-lecture
-                active_loader.clear_cache()
+                # CRUCIAL : recréer un loader frais avec une connexion neuve
+                # pour court-circuiter tout cache TTL résiduel de GSheetsConnection
+                get_fresh_loader()
                 st.rerun()
             else:
                 st.error("❌ Erreur lors de l'enregistrement. Voir les messages ci-dessus.")
