@@ -13,7 +13,7 @@ try:
     GTTS_AVAILABLE = True
 except ImportError:
     GTTS_AVAILABLE = False
-from shared import init_campaign_selector, render_brand_page_header
+from shared import init_campaign_selector, render_brand_page_header, brand_spinner
 
 # ── Imports optionnels ───────────────────────────────────────────────────────
 try:
@@ -399,7 +399,7 @@ def transition_to_optional_or_confirm(warning_suffix: str = ""):
 
 def process_initial_audio(audio_bytes: bytes, context: dict, api_key: str):
     """Traite le premier enregistrement (description complète de l'intervention)."""
-    with st.spinner("🤖 Analyse de votre intervention en cours…"):
+    with brand_spinner("🤖 Analyse de votre intervention en cours…"):
         result = transcribe_audio_bytes(audio_bytes, context, api_key)
 
     if not result:
@@ -466,7 +466,7 @@ def process_followup_audio(audio_bytes: bytes, context: dict, api_key: str, opti
     if optional_mode:
         # ── Question optionnelle GLOBALE : une seule passe ──
         question_asked = st.session_state.get("va_current_question", "")
-        with st.spinner("📝 Enregistrement des informations complémentaires…"):
+        with brand_spinner("📝 Enregistrement des informations complémentaires…"):
             result = transcribe_optional_fields_bulk(audio_bytes, current_data, context, api_key, question_asked)
 
         raw_text = result.get("raw_text", "…")
@@ -497,7 +497,7 @@ def process_followup_audio(audio_bytes: bytes, context: dict, api_key: str, opti
     field = st.session_state.get("va_current_field", "")
     field_idx = st.session_state.get("va_current_field_idx", 0)
 
-    with st.spinner("📝 Mise à jour…"):
+    with brand_spinner("📝 Mise à jour…"):
         result = transcribe_audio_followup(audio_bytes, question, field, current_data, context, api_key)
 
     raw_text = result.get("raw_text", "…")
@@ -844,7 +844,7 @@ with tab_voice:
 
         df_new = pd.DataFrame(rows)
 
-        with st.spinner("💾 Enregistrement dans Google Sheets…"):
+        with brand_spinner("💾 Enregistrement dans Google Sheets…"):
             try:
                 success = active_loader.bulk_insert_interventions(df_new)
             except Exception as e:
@@ -1323,7 +1323,7 @@ with tab_manual:
                     rows_to_insert.append(base_row)
 
             df_new = pd.DataFrame(rows_to_insert)
-            with st.spinner("Mise à jour du journal…"):
+            with brand_spinner("Mise à jour du journal…"):
                 if is_edit_mode:
                     active_loader.delete_interventions(edit_data['ID_Intervention'])
                 success = active_loader.bulk_insert_interventions(df_new)
