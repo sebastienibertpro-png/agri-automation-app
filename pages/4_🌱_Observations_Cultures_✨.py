@@ -32,7 +32,7 @@ folium.LayerControl().add_to(m_map)
 
 if not df_obs.empty:
     for _, row in df_obs.iterrows():
-        gps = str(row.get('Localisation_GPS', ''))
+        gps = str(row.get('Localisation_GPS', row.get('Localisation GPS', ''))).replace(' ', '')
         if gps and ',' in gps:
             try:
                 lat, lon = map(float, gps.split(','))
@@ -40,7 +40,7 @@ if not df_obs.empty:
                 photo_id = str(row.get('Photo', ''))
                 
                 popup_html = f"<b>{row['ID_Parcelle']}</b><br>{row['Date']}<br>{obs_text}"
-                if photo_id:
+                if photo_id and str(photo_id).lower() != 'nan':
                     if str(photo_id).startswith("http"):
                         photo_url = photo_id
                     else:
@@ -56,7 +56,8 @@ if not df_obs.empty:
                 
                 # Center on last observation
                 m_map.location = [lat, lon]
-            except: pass
+            except Exception as e:
+                pass
 
 st_folium(m_map, width=None, height=500, use_container_width=True)
 
@@ -95,15 +96,34 @@ if diag_photo:
                     2. DIAGNOSTIC : Identifie les symptômes visibles sur la plante (maladie fongique, bactérie, virus, carence en nutriments, attaque d'insecte, stress abiotique, etc.).
                     3. RECOMMANDATIONS : Propose des solutions concrètes ou des recommandations pour traiter le problème.
                     Si la photo n'est pas claire, précise-le. Sois précis, professionnel et structure ta réponse.
+
+                    IMPORTANT : À la toute fin de ta réponse, ajoute un encart avec la balise ---RESUME---.
+                    Sous cette balise, écris un résumé très clair et succinct en 1 ou 2 phrases du diagnostic et de la solution. 
+                    Ce résumé servira de note géolocalisée et de plus-value technique directe pour l'agriculteur.
                     """
                     
                     response = model.generate_content([prompt, img])
                     
+                    # Sauvegarder dans le session state pour éviter l'effacement au rerender
+                    st.session_state["diag_result_text"] = response.text
                     st.success("Analyse terminée !")
-                    st.markdown("### 📋 Résultat du Diagnostic")
-                    st.info(response.text)
                 except Exception as e:
                     st.error(f"Erreur lors du diagnostic IA : {e}")
+
+if "diag_result_text" in st.session_state:
+    st.markdown("### 📋 Résultat du Diagnostic")
+    st.info(st.session_state["diag_result_text"])
+    
+    # Bouton direct pour remplir l'observation
+    if st.button("📝 Utiliser ce résumé pour une Nouvelle Observation", use_container_width=True):
+        res_text = st.session_state["diag_result_text"]
+        if "---RESUME---" in res_text:
+            resume = res_text.split("---RESUME---")[-1].strip()
+        else:
+            resume = res_text[:200] + "..."
+            
+        st.session_state["auto_fill_obs_text"] = f"Diagnostic IA: {resume}"
+        st.success("Résumé copié ! Vous pouvez finaliser votre saisie ci-dessous.")
 
 st.divider()
 
@@ -119,7 +139,8 @@ with st.expander("Ouvrir le formulaire de saisie", expanded=False):
         obs_stade = st.selectbox("Stade Culture", ["Levée", "3F", "6F", "10F", "Floraison", "Maturité", "Récolte"], key="obs_s")
         obs_photo = st.file_uploader("Prendre une photo (ou charger)", type=["jpg", "jpeg", "png"], key="obs_img")
 
-    obs_text = st.text_area("Observations au champ", placeholder="Saisir vos remarques ici...")
+    default_obs_text = st.session_state.get("auto_fill_obs_text", "")
+    obs_text = st.text_area("Observations au champ", value=default_obs_text, placeholder="Saisir vos remarques ici...")
 
     # Gestion GPS Automatique
     st.markdown("**Localisation (GPS)**")
