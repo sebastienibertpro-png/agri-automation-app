@@ -259,115 +259,115 @@ with st.container():
         df_planned = active_loader.get_planned_treatments(selected_campaign)
         
         if not df_planned.empty:
-        interventions_by_dp = {}
-        for _, row in df_planned.iterrows():
-            d_val = row['Date']
-            d_str = "Date Inconnue"
-            if pd.notnull(d_val):
-                try:
-                   if isinstance(d_val, str):
-                       d_val = pd.to_datetime(d_val)
-                   d_str = d_val.strftime('%Y-%m-%d')
-                except:
-                   d_str = str(d_val)
-                   
-            p_id = row['ID_Parcelle']
-            key_dp = (d_str, p_id)
-            if key_dp not in interventions_by_dp: interventions_by_dp[key_dp] = []
-            interventions_by_dp[key_dp].append(row)
-            
-        mixes = {}
-        for key_dp, rows in interventions_by_dp.items():
-            d_str, p_id = key_dp
-            prod_signatures = []
-            for r in rows:
-                p_name = str(r.get('Nom_Produit', '')).strip().lower()
-                dose = str(r.get('Dose_Ha', '')).strip()
-                prod_signatures.append(f"{p_name}_{dose}")
-            mix_signature = tuple(sorted(prod_signatures))
-            mix_key = (d_str, mix_signature)
-            if mix_key not in mixes: mixes[mix_key] = []
-            mixes[mix_key].append({'Parcelle': p_id, 'Rows': rows})
-        
-        mix_options = []
-        mix_map = {}
-        label_counter = {}
-        for k, intervs in mixes.items():
-            d_str, mix_sig = k
-            first_rows = intervs[0]['Rows']
-            nb_p = len(first_rows)
-            nb_parcelles = len(intervs)
-            p_names = [i['Parcelle'] for i in intervs]
-            if nb_parcelles <= 2: p_label = " & ".join(p_names)
-            else: p_label = f"{nb_parcelles} Parcelles"
-            
-            base_label = f"{d_str} - {p_label} ({nb_p} produits)"
-            if base_label in label_counter:
-                label_counter[base_label] += 1
-                label = f"{base_label} (Mix {label_counter[base_label]})"
-            else:
-                label_counter[base_label] = 1
-                label = base_label
-            mix_options.append(label)
-            mix_map[label] = (k, intervs)
-        
-        mix_options = sorted(mix_options, reverse=True)
-        col_p1, col_p2 = st.columns([2, 1])
-        with col_p1:
-           selected_mix_lbl = st.selectbox("Choisir l'intervention prévue :", mix_options, key="select_mix_prep")
-        
-        if st.button("Générer Fiche Préparation", key="btn_gen_prep"):
-            key, intervs = mix_map[selected_mix_lbl]
-            date_str, mix_sig = key
-            total_surface, vol_ha_input = 0.0, 0.0
-            parcelles_info, p_ids = [], []
-            first_rows = intervs[0]['Rows']
-            
-            for interv in intervs:
-                p_id = interv['Parcelle']
-                p_ids.append(p_id)
-                first_row_interv = interv['Rows'][0]
-                try:
-                    surf_val = first_row_interv.get('Surface_Travaillée_Ha', 0)
-                    surface = float(surf_val) if pd.notnull(surf_val) else 0.0
-                except: surface = 0.0
-                total_surface += surface
-                parcelles_info.append({'name': p_id, 'surface': surface})
-                if vol_ha_input == 0.0:
+            interventions_by_dp = {}
+            for _, row in df_planned.iterrows():
+                d_val = row['Date']
+                d_str = "Date Inconnue"
+                if pd.notnull(d_val):
                     try:
-                        vol_val = first_row_interv.get('Volume_Bouillie_L_Ha', 0)
-                        vol_ha_input = float(vol_val) if pd.notnull(vol_val) else 0.0
-                    except: pass
+                        if isinstance(d_val, str):
+                            d_val = pd.to_datetime(d_val)
+                        d_str = d_val.strftime('%Y-%m-%d')
+                    except:
+                        d_str = str(d_val)
                         
-            if vol_ha_input == 0: st.warning("⚠️ Attention : Volume Bouillie / ha non renseigné.")
+                p_id = row['ID_Parcelle']
+                key_dp = (d_str, p_id)
+                if key_dp not in interventions_by_dp: interventions_by_dp[key_dp] = []
+                interventions_by_dp[key_dp].append(row)
+                
+            mixes = {}
+            for key_dp, rows in interventions_by_dp.items():
+                d_str, p_id = key_dp
+                prod_signatures = []
+                for r in rows:
+                    p_name = str(r.get('Nom_Produit', '')).strip().lower()
+                    dose = str(r.get('Dose_Ha', '')).strip()
+                    prod_signatures.append(f"{p_name}_{dose}")
+                mix_signature = tuple(sorted(prod_signatures))
+                mix_key = (d_str, mix_signature)
+                if mix_key not in mixes: mixes[mix_key] = []
+                mixes[mix_key].append({'Parcelle': p_id, 'Rows': rows})
             
-            prods = [r.to_dict() for r in first_rows]
-            sorted_prods = active_loader.sort_products_by_formulation(prods)
-            date_obj = first_rows[0]['Date']
-            if isinstance(date_obj, str):
-                try: date_obj = pd.to_datetime(date_obj)
-                except: pass
-            clean_date = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else "00000000"
-            intervention_id = f"{'|'.join(p_ids)}_{clean_date}"
+            mix_options = []
+            mix_map = {}
+            label_counter = {}
+            for k, intervs in mixes.items():
+                d_str, mix_sig = k
+                first_rows = intervs[0]['Rows']
+                nb_p = len(first_rows)
+                nb_parcelles = len(intervs)
+                p_names = [i['Parcelle'] for i in intervs]
+                if nb_parcelles <= 2: p_label = " & ".join(p_names)
+                else: p_label = f"{nb_parcelles} Parcelles"
+                
+                base_label = f"{d_str} - {p_label} ({nb_p} produits)"
+                if base_label in label_counter:
+                    label_counter[base_label] += 1
+                    label = f"{base_label} (Mix {label_counter[base_label]})"
+                else:
+                    label_counter[base_label] = 1
+                    label = base_label
+                mix_options.append(label)
+                mix_map[label] = (k, intervs)
             
-            payload = {
-                'Parcelles': parcelles_info, 'Total_Surface': total_surface,
-                'Date': date_obj, 'Volume_Bouillie_Ha': vol_ha_input,
-                'Products': sorted_prods, 'Intervention_ID': intervention_id
-            }
+            mix_options = sorted(mix_options, reverse=True)
+            col_p1, col_p2 = st.columns([2, 1])
+            with col_p1:
+               selected_mix_lbl = st.selectbox("Choisir l'intervention prévue :", mix_options, key="select_mix_prep")
             
-            with tempfile.TemporaryDirectory() as tmpdirname:
-                fname = f"Fiche_Prep_{intervention_id}.pdf"
-                fpath = os.path.join(tmpdirname, fname)
-                gen = ReportGenerator(fpath)
-                gen.generate_prep_sheet(selected_campaign, payload, base_url=APP_BASE_URL)
-                with open(fpath, "rb") as f:
-                   st.download_button(label="⬇️ Télécharger Fiche", data=f, file_name=fname, mime="application/pdf", key="dl_prep_sheet", use_container_width=True)
-            st.success("✅ Fiche de préparation générée avec succès !")
-            
-    else:
-        st.info("ℹ️ Aucune intervention planifiée trouvée pour cette campagne.")
-except Exception as e:
-    st.error(f"❌ Erreur lors du chargement du planning : {e}")
+            if st.button("Générer Fiche Préparation", key="btn_gen_prep"):
+                key, intervs = mix_map[selected_mix_lbl]
+                date_str, mix_sig = key
+                total_surface, vol_ha_input = 0.0, 0.0
+                parcelles_info, p_ids = [], []
+                first_rows = intervs[0]['Rows']
+                
+                for interv in intervs:
+                    p_id = interv['Parcelle']
+                    p_ids.append(p_id)
+                    first_row_interv = interv['Rows'][0]
+                    try:
+                        surf_val = first_row_interv.get('Surface_Travaillée_Ha', 0)
+                        surface = float(surf_val) if pd.notnull(surf_val) else 0.0
+                    except: surface = 0.0
+                    total_surface += surface
+                    parcelles_info.append({'name': p_id, 'surface': surface})
+                    if vol_ha_input == 0.0:
+                        try:
+                            vol_val = first_row_interv.get('Volume_Bouillie_L_Ha', 0)
+                            vol_ha_input = float(vol_val) if pd.notnull(vol_val) else 0.0
+                        except: pass
+                            
+                if vol_ha_input == 0: st.warning("⚠️ Attention : Volume Bouillie / ha non renseigné.")
+                
+                prods = [r.to_dict() for r in first_rows]
+                sorted_prods = active_loader.sort_products_by_formulation(prods)
+                date_obj = first_rows[0]['Date']
+                if isinstance(date_obj, str):
+                    try: date_obj = pd.to_datetime(date_obj)
+                    except: pass
+                clean_date = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else "00000000"
+                intervention_id = f"{'|'.join(p_ids)}_{clean_date}"
+                
+                payload = {
+                    'Parcelles': parcelles_info, 'Total_Surface': total_surface,
+                    'Date': date_obj, 'Volume_Bouillie_Ha': vol_ha_input,
+                    'Products': sorted_prods, 'Intervention_ID': intervention_id
+                }
+                
+                with tempfile.TemporaryDirectory() as tmpdirname:
+                    fname = f"Fiche_Prep_{intervention_id}.pdf"
+                    fpath = os.path.join(tmpdirname, fname)
+                    gen = ReportGenerator(fpath)
+                    gen.generate_prep_sheet(selected_campaign, payload, base_url=APP_BASE_URL)
+                    with open(fpath, "rb") as f:
+                       st.download_button(label="⬇️ Télécharger Fiche", data=f, file_name=fname, mime="application/pdf", key="dl_prep_sheet", use_container_width=True)
+                st.success("✅ Fiche de préparation générée avec succès !")
+                
+        else:
+            st.info("ℹ️ Aucune intervention planifiée trouvée pour cette campagne.")
+    except Exception as e:
+        st.error(f"❌ Erreur lors du chargement du planning : {e}")
 
-st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
