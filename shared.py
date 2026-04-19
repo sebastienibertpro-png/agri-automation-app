@@ -223,19 +223,96 @@ def inject_premium_css():
     .p-green { background: linear-gradient(135deg, #5E9E47 0%, #4a8037 100%) !important; }
     .p-blue { background: linear-gradient(135deg, #2F6D89 0%, #1a4153 100%) !important; }
 
-    /* ── Masquer le widget de statut natif Streamlit ("Google Sheets...") ── */
-    /* Les st.spinner() dans le code restent visibles (composant différent : stSpinner) */
+    /* ── Masquer TOTALEMENT les indicateurs de statut natifs Streamlit ── */
     [data-testid="stStatusWidget"],
     [data-testid="stEventStatusItem"],
     [data-testid="stToastContainer"],
-    .stApp > header [data-testid="stStatusWidget"] {
+    [data-testid="stStatusWidgetSpinner"],
+    header [data-testid="stStatusWidget"],
+    .stApp > header,
+    .stDecoration,
+    [data-testid="stStatusWidget"] div {
         display: none !important;
         visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
         opacity: 0 !important;
     }
+    
+    /* ── Animation de Chargement Premium AgriDiA ── */
+    .agridia-loader-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        background: transparent;
+        border-radius: 20px;
+        margin: 20px auto;
+        text-align: center;
+        z-index: 9999;
+    }
 
+    .agridia-pulse {
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, #2F6D89 0%, #5E9E47 100%);
+        border-radius: 50%;
+        margin-bottom: 25px;
+        animation: agridiaPulse 1.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 0 30px rgba(94, 158, 71, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 40px;
+        color: white;
+    }
+
+    @keyframes agridiaPulse {
+        0% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(94, 158, 71, 0.4); }
+        50% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 25px rgba(94, 158, 71, 0); }
+        100% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(94, 158, 71, 0); }
+    }
+
+    .loader-text {
+        font-family: 'Outfit', sans-serif;
+        color: #2F6D89;
+        font-weight: 700;
+        font-size: 1.4em;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        animation: agridiaFade 1.5s infinite ease-in-out;
+    }
+
+    @keyframes agridiaFade {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+    }
 </style>
 """, unsafe_allow_html=True)
+
+import contextlib
+
+@contextlib.contextmanager
+def brand_spinner(text="Chargement Agridia..."):
+    """
+    Un spinner premium aux couleurs de la marque qui remplace le st.spinner par défaut.
+    """
+    placeholder = st.empty()
+    with placeholder.container():
+        st.markdown(f"""
+            <div class="agridia-loader-container">
+                <div class="agridia-pulse">🌱</div>
+                <div class="loader-text">{text}</div>
+            </div>
+        """, unsafe_allow_html=True)
+    try:
+        yield
+    finally:
+        placeholder.empty()
+
 
 def render_brand_page_header(title, subtitle="", icon=""):
     """Rendu d'un en-tête de page premium aux couleurs AgriDiA."""
