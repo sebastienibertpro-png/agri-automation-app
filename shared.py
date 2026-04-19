@@ -42,11 +42,20 @@ def get_active_loader():
     return st.session_state["_dataloader"]
 
 def get_fresh_loader():
-    """Force la recréation d'un DataLoader, utile après une écriture."""
-    st.session_state["_dataloader"] = get_dataloader()
-    return st.session_state["_dataloader"]
+    """
+    Force la recréation d'un DataLoader en supprimant l'instance en session_state.
+    À appeler AVANT st.rerun() après une écriture pour que le prochain rendu
+    obtienne une connexion GSheets fraîche sans cache TTL résiduel.
+    """
+    # Invalider l'instance existante
+    st.session_state.pop("_dataloader", None)
+    # Créer immédiatement un nouveau loader frais
+    loader = get_dataloader()
+    st.session_state["_dataloader"] = loader
+    return loader
 
 active_loader = get_active_loader()
+
 
 def init_campaign_selector():
     if not active_loader:
