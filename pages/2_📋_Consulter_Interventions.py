@@ -17,9 +17,27 @@ product_prices = active_loader.get_product_prices(selected_campaign)
 # 2. Filtres supplémentaires en haut de page
 col_f1, col_f2 = st.columns([2, 1])
 
+# Récupération des métadonnées (surface, culture) pour enrichir le sélecteur
+parcel_meta = active_loader.get_parcel_metadata(selected_campaign)
+
+def get_parcelle_label(p_id):
+    if p_id == "Toutes":
+        return "🌍 Toutes les parcelles"
+    meta = parcel_meta.get(p_id, {})
+    surf = meta.get('Surface', 0.0)
+    cult = meta.get('Culture', 'Inconnue')
+    return f"{p_id} ({surf} ha - {cult})"
+
 with col_f1:
-    options_parcelles = ["Toutes"] + list(available_parcelles)
-    selected_parcelle = st.selectbox("🌾 Choisir la Parcelle", options_parcelles)
+    # On crée une liste de libellés enrichis
+    options_raw = ["Toutes"] + list(available_parcelles)
+    labels = [get_parcelle_label(p) for p in options_raw]
+    
+    # Mapping pour retrouver l'ID brut à partir du libellé choisi
+    label_to_id = dict(zip(labels, options_raw))
+    
+    selected_label = st.selectbox("🌾 Choisir la Parcelle", labels)
+    selected_parcelle = label_to_id[selected_label]
 
 # Filtrage par parcelle
 if selected_parcelle != "Toutes":
