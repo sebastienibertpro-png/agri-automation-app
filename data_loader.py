@@ -86,37 +86,66 @@ class DataLoader:
         print("Fichier Local chargé.")
         return False
 
+    # Clé utilisée pour stocker le cache de session dans st.session_state
+    _SESSION_CACHE_KEY = "_agridia_sheets_cache"
+
     def _get_data(self, sheet_name):
-        """Internal helper to get dataframe from active source with caching."""
+        """
+        Lit un onglet Google Sheets avec trois niveaux de cache :
+        1. session_state  — partagé entre toutes les pages, dure toute la session navigateur
+        2. RAM interne    — fallback immédiat si session_state indisponible
+        3. API GSheets    — uniquement si absent des deux caches ci-dessus
+        Seul clear_cache() invalide les niveaux 1 et 2, ce qui force un rechargement
+        après une écriture.
+        """
         SPREADSHEET_NAME = "MASTER_EXPLOITATION"
-        
+
+        # Niveau 1 : session_state (commun à toutes les pages)
+        session_cache = st.session_state.setdefault(self._SESSION_CACHE_KEY, {})
+        if sheet_name in session_cache:
+            return session_cache[sheet_name].copy()
+
+        # Niveau 2 : cache RAM interne (même si session_state n'est pas dispo)
+        if sheet_name in self._cache:
+            return self._cache[sheet_name].copy()
+
+        # Niveau 3 : appel API réel
         df = pd.DataFrame()
         if self.conn:
             try:
-                # TTL étendu à 600s pour limiter les requêtes répétitives (Quota API)
                 df = self.conn.read(worksheet=sheet_name, spreadsheet=SPREADSHEET_NAME, ttl=600)
+                # Stocker dans les deux caches
                 self._cache[sheet_name] = df.copy()
+                session_cache[sheet_name] = df.copy()
             except Exception as e:
-                # Rate limit fallback to RAM cache
                 err_str = str(e)
-                if ('429' in err_str or 'Quota' in err_str):
-                    if sheet_name in self._cache:
-                        df = self._cache[sheet_name]
-                    else:
-                        st.error(f"⚠️ Quota de requêtes Google atteint. Impossible de lire '{sheet_name}'. Veuillez patienter 1 minute.")
+                if ('429' in err_str or 'Quota' in err_str or 'RATE_LIMIT' in err_str or 'RESOURCE_EXHAUSTED' in err_str):
+                    st.error(f"⚠️ Quota de requêtes Google atteint. Impossible de lire '{sheet_name}'. Veuillez patienter 1 minute.")
                 else:
-                    st.error(f"Erreur lecture onglet '{sheet_name}' : {err_str}")
+                    st.error(f"Erreur lecture {sheet_name} : {err_str}")
         elif self.xl:
             df = pd.read_excel(self.file_path, sheet_name=sheet_name)
+            self._cache[sheet_name] = df.copy()
+            session_cache[sheet_name] = df.copy()
         else:
             raise Exception("Source de données non initialisée.")
-        
+
         return df
 
     def clear_cache(self):
-        """Vide le cache Streamlit ET le cache RAM interne."""
+        """
+        Vide les trois niveaux de cache :
+        - Cache Streamlit (st.cache_data)
+        - Cache RAM interne de l'instance
+        - Cache session_state partagé entre les pages
+        À appeler APRÈS chaque écriture pour que le prochain affichage
+        recharge les données fraîches depuis Google Sheets.
+        """
         st.cache_data.clear()
-        self._cache.clear()  # Vide aussi le cache RAM de l'instance
+        self._cache.clear()
+        # Vider aussi le cache session partagé entre les pages
+        if self._SESSION_CACHE_KEY in st.session_state:
+            st.session_state.pop(self._SESSION_CACHE_KEY, None)
 
     def get_interventions(self, force_fresh=False):
         """
@@ -329,14 +358,26 @@ class DataLoader:
         df_asso = self.get_assolement(campaign)
         df_ref = self.get_parcelles()
         
-        # Merge Assolement (Campagne specific) with Ref (Static)
-        # We start from df_ref to ensure we have all reference parcels, then merge assolement info.
-        merged = pd.merge(df_ref, df_asso, on='ID_Parcelle', how='left', suffixes=('', '_asso'))
+        # Guard: si l'un des deux DataFrames est vide ou manque la colonne de jointure,
+        # on évite le crash KeyError en construisant un résultat partiel ou vide.
+        ref_has_key = not df_ref.empty and 'ID_Parcelle' in df_ref.columns
+        asso_has_key = not df_asso.empty and 'ID_Parcelle' in df_asso.columns
         
         metadata = {}
+        
+        if not ref_has_key:
+            # Rien à faire sans les références de parcelles
+            return metadata
+        
+        if asso_has_key:
+            # Merge complet : Assolement (Campagne specific) avec Ref (Static)
+            merged = pd.merge(df_ref, df_asso, on='ID_Parcelle', how='left', suffixes=('', '_asso'))
+        else:
+            # ASSOLEMENT non disponible (quota ou erreur) — on utilise juste REF_PARCELLES
+            merged = df_ref.copy()
+        
         for _, row in merged.iterrows():
             p_id = row['ID_Parcelle']
-            
             metadata[p_id] = {
                 'Culture': row.get('Culture', 'Inconnue'),
                 'Surface': row.get('Surface_Référence_Ha', 0.0),
