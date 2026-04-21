@@ -1501,19 +1501,26 @@ class DataLoader:
                 continue
                 
             code = str(f.get("Code", ""))
-            name = str(f.get("Name", ""))
-            group = str(f.get("PlotsGroup", ""))
+            name = str(f.get("Name", "")).replace("None", "")
+            group = str(f.get("PlotsGroup", "")).replace("None", "")
             
-            # Reconstruct Agridia ID_Parcelle: Name_Group or Name
+            # Reconstruct Agridia ID_Parcelle: 
+            # Priority: Name_Group, Name, or Code
             if name and group:
                 clean_group = group.replace("Les ", "").replace("La ", "").replace("Le ", "").strip()
                 id_parcelle = f"{name}_{clean_group}"
+            elif name:
+                id_parcelle = name
             else:
-                id_parcelle = name or code
+                id_parcelle = f"Parcelle_{code}"
                 
             # Area in hectares
             area_m2 = float(f.get("Area", 0))
             area_ha = round(area_m2 / 10000.0, 2)
+            
+            # Plowing/Strategy
+            is_plowed = f.get("Plowing", False)
+            strategy = "Labour" if is_plowed else "TCS / Direct"
             
             # Geography & Centroid
             gps_coord = ""
@@ -1522,25 +1529,32 @@ class DataLoader:
                 try:
                     poly = wkt.loads(geog_wkt)
                     centroid = poly.centroid
-                    # Convert to WGS84
                     lon, lat = transformer.transform(centroid.x, centroid.y)
                     gps_coord = f"{lat:.6f}, {lon:.6f}"
                 except:
                     pass
             
+            # Create a unique ID_Assolement even if ID_Parcelle is shared (e.g. sub-plots)
+            # Use a hash of name + area + crop or just the Geofolia unique ID (f.get("Id"))
+            geofolia_uuid = f.get("Id", "")
+            internal_asso_id = f"ASSOL_{campaign}_{geofolia_uuid[:8]}"
+
             row = {
                 'Campagne': campaign,
-                'ID_Assolement': f"ASSOL_{campaign}_{id_parcelle}",
+                'ID_Assolement': internal_asso_id,
                 'ID_Parcelle': id_parcelle,
                 'Nom Terrain': name,
                 'îlot PAC': f.get("IsletNum", ""),
                 'Surface_Référence_Ha': area_ha,
                 'Culture': f.get("CropName", ""),
+                'Code_Culture_PAC': f.get("RNCropCode", ""),
                 'Variété': f.get("VarietyName", ""),
                 'Type_sol': f.get("SoilName", ""),
                 'GPS': gps_coord,
                 'Commune': f.get("City", ""),
                 'Precedent_Cultural': f.get("NMinus1Crop", ""),
+                'Gestion_Résidus': f.get("ResiduesName", ""),
+                'Strategie_Travail_Sol': strategy
             }
             parsed_rows.append(row)
             
