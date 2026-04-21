@@ -34,6 +34,7 @@ def inject_premium_css():
         padding: 4px !important;
         background-color: white !important;
         margin-top: 0px !important;
+        --st-colors-primary: #5E9E47 !important;
     }
     
     /* Multiselect Tags (Filtres) : Passer en vert au lieu du rouge par défaut */
