@@ -16,19 +16,16 @@ if not dl:
     st.warning("⚠️ Mode Local actif (Lecture seule). Aucune sauvegarde possible.")
     st.stop()
 
-# ══════════════════════════════════════════════════════════════════════════════
-# COLUMNS DEFINITION
-# ══════════════════════════════════════════════════════════════════════════════
 ASSO_COLUMNS = [
-    'Campagne', 'ID_Assolement', 'ID_Parcelle', 'Nom Terrain', 'îlot PAC', 
+    'Campagne', 'ID_Assolement', 'ID_Parcelle', 'îlot PAC', 'Commune',
     'Surface_Référence_Ha', 'Culture', 'Code_Culture_PAC', 'Variété', 'Precedent_Cultural', 
-    'Commune', 'Type_sol', 'Drainage', 'Irrigation (oui/non)', 'GPS',
+    'Type_sol', 'Drainage', 'Irrigation (oui/non)', 'ZNT_Riverain', 'ZNT_Aqua',
     'Strategie_Travail_Sol', 'Gestion_Résidus',
     'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T',
-    'Date_Semis_Previsionnelle', 'Commentaire_Assolement'
+    'Date_Semis_Previsionnelle', 'Commentaire_Assolement', 'Nom Terrain', 'GPS'
 ]
 
-ASSO_HIDDEN = {'Commentaire_Assolement', 'ID_Assolement', 'Camp_Int', 'GPS', 'Nom Terrain'}
+ASSO_HIDDEN = {'Commentaire_Assolement', 'ID_Assolement', 'Camp_Int', 'GPS', 'Nom Terrain', 'image'}
 
 def ensure_columns(df, columns):
     """Ensures all columns exist in the DataFrame."""
@@ -78,14 +75,17 @@ with tab_asso:
     # Ensure columns exist first
     df_curr_asso = ensure_columns(df_curr_asso, ASSO_COLUMNS)
     
-    # Text columns: force string and handle NaNs
-    text_cols = ['ID_Parcelle', 'Nom Terrain', 'îlot PAC', 'Culture', 'Variété', 'Type_sol', 'Commune', 'Precedent_Cultural', 'Commentaire_Assolement', 'ID_Assolement']
+    # Text columns: force string and handle NaNs/None
+    text_cols = ['ID_Parcelle', 'Nom Terrain', 'îlot PAC', 'Culture', 'Variété', 'Type_sol', 'Commune', 'Precedent_Cultural', 'Commentaire_Assolement', 'ID_Assolement', 'Code_Culture_PAC', 'Strategie_Travail_Sol', 'Gestion_Résidus']
     for col in text_cols:
-        df_curr_asso[col] = df_curr_asso[col].astype(str).replace(['nan', 'None', '<NA>', 'NaT', 'None'], '')
+        if col in df_curr_asso.columns:
+            df_curr_asso[col] = df_curr_asso[col].astype(str).replace(['nan', 'None', '<NA>', 'NaT', 'None'], '')
     
     # Numeric columns: force float/int
-    for col in ['Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T']:
-        df_curr_asso[col] = pd.to_numeric(df_curr_asso[col], errors='coerce').fillna(0.0).astype(float)
+    num_cols = ['Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T', 'ZNT_Riverain', 'ZNT_Aqua']
+    for col in num_cols:
+        if col in df_curr_asso.columns:
+            df_curr_asso[col] = pd.to_numeric(df_curr_asso[col], errors='coerce').fillna(0.0).astype(float)
     
     df_curr_asso['Campagne'] = pd.to_numeric(df_curr_asso['Campagne'], errors='coerce').fillna(campagne_input).astype(int)
     
@@ -99,9 +99,12 @@ with tab_asso:
         "Campagne": st.column_config.NumberColumn("Camp.", disabled=True, format="%d"),
         "ID_Parcelle": st.column_config.TextColumn("ID Parcelle (Unique)", help="Identifiant interne pour les autres pages."),
         "îlot PAC": st.column_config.TextColumn("Îlot"),
+        "Commune": st.column_config.TextColumn("Commune"),
         "Surface_Référence_Ha": st.column_config.NumberColumn("Surf (ha)", format="%.2f"),
         "Culture": st.column_config.TextColumn("Culture"),
-        "Code_Culture_PAC": st.column_config.TextColumn("Code Culture PAC"),
+        "Code_Culture_PAC": st.column_config.TextColumn("Code PAC"),
+        "ZNT_Riverain": st.column_config.NumberColumn("ZNT Riverain"),
+        "ZNT_Aqua": st.column_config.NumberColumn("ZNT Aqua"),
         "Type_sol": st.column_config.TextColumn("Sol"),
         "Date_Semis_Previsionnelle": st.column_config.DateColumn("Semis"),
     }
