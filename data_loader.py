@@ -16,6 +16,18 @@ class DataLoader:
         self.xl = None 
         self._cache = {} # Local session cache
 
+    def get_parcelles(self, campaign=None):
+        """
+        [REFACTORED] Pulls parcel data from ASSOLEMENT for the current campaign.
+        If no campaign provided, falls back to the static REF_PARCELLES for backward compatibility.
+        """
+        if campaign:
+            df_asso = self.get_assolement(campaign)
+            if not df_asso.empty:
+                # Return essential columns to match REF_PARCELLES schema as much as possible
+                return df_asso
+        return self._get_data("REF_PARCELLES")
+
     def _remove_accents(self, s):
         import unicodedata
         if not s or not isinstance(s, str): return s
@@ -192,8 +204,8 @@ class DataLoader:
         """Loads REF_INTRANTS."""
         return self._get_data("REF_INTRANTS")
 
-    def get_parcelles(self):
-        """Loads REF_PARCELLES."""
+    def get_parcelles_static(self):
+        """Loads the original REF_PARCELLES tab."""
         return self._get_data("REF_PARCELLES")
     
     def get_assolement(self, campaign=None):
@@ -1465,4 +1477,85 @@ class DataLoader:
             return True
         except Exception as e:
             st.error(f"Erreur delete {sheet_name} : {e}")
+            return False
+
+    def parse_geofolia_json(self, json_content: dict, campaign: int):
+        """
+        Parses Geofolia JSON 'Field.Json' into a pandas DataFrame compatible with Agridia.
+        """
+        import pandas as pd
+        from shapely import wkt
+        from pyproj import Transformer
+        
+        fields = json_content.get("Fields", [])
+        if not fields:
+            return pd.DataFrame()
+            
+        # Transformer for Lambert 93 (EPSG:2154) to GPS (EPSG:4326)
+        transformer = Transformer.from_crs("EPSG:2154", "EPSG:4326", always_xy=True)
+        
+        parsed_rows = []
+        for f in fields:
+            # Filter by year
+            if int(f.get("HarvestYear", 0)) != int(campaign):
+                continue
+                
+            code = str(f.get("Code", ""))
+            name = str(f.get("Name", ""))
+            group = str(f.get("PlotsGroup", ""))
+            
+            # Reconstruct Agridia ID_Parcelle: Name_Group or Name
+            if name and group:
+                clean_group = group.replace("Les ", "").replace("La ", "").replace("Le ", "").strip()
+                id_parcelle = f"{name}_{clean_group}"
+            else:
+                id_parcelle = name or code
+                
+            # Area in hectares
+            area_m2 = float(f.get("Area", 0))
+            area_ha = round(area_m2 / 10000.0, 2)
+            
+            # Geography & Centroid
+            gps_coord = ""
+            geog_wkt = f.get("Geography", "")
+            if geog_wkt:
+                try:
+                    poly = wkt.loads(geog_wkt)
+                    centroid = poly.centroid
+                    # Convert to WGS84
+                    lon, lat = transformer.transform(centroid.x, centroid.y)
+                    gps_coord = f"{lat:.6f}, {lon:.6f}"
+                except:
+                    pass
+            
+            row = {
+                'Campagne': campaign,
+                'ID_Assolement': f"ASSOL_{campaign}_{id_parcelle}",
+                'ID_Parcelle': id_parcelle,
+                'Nom Terrain': name,
+                'îlot PAC': f.get("IsletNum", ""),
+                'Surface_Référence_Ha': area_ha,
+                'Culture': f.get("CropName", ""),
+                'Variété': f.get("VarietyName", ""),
+                'Type_sol': f.get("SoilName", ""),
+                'GPS': gps_coord,
+                'Commune': f.get("City", ""),
+                'Precedent_Cultural': f.get("NMinus1Crop", ""),
+            }
+            parsed_rows.append(row)
+            
+        return pd.DataFrame(parsed_rows)
+
+    def overwrite_worksheet(self, sheet_name: str, df: pd.DataFrame) -> bool:
+        """Fully overwrites a worksheet with a new DataFrame."""
+        if not self.conn:
+            st.error("Action impossible en local.")
+            return False
+        try:
+            self.conn.update(worksheet=sheet_name, data=df, spreadsheet="MASTER_EXPLOITATION")
+            self._cache.pop(sheet_name, None)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Erreur overwrite {sheet_name} : {e}")
             return False
