@@ -1,4 +1,4 @@
-# VER_2_4_FINAL - UI Strict Filtering & Global Cleaning
+# VER_2_6_FINAL - Ultra-Robust Cleaning & Fuzzy PAC
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -72,13 +72,17 @@ with tab_asso:
 
     render_premium_header("🌾 Détail de l'Assolement", f"Modification directe pour {campagne_input}", color="green")
 
-    # --- FORCED TYPE CLEANING FOR DATA EDITOR ---
+    # --- ULTRA-ROBUST CLEANING FOR DATA EDITOR ---
     # Ensure columns exist first
     df_curr_asso = ensure_columns(df_curr_asso, ASSO_COLUMNS)
     
-    # Global Cleanup: Remove any "None" string or NaN from EVERY column
+    # Global Cleanup: Radical removal of ANY "None" string or variant
     for col in df_curr_asso.columns:
-        df_curr_asso[col] = df_curr_asso[col].astype(str).replace(['nan', 'None', '<NA>', 'NaT', 'None', 'nan', 'nan', 'null'], '')
+        # Avoid cleaning date columns here to prevent breaking them
+        if col != 'Date_Semis_Previsionnelle':
+            df_curr_asso[col] = df_curr_asso[col].astype(str).str.strip().replace(
+                ['nan', 'None', '<NA>', 'NaT', 'None', 'nan', 'nan', 'null', 'None ', ' None', 'NaN', 'None', ''], ''
+            )
     
     # Re-apply Numeric types for the editor to work correctly
     num_cols = ['Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T', 'ZNT_Riverain', 'ZNT_Aqua']
