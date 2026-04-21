@@ -21,14 +21,14 @@ if not dl:
 # ══════════════════════════════════════════════════════════════════════════════
 ASSO_COLUMNS = [
     'Campagne', 'ID_Assolement', 'ID_Parcelle', 'Nom Terrain', 'îlot PAC', 
-    'Surface_Référence_Ha', 'Culture', 'Variété', 'Precedent_Cultural', 
+    'Surface_Référence_Ha', 'Culture', 'Code_Culture_PAC', 'Variété', 'Precedent_Cultural', 
     'Commune', 'Type_sol', 'Drainage', 'Irrigation (oui/non)', 'GPS',
     'Strategie_Travail_Sol', 'Gestion_Résidus',
     'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T',
     'Date_Semis_Previsionnelle', 'Commentaire_Assolement'
 ]
 
-ASSO_HIDDEN = {'Commentaire_Assolement', 'ID_Assolement', 'Camp_Int', 'GPS'}
+ASSO_HIDDEN = {'Commentaire_Assolement', 'ID_Assolement', 'Camp_Int', 'GPS', 'Nom Terrain'}
 
 def ensure_columns(df, columns):
     """Ensures all columns exist in the DataFrame."""
@@ -97,16 +97,23 @@ with tab_asso:
     # Configuration de l'éditeur
     col_config = {
         "Campagne": st.column_config.NumberColumn("Camp.", disabled=True, format="%d"),
-        "ID_Parcelle": st.column_config.TextColumn("ID Parcelle (Unique)", help="L'identifiant utilisé dans les autres pages."),
-        "Nom Terrain": st.column_config.TextColumn("Nom"),
+        "ID_Parcelle": st.column_config.TextColumn("ID Parcelle (Unique)", help="Identifiant interne pour les autres pages."),
         "îlot PAC": st.column_config.TextColumn("Îlot"),
         "Surface_Référence_Ha": st.column_config.NumberColumn("Surf (ha)", format="%.2f"),
         "Culture": st.column_config.TextColumn("Culture"),
+        "Code_Culture_PAC": st.column_config.TextColumn("Code Culture PAC"),
         "Type_sol": st.column_config.TextColumn("Sol"),
         "Date_Semis_Previsionnelle": st.column_config.DateColumn("Semis"),
     }
     for h in ASSO_HIDDEN:
         col_config[h] = None
+
+    # Check for unique IDs for warnings
+    ids_check = df_curr_asso['ID_Parcelle'].dropna().astype(str).str.strip()
+    duplicates = ids_check[ids_check.duplicated()].unique()
+    if len(duplicates) > 0:
+        st.warning(f"⚠️ **Doublons détectés** : Les parcelles suivantes ont le même ID : {', '.join(duplicates)}. "
+                   "Veuillez les renommer (ex: Nom_1, Nom_2) pour que chaque ligne soit unique.")
 
     edited_df = st.data_editor(
         df_curr_asso, 
