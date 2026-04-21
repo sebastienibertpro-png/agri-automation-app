@@ -17,6 +17,11 @@ def inject_premium_css():
         --primary-color: #5E9E47;
     }
 
+    * {
+        --primary-color: #5E9E47 !important;
+        --st-colors-primary: #5E9E47 !important;
+    }
+
     /* Typographie : Ciblage chirurgical pour éviter de casser les ligatures des icônes Material Symbols */
     
     /* Titres principaux (Toutes les tailles) */
