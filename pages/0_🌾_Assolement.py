@@ -227,7 +227,9 @@ with tab_asso:
 
                 # Convert Code_Culture_PAC back to 3-letter code
                 if 'Code_Culture_PAC' in edited_df.columns:
-                    edited_df['Code_Culture_PAC'] = edited_df['Code_Culture_PAC'].apply(lambda x: str(x).split(' - ')[0] if ' - ' in str(x) else x)
+                    edited_df['Code_Culture_PAC'] = edited_df['Code_Culture_PAC'].apply(
+                        lambda x: str(x).split(' - ')[0][:3] if ' - ' in str(x) else str(x)[:3]
+                    )
 
                 if 'Camp_Int' in edited_df.columns: edited_df = edited_df.drop(columns=['Camp_Int'])
                 # Re-merge with other campaigns
