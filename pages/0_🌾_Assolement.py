@@ -1,4 +1,4 @@
-# VER_2_6_FINAL - Ultra-Robust Cleaning & Fuzzy PAC
+# VER_2_7_FINAL - Selective Import & Master Checkbox
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -208,26 +208,53 @@ with tab_import:
                 if not parsed_df.empty:
                     st.success(f"✅ {len(parsed_df)} parcelles détectées dans le fichier Geofolia pour {selected_campaign}.")
                     
-                    st.markdown("### 📋 Aperçu des données à importer")
-                    st.dataframe(parsed_df, use_container_width=True, hide_index=True)
+                    st.markdown("### 📋 Sélection des parcelles à importer")
+                    
+                    # Master Checkbox for Select All
+                    select_all = st.checkbox("Tout cocher / décocher", value=True, help="Coche ou décoche toutes les parcelles de la liste.")
+                    
+                    # Prepare DF with selection column
+                    parsed_df.insert(0, 'Sél.', select_all)
+                    
+                    # Data Editor for selection
+                    import_selection = st.data_editor(
+                        parsed_df,
+                        column_config={
+                            "Sél.": st.column_config.CheckboxColumn("Sél.", default=True),
+                            "ID_Parcelle": st.column_config.TextColumn("Parcelle", disabled=True),
+                            "Culture": st.column_config.TextColumn("Culture", disabled=True),
+                            "Surface_Référence_Ha": st.column_config.NumberColumn("Surf (ha)", format="%.2f", disabled=True),
+                        },
+                        use_container_width=True,
+                        hide_index=True,
+                        key="import_filter_editor"
+                    )
+                    
+                    # Count selected rows
+                    selected_rows = import_selection[import_selection['Sél.'] == True].copy()
+                    st.info(f"📍 {len(selected_rows)} parcelles sélectionnées sur {len(parsed_df)} pour l'importation.")
                     
                     st.warning("⚠️ L'importation remplacera l'assolement existant pour cette campagne dans Google Sheets.")
                     
-                    if st.button("🚀 Valider et Importer dans Agridia", type="primary"):
+                    if st.button("🚀 Valider et Importer dans Agridia", type="primary", disabled=len(selected_rows) == 0):
                         with st.spinner("Fusion des données..."):
                             df_all = dl.get_assolement()
-                            # Filtrer pour enlever la campagne actuelle
+                            
+                            # Clean selected rows (remove selection column)
+                            rows_to_import = selected_rows.drop(columns=['Sél.'])
+                            
+                            # Re-merge with other campaigns
                             if not df_all.empty:
                                 df_all['Camp_Int'] = pd.to_numeric(df_all['Campagne'], errors='coerce').fillna(0).astype(int)
                                 df_others = df_all[df_all['Camp_Int'] != int(selected_campaign)].copy()
                                 df_others = df_others.drop(columns=['Camp_Int'])
-                                final_to_save = pd.concat([df_others, parsed_df], ignore_index=True)
+                                final_to_save = pd.concat([df_others, rows_to_import], ignore_index=True)
                             else:
-                                final_to_save = parsed_df
+                                final_to_save = rows_to_import
                                 
                             if dl.overwrite_worksheet("ASSOLEMENT", final_to_save):
                                 st.balloons()
-                                st.success("Importation réussie !")
+                                st.success(f"Importation de {len(rows_to_import)} parcelles réussie !")
                                 st.rerun()
                 else:
                     st.error(f"Aucune donnée trouvée pour la campagne {selected_campaign} dans ce fichier.")
