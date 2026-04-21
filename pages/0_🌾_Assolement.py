@@ -59,6 +59,12 @@ with tab_asso:
         df_curr_asso = df_asso_all[df_asso_all['Camp_Int'] == campagne_input].copy()
         df_others = df_asso_all[df_asso_all['Camp_Int'] != campagne_input].copy()
 
+    # Load PAC Referential
+    pac_ref = dl.get_pac_codes()
+    # Create list for selectbox: "CODE - Label"
+    pac_options = [f"{k} - {v}" for k, v in pac_ref.items()]
+    pac_options = sorted(pac_options)
+
     # Ensure all columns exist for the UI
     df_curr_asso = ensure_columns(df_curr_asso, ASSO_COLUMNS)
 
@@ -113,6 +119,27 @@ with tab_asso:
         if col in df_curr_asso.columns:
             df_curr_asso[col] = df_curr_asso[col].apply(lambda x: "oui" if str(x).strip() in ['1', '1.0', 'True', 'oui'] else "non")
 
+    # AUTO-MAPPING: F62, ZCD -> Official PAC Codes
+    def fix_legacy_pac(row):
+        code = str(row.get('Code_Culture_PAC', '')).strip().upper()
+        # Specific User Mappings
+        if code == 'F62': return 'FTE' # Féverole
+        if code == 'ZCD': return 'CZH' # Colza d'hiver
+        return code
+    
+    if 'Code_Culture_PAC' in df_curr_asso.columns:
+        df_curr_asso['Code_Culture_PAC'] = df_curr_asso.apply(fix_legacy_pac, axis=1)
+
+    # Convert Code_Culture_PAC to "CODE - Label" for the editor if match found
+    def format_pac_label(code):
+        code = str(code).strip().upper()
+        if code in pac_ref:
+            return f"{code} - {pac_ref[code]}"
+        return code
+    
+    if 'Code_Culture_PAC' in df_curr_asso.columns:
+        df_curr_asso['Code_Culture_PAC'] = df_curr_asso['Code_Culture_PAC'].apply(format_pac_label)
+
     # Re-apply Numeric types for other technical columns
     tech_num_cols = ['Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T']
     for col in tech_num_cols:
@@ -147,7 +174,7 @@ with tab_asso:
         "Commune": st.column_config.TextColumn("Commune"),
         "Surface_Référence_Ha": st.column_config.NumberColumn("Surf (ha)", format="%.2f"),
         "Culture": st.column_config.TextColumn("Culture"),
-        "Code_Culture_PAC": st.column_config.TextColumn("Code PAC"),
+        "Code_Culture_PAC": st.column_config.SelectboxColumn("Code PAC", options=pac_options, help="Choisir le code Telepac officiel."),
         "ZNT_Riverain": st.column_config.SelectboxColumn("ZNT Riverain", options=["oui", "non"]),
         "ZNT_Aqua": st.column_config.SelectboxColumn("ZNT Aqua", options=["oui", "non"]),
         "Type_sol": st.column_config.SelectboxColumn("Sol", 
@@ -196,6 +223,10 @@ with tab_asso:
                 for col in ['ZNT_Riverain', 'ZNT_Aqua']:
                     if col in edited_df.columns:
                         edited_df[col] = edited_df[col].apply(lambda x: 1 if x == "oui" else 0)
+
+                # Convert Code_Culture_PAC back to 3-letter code
+                if 'Code_Culture_PAC' in edited_df.columns:
+                    edited_df['Code_Culture_PAC'] = edited_df['Code_Culture_PAC'].apply(lambda x: str(x).split(' - ')[0] if ' - ' in str(x) else x)
 
                 if 'Camp_Int' in edited_df.columns: edited_df = edited_df.drop(columns=['Camp_Int'])
                 # Re-merge with other campaigns
