@@ -64,6 +64,17 @@ with tab_asso:
 
     render_premium_header("🌾 Détail de l'Assolement", f"Modification directe pour {campagne_input}", color="green")
 
+    # --- FORCED TYPE CLEANING FOR DATA EDITOR ---
+    if not df_curr_asso.empty:
+        df_curr_asso['Campagne'] = pd.to_numeric(df_curr_asso['Campagne'], errors='coerce').fillna(campagne_input).astype(int)
+        df_curr_asso['Surface_Référence_Ha'] = pd.to_numeric(df_curr_asso['Surface_Référence_Ha'], errors='coerce').fillna(0.0).astype(float)
+        df_curr_asso['Objectif_Rendement_Qx_Ha'] = pd.to_numeric(df_curr_asso['Objectif_Rendement_Qx_Ha'], errors='coerce').fillna(0.0).astype(float)
+        df_curr_asso['Prix_Vente_Objectif_€/T'] = pd.to_numeric(df_curr_asso['Prix_Vente_Objectif_€/T'], errors='coerce').fillna(0.0).astype(float)
+        df_curr_asso['Date_Semis_Previsionnelle'] = pd.to_datetime(df_curr_asso['Date_Semis_Previsionnelle'], errors='coerce').dt.date
+        
+        # Ensure ID_Parcelle is string to avoid mixed types
+        df_curr_asso['ID_Parcelle'] = df_curr_asso['ID_Parcelle'].astype(str).replace(['nan', 'None'], '')
+
     # Configuration de l'éditeur
     col_config = {
         "Campagne": st.column_config.NumberColumn("Camp.", disabled=True, format="%d"),
