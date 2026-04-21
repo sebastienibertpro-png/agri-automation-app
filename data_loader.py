@@ -247,6 +247,17 @@ class DataLoader:
         except Exception as e:
             return pd.DataFrame()
 
+    def get_pac_codes(self):
+        """Loads the unofficial/mapped PAC codes from JSON referential."""
+        import json
+        json_path = os.path.join(os.path.dirname(__file__), "pac_codes.json")
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            st.error(f"Erreur chargement pac_codes.json : {e}")
+            return {}
+
     def get_ref_compteurs(self):
         """Loads REF_COMPTEURS (ID_Compteur, Numero_Serie_Compteur, Reseau_type, Mail_Contact-Reseau, Usage%)."""
         return self._get_data("REF_COMPTEURS")
