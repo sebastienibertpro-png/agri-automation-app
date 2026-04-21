@@ -8,6 +8,20 @@ try:
 except ImportError:
     rfz_process, rfz_fuzz = None, None
 
+# Mapping Geofolia (Botanique) -> Télépac (Administratif)
+GEOFOLIA_PAC_MAP = {
+    'ZCS': 'MIS',   # Maïs grain
+    'ZAR': 'BTH',   # Blé tendre d'hiver
+    'ZBH': 'ORG',   # Orge d'hiver
+    'ZCT': 'CZH',   # Colza d'hiver
+    'ZBM': 'TAV',   # Tournesol
+    'ZCE': 'PST',   # Pois protéagineux
+    'ZBS': 'SJA',   # Soja
+    'ZCX': 'MIS',   # Maïs pop-corn (souvent MIS)
+    'ZCP': 'J6S',   # Jachère
+    'ZAZ': 'BTH',   # Blé autre
+}
+
 class DataLoader:
     def __init__(self, file_path, use_cloud=True, credentials_dict=None):
         self.file_path = file_path
@@ -1535,9 +1549,12 @@ class DataLoader:
                     pass
             
             # Create a unique ID_Assolement even if ID_Parcelle is shared (e.g. sub-plots)
-            # Use a hash of name + area + crop or just the Geofolia unique ID (f.get("Id"))
             geofolia_uuid = f.get("Id", "")
             internal_asso_id = f"ASSOL_{campaign}_{geofolia_uuid[:8]}"
+            
+            # PAC Code Translation
+            bot_code = f.get("BotanicalSpeciesCode", "")
+            pac_code = GEOFOLIA_PAC_MAP.get(bot_code, bot_code)  # Fallback to geofolia code if not in map
 
             row = {
                 'Campagne': campaign,
@@ -1547,15 +1564,22 @@ class DataLoader:
                 'îlot PAC': f.get("IsletNum", ""),
                 'Surface_Référence_Ha': area_ha,
                 'Culture': f.get("CropName", ""),
-                'Code_Culture_PAC': f.get("RNCropCode", ""),
+                'Code_Culture_PAC': pac_code,
                 'Variété': f.get("VarietyName", ""),
                 'Type_sol': f.get("SoilName", ""),
                 'GPS': gps_coord,
                 'Commune': f.get("City", ""),
                 'Precedent_Cultural': f.get("NMinus1Crop", ""),
                 'Gestion_Résidus': f.get("ResiduesName", ""),
-                'Strategie_Travail_Sol': strategy
+                'Strategie_Travail_Sol': strategy,
+                'ZNT_Riverain': f.get("ZNTReductionResident", 0),
+                'ZNT_Aqua': f.get("ZNTReductionAqua", 0),
             }
+            # Robust cleaning of "None"
+            for k, v in row.items():
+                if v is None or str(v).lower() == "none":
+                    row[k] = "" if isinstance(v, str) else 0
+
             parsed_rows.append(row)
             
         return pd.DataFrame(parsed_rows)
