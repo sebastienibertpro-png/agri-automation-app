@@ -75,27 +75,24 @@ with tab_asso:
     render_premium_header("🌾 Détail de l'Assolement", f"Modification directe pour {campagne_input}", color="green")
 
     # --- FORCED TYPE CLEANING FOR DATA EDITOR ---
-    if not df_curr_asso.empty:
-        # Numeric columns
-        for col in ['Campagne', 'Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T']:
-            if col in df_curr_asso.columns:
-                df_curr_asso[col] = pd.to_numeric(df_curr_asso[col], errors='coerce').fillna(0).astype(float if 'Surface' in col or 'Objectif' in col or 'Prix' in col else int)
-        
-        # Date column
-        if 'Date_Semis_Previsionnelle' in df_curr_asso.columns:
-            df_curr_asso['Date_Semis_Previsionnelle'] = pd.to_datetime(df_curr_asso['Date_Semis_Previsionnelle'], errors='coerce').dt.date
-        
-        # Text columns - CRITICAL: must be string and NO mixed types (like NaN which is a float)
-        text_cols = ['ID_Parcelle', 'Nom Terrain', 'îlot PAC', 'Culture', 'Variété', 'Type_sol', 'Commune', 'Precedent_Cultural', 'Commentaire_Assolement']
-        for col in text_cols:
-            if col in df_curr_asso.columns:
-                df_curr_asso[col] = df_curr_asso[col].astype(str).replace(['nan', 'None', '<NA>', 'NaT'], '')
-    else:
-        # If empty, ensure correct dtypes for the dynamic row feature
-        df_curr_asso = pd.DataFrame(columns=ASSO_COLUMNS)
-        df_curr_asso = df_curr_asso.astype({c: 'str' for c in ASSO_COLUMNS})
-        df_curr_asso['Surface_Référence_Ha'] = df_curr_asso['Surface_Référence_Ha'].astype(float)
-        df_curr_asso['Campagne'] = df_curr_asso['Campagne'].astype(int)
+    # Ensure columns exist first
+    df_curr_asso = ensure_columns(df_curr_asso, ASSO_COLUMNS)
+    
+    # Text columns: force string and handle NaNs
+    text_cols = ['ID_Parcelle', 'Nom Terrain', 'îlot PAC', 'Culture', 'Variété', 'Type_sol', 'Commune', 'Precedent_Cultural', 'Commentaire_Assolement', 'ID_Assolement']
+    for col in text_cols:
+        df_curr_asso[col] = df_curr_asso[col].astype(str).replace(['nan', 'None', '<NA>', 'NaT', 'None'], '')
+    
+    # Numeric columns: force float/int
+    for col in ['Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T']:
+        df_curr_asso[col] = pd.to_numeric(df_curr_asso[col], errors='coerce').fillna(0.0).astype(float)
+    
+    df_curr_asso['Campagne'] = pd.to_numeric(df_curr_asso['Campagne'], errors='coerce').fillna(campagne_input).astype(int)
+    
+    # Date column: must be handled carefully
+    df_curr_asso['Date_Semis_Previsionnelle'] = pd.to_datetime(df_curr_asso['Date_Semis_Previsionnelle'], errors='coerce')
+    # Convert to date objects, leaving NaT as None which is accepted by DateColumn
+    df_curr_asso['Date_Semis_Previsionnelle'] = df_curr_asso['Date_Semis_Previsionnelle'].apply(lambda x: x.date() if pd.notnull(x) else None)
 
     # Configuration de l'éditeur
     col_config = {
