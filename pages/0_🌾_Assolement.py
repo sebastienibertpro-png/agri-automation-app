@@ -106,7 +106,7 @@ with tab_asso:
     # Configuration de l'éditeur
     col_config = {
         "Campagne": st.column_config.NumberColumn("Camp.", disabled=True, format="%d"),
-        "ID_Parcelle": st.column_config.TextColumn("ID Parcelle (Unique)", help="Identifiant interne pour les autres pages."),
+        "ID_Parcelle": st.column_config.TextColumn("ID Parcelle (Unique)"),
         "îlot PAC": st.column_config.TextColumn("Îlot"),
         "Commune": st.column_config.TextColumn("Commune"),
         "Surface_Référence_Ha": st.column_config.NumberColumn("Surf (ha)", format="%.2f"),
@@ -114,7 +114,18 @@ with tab_asso:
         "Code_Culture_PAC": st.column_config.TextColumn("Code PAC"),
         "ZNT_Riverain": st.column_config.NumberColumn("ZNT Riverain"),
         "ZNT_Aqua": st.column_config.NumberColumn("ZNT Aqua"),
-        "Type_sol": st.column_config.TextColumn("Sol"),
+        "Type_sol": st.column_config.SelectboxColumn("Sol", 
+            options=['Argileux', 'Limoneux', 'Sableux', 'Argilo-Limoneux', 'Limono-Argileux', 'Sablo-Limoneux', 'Calcaire', 'Humifère', 'Alluvions'],
+            help="Sélectionnez le type de sol dominant."
+        ),
+        "Strategie_Travail_Sol": st.column_config.SelectboxColumn("Travail du sol", 
+            options=['Labour', 'TCS (Simplifié)', 'Semis Direct', 'Strip-till'],
+            help="Méthode de travail du sol utilisée."
+        ),
+        "Gestion_Résidus": st.column_config.SelectboxColumn("Gestion des résidus", 
+            options=['Enfouis', 'Exportés (récoltés)', 'Broyés / Laissés en surface'],
+            help="Devenir des résidus de culture."
+        ),
         "Date_Semis_Previsionnelle": st.column_config.DateColumn("Semis"),
     }
     for h in ASSO_HIDDEN:
