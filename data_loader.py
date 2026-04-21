@@ -1552,9 +1552,16 @@ class DataLoader:
             geofolia_uuid = f.get("Id", "")
             internal_asso_id = f"ASSOL_{campaign}_{geofolia_uuid[:8]}"
             
-            # PAC Code Translation
-            bot_code = f.get("BotanicalSpeciesCode", "")
-            pac_code = GEOFOLIA_PAC_MAP.get(bot_code, bot_code)  # Fallback to geofolia code if not in map
+            # PAC Code Translation - Smarter fuzzy matching
+            bot_code = str(f.get("BotanicalSpeciesCode", "")).strip()
+            rn_code = str(f.get("RNCropCode", "")).strip()
+            
+            # Try to find a match in the map (checking prefixes like ZCS in ZCS I07)
+            pac_code = rn_code # default
+            for geof_prefix, pac_target in GEOFOLIA_PAC_MAP.items():
+                if geof_prefix in bot_code or geof_prefix in rn_code:
+                    pac_code = pac_target
+                    break
 
             row = {
                 'Campagne': campaign,
@@ -1575,10 +1582,11 @@ class DataLoader:
                 'ZNT_Riverain': f.get("ZNTReductionResident", 0),
                 'ZNT_Aqua': f.get("ZNTReductionAqua", 0),
             }
-            # Robust cleaning of "None"
+            # Radical cleaning of "None" strings
             for k, v in row.items():
-                if v is None or str(v).lower() == "none":
-                    row[k] = "" if isinstance(v, str) else 0
+                s_v = str(v).strip()
+                if v is None or s_v.lower() in ["none", "nan", "<na>", "nat", "null", ""]:
+                    row[k] = "" if k not in ['Surface_Référence_Ha', 'ZNT_Riverain', 'ZNT_Aqua'] else 0
 
             parsed_rows.append(row)
             
