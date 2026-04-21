@@ -183,7 +183,7 @@ with tab_ilots:
 # TAB IMPORTATION
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_import:
-    render_premium_header("📥 Importateur de données externes", "Importez votre assolement depuis Geofolia ou Télépac", color="green")
+    render_premium_header("Importer depuis un logiciel ou Télépac", "Importez votre assolement depuis Geofolia ou Télépac", color="green")
     
     col_file, col_info = st.columns([2, 1])
     
@@ -195,8 +195,6 @@ with tab_import:
         st.markdown(f"""
         **Cible de l'import** : 
         Campagne **{selected_campaign}**
-        
-        *Note : L'importation pour 2024 est recommandée pour tester l'outil sans affecter votre campagne actuelle.*
         """)
 
     if uploaded_file:
