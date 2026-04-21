@@ -213,7 +213,7 @@ def get_active_loader():
     # On injecte le CSS immédiatement pour masquer les "Running" de la connexion GSheets
     inject_premium_css()
     
-    if "_dataloader" not in st.session_state or st.session_state["_dataloader"] is None:
+    if "_dataloader" not in st.session_state or st.session_state["_dataloader"] is None or not hasattr(st.session_state["_dataloader"], "get_pac_codes"):
         st.session_state["_dataloader"] = get_dataloader()
     return st.session_state["_dataloader"]
 
