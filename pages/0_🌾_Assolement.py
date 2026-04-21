@@ -72,21 +72,51 @@ with tab_asso:
 
     render_premium_header("🌾 Détail de l'Assolement", f"Modification directe pour {campagne_input}", color="green")
 
+    # --- FILTERS ---
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        filter_culture = st.multiselect("Filtrer par Culture", options=sorted(df_curr_asso['Culture'].unique()))
+    with col_f2:
+        # Format ilots for display in filter (as integers)
+        ilots_available = df_curr_asso['îlot PAC'].dropna().unique()
+        ilots_display = []
+        for i in ilots_available:
+            try:
+                ilots_display.append(int(float(i)))
+            except:
+                ilots_display.append(str(i))
+        filter_ilot = st.multiselect("Filtrer par Îlot", options=sorted(list(set(ilots_display))))
+
+
     # --- ULTRA-ROBUST CLEANING FOR DATA EDITOR ---
     # Ensure columns exist first
     df_curr_asso = ensure_columns(df_curr_asso, ASSO_COLUMNS)
     
+    # Pre-sorting for alphabetical order
+    df_curr_asso = df_curr_asso.sort_values(by=['îlot PAC', 'ID_Parcelle'])
+
     # Global Cleanup: Radical removal of ANY "None" string or variant
     for col in df_curr_asso.columns:
-        # Avoid cleaning date columns here to prevent breaking them
         if col != 'Date_Semis_Previsionnelle':
+            # 1. Real None handling
+            df_curr_asso[col] = df_curr_asso[col].fillna('')
+            # 2. String None handling
             df_curr_asso[col] = df_curr_asso[col].astype(str).str.strip().replace(
-                ['nan', 'None', '<NA>', 'NaT', 'None', 'nan', 'nan', 'null', 'None ', ' None', 'NaN', 'None', ''], ''
+                ['nan', 'None', '<NA>', 'NaT', 'null', 'NaN', 'None ', ' None', 'nan'], ''
             )
     
-    # Re-apply Numeric types for the editor to work correctly
-    num_cols = ['Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T', 'ZNT_Riverain', 'ZNT_Aqua']
-    for col in num_cols:
+    # Numeric formatting for Ilot (no decimal)
+    if 'îlot PAC' in df_curr_asso.columns:
+        df_curr_asso['îlot PAC'] = pd.to_numeric(df_curr_asso['îlot PAC'], errors='coerce')
+
+    # ZNT Conversion for UI (0/1 -> oui/non)
+    for col in ['ZNT_Riverain', 'ZNT_Aqua']:
+        if col in df_curr_asso.columns:
+            df_curr_asso[col] = df_curr_asso[col].apply(lambda x: "oui" if str(x).strip() in ['1', '1.0', 'True', 'oui'] else "non")
+
+    # Re-apply Numeric types for other technical columns
+    tech_num_cols = ['Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T']
+    for col in tech_num_cols:
         if col in df_curr_asso.columns:
             df_curr_asso[col] = pd.to_numeric(df_curr_asso[col], errors='coerce').fillna(0.0).astype(float)
     
@@ -96,24 +126,27 @@ with tab_asso:
     df_curr_asso['Date_Semis_Previsionnelle'] = pd.to_datetime(df_curr_asso['Date_Semis_Previsionnelle'], errors='coerce')
     df_curr_asso['Date_Semis_Previsionnelle'] = df_curr_asso['Date_Semis_Previsionnelle'].apply(lambda x: x.date() if pd.notnull(x) else None)
 
-    # STRICT FILTERING: Only keep columns we want to show/manage
-    # This removes parasites like "Contrat_Commercial" or "image"
-    display_cols = [c for c in ASSO_COLUMNS if c not in ASSO_HIDDEN]
-    # We keep hidden columns in the DF for saving, but we restrict the editor's view if needed
-    # Or simpler: we only pass the columns we defined in ASSO_COLUMNS
+    # APPLY FILTERS
     df_editor = df_curr_asso[ASSO_COLUMNS].copy()
+    if filter_culture:
+        df_editor = df_editor[df_editor['Culture'].isin(filter_culture)]
+    if filter_ilot:
+        # Need to match the cleaned ilot strings
+        filter_ilot_str = [str(i) for i in filter_ilot]
+        df_editor = df_editor[df_editor['îlot PAC'].isin(filter_ilot_str)]
+
 
     # Configuration de l'éditeur
     col_config = {
         "Campagne": st.column_config.NumberColumn("Camp.", disabled=True, format="%d"),
         "ID_Parcelle": st.column_config.TextColumn("ID Parcelle (Unique)"),
-        "îlot PAC": st.column_config.TextColumn("Îlot"),
+        "îlot PAC": st.column_config.NumberColumn("Îlot", format="%d"),
         "Commune": st.column_config.TextColumn("Commune"),
         "Surface_Référence_Ha": st.column_config.NumberColumn("Surf (ha)", format="%.2f"),
         "Culture": st.column_config.TextColumn("Culture"),
         "Code_Culture_PAC": st.column_config.TextColumn("Code PAC"),
-        "ZNT_Riverain": st.column_config.NumberColumn("ZNT Riverain"),
-        "ZNT_Aqua": st.column_config.NumberColumn("ZNT Aqua"),
+        "ZNT_Riverain": st.column_config.SelectboxColumn("ZNT Riverain", options=["oui", "non"]),
+        "ZNT_Aqua": st.column_config.SelectboxColumn("ZNT Aqua", options=["oui", "non"]),
         "Type_sol": st.column_config.SelectboxColumn("Sol", 
             options=['Argileux', 'Limoneux', 'Sableux', 'Argilo-Limoneux', 'Limono-Argileux', 'Sablo-Limoneux', 'Calcaire', 'Humifère', 'Alluvions'],
             help="Sélectionnez le type de sol dominant."
@@ -126,7 +159,7 @@ with tab_asso:
             options=['Enfouis', 'Exportés (récoltés)', 'Broyés / Laissés en surface'],
             help="Devenir des résidus de culture."
         ),
-        "Date_Semis_Previsionnelle": st.column_config.DateColumn("Semis"),
+        "Date_Semis_Previsionnelle": st.column_config.DateColumn("Date de semis"),
     }
     for h in ASSO_HIDDEN:
         col_config[h] = None
@@ -155,6 +188,12 @@ with tab_asso:
                 st.error(f"❌ Erreur : Des IDs de parcelles sont en double : {ids[ids.duplicated()].unique()}")
             else:
                 edited_df['Campagne'] = campagne_input
+                
+                # Convert ZNT back to numbers for storage consistency
+                for col in ['ZNT_Riverain', 'ZNT_Aqua']:
+                    if col in edited_df.columns:
+                        edited_df[col] = edited_df[col].apply(lambda x: 1 if x == "oui" else 0)
+
                 if 'Camp_Int' in edited_df.columns: edited_df = edited_df.drop(columns=['Camp_Int'])
                 # Re-merge with other campaigns
                 others_clean = df_others.drop(columns=['Camp_Int']) if 'Camp_Int' in df_others.columns else df_others
