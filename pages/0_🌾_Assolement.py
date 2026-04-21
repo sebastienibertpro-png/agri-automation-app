@@ -1,4 +1,4 @@
-# VER_2_3_FINAL - Importateur Intelligent Geofolia v2
+# VER_2_4_FINAL - UI Strict Filtering & Global Cleaning
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -76,13 +76,11 @@ with tab_asso:
     # Ensure columns exist first
     df_curr_asso = ensure_columns(df_curr_asso, ASSO_COLUMNS)
     
-    # Text columns: force string and handle NaNs/None
-    text_cols = ['ID_Parcelle', 'Nom Terrain', 'îlot PAC', 'Culture', 'Variété', 'Type_sol', 'Commune', 'Precedent_Cultural', 'Commentaire_Assolement', 'ID_Assolement', 'Code_Culture_PAC', 'Strategie_Travail_Sol', 'Gestion_Résidus']
-    for col in text_cols:
-        if col in df_curr_asso.columns:
-            df_curr_asso[col] = df_curr_asso[col].astype(str).replace(['nan', 'None', '<NA>', 'NaT', 'None'], '')
+    # Global Cleanup: Remove any "None" string or NaN from EVERY column
+    for col in df_curr_asso.columns:
+        df_curr_asso[col] = df_curr_asso[col].astype(str).replace(['nan', 'None', '<NA>', 'NaT', 'None', 'nan', 'nan', 'null'], '')
     
-    # Numeric columns: force float/int
+    # Re-apply Numeric types for the editor to work correctly
     num_cols = ['Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T', 'ZNT_Riverain', 'ZNT_Aqua']
     for col in num_cols:
         if col in df_curr_asso.columns:
@@ -92,8 +90,14 @@ with tab_asso:
     
     # Date column: must be handled carefully
     df_curr_asso['Date_Semis_Previsionnelle'] = pd.to_datetime(df_curr_asso['Date_Semis_Previsionnelle'], errors='coerce')
-    # Convert to date objects, leaving NaT as None which is accepted by DateColumn
     df_curr_asso['Date_Semis_Previsionnelle'] = df_curr_asso['Date_Semis_Previsionnelle'].apply(lambda x: x.date() if pd.notnull(x) else None)
+
+    # STRICT FILTERING: Only keep columns we want to show/manage
+    # This removes parasites like "Contrat_Commercial" or "image"
+    display_cols = [c for c in ASSO_COLUMNS if c not in ASSO_HIDDEN]
+    # We keep hidden columns in the DF for saving, but we restrict the editor's view if needed
+    # Or simpler: we only pass the columns we defined in ASSO_COLUMNS
+    df_editor = df_curr_asso[ASSO_COLUMNS].copy()
 
     # Configuration de l'éditeur
     col_config = {
@@ -120,7 +124,7 @@ with tab_asso:
                    "Veuillez les renommer (ex: Nom_1, Nom_2) pour que chaque ligne soit unique.")
 
     edited_df = st.data_editor(
-        df_curr_asso, 
+        df_editor, 
         column_config=col_config, 
         num_rows="dynamic", 
         use_container_width=True, 
