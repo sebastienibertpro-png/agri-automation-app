@@ -12,6 +12,10 @@ def inject_premium_css():
     st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+    
+    :root {
+        --primary-color: #5E9E47;
+    }
 
     /* Typographie : Ciblage chirurgical pour éviter de casser les ligatures des icônes Material Symbols */
     
@@ -35,6 +39,8 @@ def inject_premium_css():
         background-color: white !important;
         margin-top: 0px !important;
         --st-colors-primary: #5E9E47 !important;
+        --st-colors-primary-70: rgba(94, 158, 71, 0.7) !important;
+        accent-color: #5E9E47 !important;
     }
     
     /* Multiselect Tags (Filtres) : Passer en vert au lieu du rouge par défaut */
