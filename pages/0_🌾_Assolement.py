@@ -30,6 +30,13 @@ ASSO_COLUMNS = [
 
 ASSO_HIDDEN = {'Commentaire_Assolement', 'ID_Assolement', 'Camp_Int', 'GPS'}
 
+def ensure_columns(df, columns):
+    """Ensures all columns exist in the DataFrame."""
+    for col in columns:
+        if col not in df.columns:
+            df[col] = ""
+    return df
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -53,6 +60,9 @@ with tab_asso:
         df_asso_all['Camp_Int'] = pd.to_numeric(df_asso_all['Campagne'], errors='coerce').fillna(0).astype(int)
         df_curr_asso = df_asso_all[df_asso_all['Camp_Int'] == campagne_input].copy()
         df_others = df_asso_all[df_asso_all['Camp_Int'] != campagne_input].copy()
+
+    # Ensure all columns exist for the UI
+    df_curr_asso = ensure_columns(df_curr_asso, ASSO_COLUMNS)
 
     # Statistique rapide
     if not df_curr_asso.empty:
