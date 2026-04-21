@@ -8,7 +8,7 @@ from shared import init_campaign_selector, inject_premium_css, render_premium_he
 st.set_page_config(page_title="Assolement & Parcelles", page_icon="🌾", layout="wide")
 inject_premium_css()
 
-render_brand_page_header("Gestion de l'Assolement & Parcelles", "Source de vérité unique pour votre exploitation ✨", icon="🌾")
+render_brand_page_header("Mes parcelles", "Gérer votre assolement et vos îlots", icon="🌾")
 
 active_loader, selected_campaign, df_campaign, available_parcelles = init_campaign_selector()
 dl = active_loader
@@ -39,9 +39,9 @@ def ensure_columns(df, columns):
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
 tab_asso, tab_ilots, tab_import = st.tabs([
-    "🌾 Plan d'Assolement", 
-    "🗺️ Groupement par Îlots", 
-    "📥 Importation (Geofolia/Télépac)"
+    "🌾 Assolement", 
+    "🗺️ Ilots", 
+    "📥 Importer (Logiciel/Télépac)"
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
