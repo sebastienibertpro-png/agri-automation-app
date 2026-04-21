@@ -76,14 +76,26 @@ with tab_asso:
 
     # --- FORCED TYPE CLEANING FOR DATA EDITOR ---
     if not df_curr_asso.empty:
-        df_curr_asso['Campagne'] = pd.to_numeric(df_curr_asso['Campagne'], errors='coerce').fillna(campagne_input).astype(int)
-        df_curr_asso['Surface_Référence_Ha'] = pd.to_numeric(df_curr_asso['Surface_Référence_Ha'], errors='coerce').fillna(0.0).astype(float)
-        df_curr_asso['Objectif_Rendement_Qx_Ha'] = pd.to_numeric(df_curr_asso['Objectif_Rendement_Qx_Ha'], errors='coerce').fillna(0.0).astype(float)
-        df_curr_asso['Prix_Vente_Objectif_€/T'] = pd.to_numeric(df_curr_asso['Prix_Vente_Objectif_€/T'], errors='coerce').fillna(0.0).astype(float)
-        df_curr_asso['Date_Semis_Previsionnelle'] = pd.to_datetime(df_curr_asso['Date_Semis_Previsionnelle'], errors='coerce').dt.date
+        # Numeric columns
+        for col in ['Campagne', 'Surface_Référence_Ha', 'Objectif_Rendement_Qx_Ha', 'Prix_Vente_Objectif_€/T']:
+            if col in df_curr_asso.columns:
+                df_curr_asso[col] = pd.to_numeric(df_curr_asso[col], errors='coerce').fillna(0).astype(float if 'Surface' in col or 'Objectif' in col or 'Prix' in col else int)
         
-        # Ensure ID_Parcelle is string to avoid mixed types
-        df_curr_asso['ID_Parcelle'] = df_curr_asso['ID_Parcelle'].astype(str).replace(['nan', 'None'], '')
+        # Date column
+        if 'Date_Semis_Previsionnelle' in df_curr_asso.columns:
+            df_curr_asso['Date_Semis_Previsionnelle'] = pd.to_datetime(df_curr_asso['Date_Semis_Previsionnelle'], errors='coerce').dt.date
+        
+        # Text columns - CRITICAL: must be string and NO mixed types (like NaN which is a float)
+        text_cols = ['ID_Parcelle', 'Nom Terrain', 'îlot PAC', 'Culture', 'Variété', 'Type_sol', 'Commune', 'Precedent_Cultural', 'Commentaire_Assolement']
+        for col in text_cols:
+            if col in df_curr_asso.columns:
+                df_curr_asso[col] = df_curr_asso[col].astype(str).replace(['nan', 'None', '<NA>', 'NaT'], '')
+    else:
+        # If empty, ensure correct dtypes for the dynamic row feature
+        df_curr_asso = pd.DataFrame(columns=ASSO_COLUMNS)
+        df_curr_asso = df_curr_asso.astype({c: 'str' for c in ASSO_COLUMNS})
+        df_curr_asso['Surface_Référence_Ha'] = df_curr_asso['Surface_Référence_Ha'].astype(float)
+        df_curr_asso['Campagne'] = df_curr_asso['Campagne'].astype(int)
 
     # Configuration de l'éditeur
     col_config = {
