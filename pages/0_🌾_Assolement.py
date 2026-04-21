@@ -59,8 +59,9 @@ with tab_asso:
         df_curr_asso = df_asso_all[df_asso_all['Camp_Int'] == campagne_input].copy()
         df_others = df_asso_all[df_asso_all['Camp_Int'] != campagne_input].copy()
 
-    # Load PAC Referential
-    pac_ref = dl.get_pac_codes()
+    # Load PAC Referential (Safety check for session_state persistence)
+    pac_ref = dl.get_pac_codes() if hasattr(dl, 'get_pac_codes') else {}
+    
     # Create list for selectbox: "CODE - Label"
     pac_options = [f"{k} - {v}" for k, v in pac_ref.items()]
     pac_options = sorted(pac_options)
