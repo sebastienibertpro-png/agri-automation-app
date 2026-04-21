@@ -72,20 +72,19 @@ with tab_asso:
 
     render_premium_header("🌾 Détail de l'Assolement", f"Modification directe pour {campagne_input}", color="green")
 
-    # --- FILTERS ---
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        filter_culture = st.multiselect("Filtrer par Culture", options=sorted(df_curr_asso['Culture'].unique()))
-    with col_f2:
-        # Format ilots for display in filter (as integers)
-        ilots_available = df_curr_asso['îlot PAC'].dropna().unique()
-        ilots_display = []
-        for i in ilots_available:
-            try:
-                ilots_display.append(int(float(i)))
-            except:
-                ilots_display.append(str(i))
-        filter_ilot = st.multiselect("Filtrer par Îlot", options=sorted(list(set(ilots_display))))
+    # --- CONTROL PANEL (FILTERS & SORT) ---
+    with st.expander("🔍 Options d'affichage (Filtres & Tri)", expanded=True):
+        c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
+        with c1:
+            filter_culture = st.multiselect("Filtrer par Culture", options=sorted(df_curr_asso['Culture'].unique()))
+        with c2:
+            ilots_available = sorted([i for i in df_curr_asso['îlot PAC'].dropna().unique() if str(i).strip() != ''])
+            filter_ilot = st.multiselect("Filtrer par Îlot", options=ilots_available)
+        with c3:
+            visible_cols = [c for c in ASSO_COLUMNS if c not in ASSO_HIDDEN]
+            sort_col = st.selectbox("Trier par colonne", options=visible_cols, index=visible_cols.index('îlot PAC') if 'îlot PAC' in visible_cols else 0)
+        with c4:
+            sort_sense = st.radio("Sens", options=["⬆️", "⬇️"], horizontal=True, help="Croissant ou Décroissant")
 
 
     # --- ULTRA-ROBUST CLEANING FOR DATA EDITOR ---
@@ -126,14 +125,18 @@ with tab_asso:
     df_curr_asso['Date_Semis_Previsionnelle'] = pd.to_datetime(df_curr_asso['Date_Semis_Previsionnelle'], errors='coerce')
     df_curr_asso['Date_Semis_Previsionnelle'] = df_curr_asso['Date_Semis_Previsionnelle'].apply(lambda x: x.date() if pd.notnull(x) else None)
 
-    # APPLY FILTERS
+    # APPLY FILTERS & SORT
     df_editor = df_curr_asso[ASSO_COLUMNS].copy()
+    
     if filter_culture:
         df_editor = df_editor[df_editor['Culture'].isin(filter_culture)]
     if filter_ilot:
-        # Need to match the cleaned ilot strings
-        filter_ilot_str = [str(i) for i in filter_ilot]
-        df_editor = df_editor[df_editor['îlot PAC'].isin(filter_ilot_str)]
+        df_editor = df_editor[df_editor['îlot PAC'].isin(filter_ilot)]
+    
+    # Sort
+    ascending = True if sort_sense == "⬆️" else False
+    if sort_col in df_editor.columns:
+        df_editor = df_editor.sort_values(by=sort_col, ascending=ascending)
 
 
     # Configuration de l'éditeur
