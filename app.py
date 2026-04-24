@@ -443,13 +443,12 @@ with col_factures:
             badge_icon = "✅"
         
         st.markdown(f"""
-        <a href="Assistant_Comptable" target="_self" style="text-decoration: none; color: inherit; display: block;">
-            <div class="dash-card card-purple">
-                <h4 style="color: #7b1fa2;">🤖 Assistant Comptable</h4>
-                <p style="font-size: 2em; font-weight: bold; text-align: center; margin: 8px 0; color: {badge_color};">{badge_icon} {nb_factures}</p>
-                <p style="text-align: center; font-weight: 600;">facture(s) à traiter</p>
-            </div>
-        </a>
+        st.markdown(f"""
+        <div class="dash-card card-purple">
+            <h4 style="color: #7b1fa2;">🤖 Assistant Comptable</h4>
+            <p style="font-size: 2em; font-weight: bold; text-align: center; margin: 8px 0; color: {badge_color};">{badge_icon} {nb_factures}</p>
+            <p style="text-align: center; font-weight: 600;">facture(s) à traiter</p>
+        </div>
         """, unsafe_allow_html=True)
         
         if nb_factures > 0:
@@ -460,6 +459,18 @@ with col_factures:
             </div>
             """, unsafe_allow_html=True)
             
+        if st.button("Consulter l'Assistant Comptable ➔", use_container_width=True, key="btn_compta"):
+            compta_page_path = None
+            if os.path.exists("pages"):
+                for f in os.listdir("pages"):
+                    if "Assistant_Comptable" in f and f.endswith(".py"):
+                        compta_page_path = f"pages/{f}"
+                        break
+            if compta_page_path:
+                st.switch_page(compta_page_path)
+            else:
+                st.error("Page introuvable sur le serveur.")
+                
     except Exception as e:
         st.markdown(f"""
         <div class="dash-card card-purple">
