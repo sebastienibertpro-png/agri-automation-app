@@ -335,8 +335,7 @@ with tab_carto:
     Draw(
         export=True, 
         position="topleft", 
-        draw_options={'circle': False, 'rectangle': False, 'polyline': False, 'marker': False, 'circlemarker': False, 'polygon': True},
-        feature_group=telepac_fg
+        draw_options={'circle': False, 'rectangle': False, 'polyline': False, 'marker': False, 'circlemarker': False, 'polygon': True}
     ).add_to(m)
 
     js_translation = """
