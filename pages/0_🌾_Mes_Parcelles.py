@@ -243,16 +243,10 @@ with tab_carto:
         control=True
     ).add_to(m)
 
-    telepac_fg = folium.FeatureGroup(name="Parcelle Sélectionnée (Éditable)")
-    others_fg = folium.FeatureGroup(name="Autres Parcelles")
+    telepac_fg = folium.FeatureGroup(name="Contours Parcelles")
     if telepac_gdf is not None and not telepac_gdf.empty:
         # Nettoyage des géométries invalides ou vides avant affichage
         telepac_gdf = telepac_gdf[telepac_gdf.is_valid & ~telepac_gdf.is_empty].copy()
-        
-        # Récupération de la parcelle cliquée lors de la précédente interaction
-        selected_id = None
-        if "carto_map" in st.session_state and st.session_state.carto_map:
-            selected_id = st.session_state.carto_map.get("last_object_clicked_popup")
             
         CROP_COLORS = {
             'BTH': '#f1c40f', 'BLE': '#f1c40f', 'BLÉ': '#f1c40f',
@@ -297,37 +291,28 @@ with tab_carto:
             surf = props.get('SURFACE', '')
             if surf: tooltip_html += f"<b>SURFACE:</b> {surf} ha"
 
-            def add_folium_polygon(poly, is_selected):
+            def add_folium_polygon(poly):
                 locations = [[(lat, lon) for lon, lat in poly.exterior.coords]]
                 for interior in poly.interiors:
                     locations.append([(lat, lon) for lon, lat in interior.coords])
                 
-                # Highlight selected parcel with a thicker border
-                poly_weight = 4 if is_selected else style['weight']
-                poly_color = '#e74c3c' if is_selected else style['color']
-                
-                target_fg = telepac_fg if is_selected else others_fg
-                
                 folium.Polygon(
                     locations=locations,
-                    color=poly_color,
-                    weight=poly_weight,
+                    color=style['color'],
+                    weight=style['weight'],
                     fill_color=style['fillColor'],
                     fill_opacity=style['fillOpacity'],
                     tooltip=tooltip_html,
                     popup=str(props.get('NUM_PARCEL', ''))
-                ).add_to(target_fg)
-
-            is_selected = str(props.get('NUM_PARCEL', '')) == str(selected_id)
+                ).add_to(telepac_fg)
 
             if geom.geom_type == 'Polygon':
-                add_folium_polygon(geom, is_selected)
+                add_folium_polygon(geom)
             elif geom.geom_type == 'MultiPolygon':
                 for poly in geom.geoms:
-                    add_folium_polygon(poly, is_selected)
+                    add_folium_polygon(poly)
         
-    others_fg.add_to(m)
-
+    telepac_fg.add_to(m)
     folium.LayerControl().add_to(m)
 
     Fullscreen(position='topright').add_to(m)
@@ -378,36 +363,6 @@ with tab_carto:
     }, 100);
     setTimeout(() => clearInterval(checkDraw), 5000);
 
-    // Link the selected polygon (red border) to the Draw control's editable group
-    let linkDraw = setInterval(() => {
-        if (typeof L === 'undefined') return;
-        let maps = Object.values(window).filter(x => x && typeof x.eachLayer === 'function');
-        if (maps.length > 0) {
-            let map = maps[0];
-            let drawGroup = null;
-            
-            // Find the draw feature group
-            for (let key in map) {
-                let control = map[key];
-                if (control && control.options && control.options.edit && control.options.edit.featureGroup) {
-                    drawGroup = control.options.edit.featureGroup;
-                    break;
-                }
-            }
-            
-            if (drawGroup) {
-                map.eachLayer(function(layer) {
-                    // Check if it's our selected polygon
-                    if (layer instanceof L.Polygon && layer.options && layer.options.color === '#e74c3c') {
-                        // Move it to the draw group so it becomes editable!
-                        drawGroup.addLayer(layer);
-                    }
-                });
-                clearInterval(linkDraw);
-            }
-        }
-    }, 500);
-    setTimeout(() => clearInterval(linkDraw), 5000);
     </script>
     """
     m.get_root().html.add_child(Element(js_translation))
@@ -418,9 +373,7 @@ with tab_carto:
             m, 
             width="100%", 
             height=600, 
-            feature_group_to_add=telepac_fg,
-            returned_objects=["all_drawings", "last_object_clicked_popup"],
-            key="carto_map"
+            returned_objects=["all_drawings"]
         )
     except Exception as e:
         st.error(f"❌ Erreur lors du rendu de la carte Folium : {str(e)}")
