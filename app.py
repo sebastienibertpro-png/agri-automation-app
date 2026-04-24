@@ -443,11 +443,13 @@ with col_factures:
             badge_icon = "✅"
         
         st.markdown(f"""
-        <div class="dash-card card-purple">
-            <h4 style="color: #7b1fa2;">🤖 Assistant Comptable</h4>
-            <p style="font-size: 2em; font-weight: bold; text-align: center; margin: 8px 0; color: {badge_color};">{badge_icon} {nb_factures}</p>
-            <p style="text-align: center; font-weight: 600;">facture(s) à traiter</p>
-        </div>
+        <a href="Assistant_Comptable" target="_self" style="text-decoration: none; color: inherit; display: block;">
+            <div class="dash-card card-purple">
+                <h4 style="color: #7b1fa2;">🤖 Assistant Comptable</h4>
+                <p style="font-size: 2em; font-weight: bold; text-align: center; margin: 8px 0; color: {badge_color};">{badge_icon} {nb_factures}</p>
+                <p style="text-align: center; font-weight: 600;">facture(s) à traiter</p>
+            </div>
+        </a>
         """, unsafe_allow_html=True)
         
         if nb_factures > 0:
@@ -458,13 +460,11 @@ with col_factures:
             </div>
             """, unsafe_allow_html=True)
             
-        st.page_link("pages/12_🧮_Assistant_Comptable.py", label="Ouvrir l'Assistant Comptable", icon="🧮")
-        
-    except Exception:
-        st.markdown("""
+    except Exception as e:
+        st.markdown(f"""
         <div class="dash-card card-purple">
             <h4 style="color: #7b1fa2;">🤖 Assistant Comptable</h4>
-            <p>Service indisponible.</p>
+            <p>Service indisponible. ({e})</p>
         </div>
         """, unsafe_allow_html=True)
 
