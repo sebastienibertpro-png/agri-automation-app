@@ -243,14 +243,17 @@ with tab_carto:
         control=True
     ).add_to(m)
 
-    telepac_fg = folium.FeatureGroup(name="Contours Parcelles")
+    telepac_fg = folium.FeatureGroup(name="Parcelle Sélectionnée (Éditable)")
+    others_fg = folium.FeatureGroup(name="Autres Parcelles")
     if telepac_gdf is not None and not telepac_gdf.empty:
         # Nettoyage des géométries invalides ou vides avant affichage
         telepac_gdf = telepac_gdf[telepac_gdf.is_valid & ~telepac_gdf.is_empty].copy()
         
-        # Simplification des géométries pour éviter le "lag" dû aux milliers de points GPS (tolérance ~0.5 mètres)
-        telepac_gdf.geometry = telepac_gdf.geometry.simplify(0.000005, preserve_topology=True)
-        
+        # Récupération de la parcelle cliquée lors de la précédente interaction
+        selected_id = None
+        if "carto_map" in st.session_state and st.session_state.carto_map:
+            selected_id = st.session_state.carto_map.get("last_object_clicked_popup")
+            
         CROP_COLORS = {
             'BTH': '#f1c40f', 'BLE': '#f1c40f', 'BLÉ': '#f1c40f',
             'ORP': '#e67e22', 'ORH': '#d35400', 'ORGE': '#e67e22',
@@ -293,32 +296,38 @@ with tab_carto:
             tooltip_html += f"<b>CULTURE:</b> {props.get('CULTURE_UPDATED', props.get('CULTURE', props.get('CODE_CULTU', '')))}<br>"
             surf = props.get('SURFACE', '')
             if surf: tooltip_html += f"<b>SURFACE:</b> {surf} ha"
-            
-            def add_folium_polygon(poly):
+
+            def add_folium_polygon(poly, is_selected):
                 locations = [[(lat, lon) for lon, lat in poly.exterior.coords]]
                 for interior in poly.interiors:
                     locations.append([(lat, lon) for lon, lat in interior.coords])
                 
+                # Highlight selected parcel with a thicker border
+                poly_weight = 4 if is_selected else style['weight']
+                poly_color = '#e74c3c' if is_selected else style['color']
+                
+                target_fg = telepac_fg if is_selected else others_fg
+                
                 folium.Polygon(
                     locations=locations,
-                    color=style['color'],
-                    weight=style['weight'],
+                    color=poly_color,
+                    weight=poly_weight,
                     fill_color=style['fillColor'],
                     fill_opacity=style['fillOpacity'],
                     tooltip=tooltip_html,
-                    # We store the ID in a popup so if edited, it might be retrievable, although Draw returns all geoms anyway
                     popup=str(props.get('NUM_PARCEL', ''))
-                ).add_to(telepac_fg)
+                ).add_to(target_fg)
+
+            is_selected = str(props.get('NUM_PARCEL', '')) == str(selected_id)
 
             if geom.geom_type == 'Polygon':
-                add_folium_polygon(geom)
+                add_folium_polygon(geom, is_selected)
             elif geom.geom_type == 'MultiPolygon':
                 for poly in geom.geoms:
-                    add_folium_polygon(poly)
+                    add_folium_polygon(poly, is_selected)
         
+    others_fg.add_to(m)
 
-
-    telepac_fg.add_to(m)
     folium.LayerControl().add_to(m)
 
     Fullscreen(position='topright').add_to(m)
@@ -357,7 +366,7 @@ with tab_carto:
             L.drawLocal.edit.toolbar.buttons.remove = "Effacer des tracés";
             L.drawLocal.edit.toolbar.buttons.removeDisabled = "Aucun tracé à effacer";
             
-            L.drawLocal.edit.handlers.edit.tooltip.text = "Cliquez sur une parcelle pour la modifier.";
+            L.drawLocal.edit.handlers.edit.tooltip.text = "Bougez les poignées pour modifier la forme.";
             L.drawLocal.edit.handlers.remove.tooltip.text = "Cliquez sur une forme pour l'effacer.";
         }
     }
@@ -375,7 +384,14 @@ with tab_carto:
 
     st_data = None
     try:
-        st_data = st_folium(m, width="100%", height=600, returned_objects=["all_drawings", "last_object_clicked"])
+        st_data = st_folium(
+            m, 
+            width="100%", 
+            height=600, 
+            feature_group_to_add=telepac_fg,
+            returned_objects=["all_drawings", "last_object_clicked_popup"],
+            key="carto_map"
+        )
     except Exception as e:
         st.error(f"❌ Erreur lors du rendu de la carte Folium : {str(e)}")
         import traceback
@@ -394,6 +410,11 @@ with tab_carto:
                         # Combine with existing (excluding the ones that might have been modified/deleted if handled perfectly)
                         # For now, append newly drawn polygons
                         combined_gdf = pd.concat([telepac_gdf, new_geoms], ignore_index=True)
+                        
+                        # Fix multiple identical NUM_PARCEL if the user edited an existing one
+                        # The newly drawn ones from 'all_drawings' will NOT have NUM_PARCEL from the popup automatically,
+                        # because st_folium Draw returns raw geojson without the popup binding.
+                        # However, for now, we just append them. A better approach is to match by intersection or let user name them.
                     else:
                         combined_gdf = new_geoms
                         
