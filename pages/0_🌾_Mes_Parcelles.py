@@ -225,9 +225,11 @@ with tab_carto:
                           telepac_gdf['CULTURE_UPDATED'] = telepac_gdf.apply(update_culture, axis=1)
 
                 bounds = telepac_gdf.total_bounds
-                center_lon_default = (bounds[0] + bounds[2]) / 2
-                center_lat_default = (bounds[1] + bounds[3]) / 2
-                default_zoom = 13
+                # Prevent invalid bounds if all geometries are empty
+                if not pd.isna(bounds[0]) and not np.isinf(bounds[0]):
+                    center_lon_default = (bounds[0] + bounds[2]) / 2
+                    center_lat_default = (bounds[1] + bounds[3]) / 2
+                    default_zoom = 13
             except Exception as e:
                 st.error(f"Erreur lors de la lecture des données cartographiques : {e}")
                 
@@ -242,7 +244,10 @@ with tab_carto:
     ).add_to(m)
 
     telepac_fg = folium.FeatureGroup(name="Contours Parcelles")
-    if telepac_gdf is not None:
+    if telepac_gdf is not None and not telepac_gdf.empty:
+        # Nettoyage des géométries invalides ou vides avant affichage
+        telepac_gdf = telepac_gdf[telepac_gdf.is_valid & ~telepac_gdf.is_empty].copy()
+        
         CROP_COLORS = {
             'BTH': '#f1c40f', 'BLE': '#f1c40f', 'BLÉ': '#f1c40f',
             'ORP': '#e67e22', 'ORH': '#d35400', 'ORGE': '#e67e22',
@@ -339,7 +344,13 @@ with tab_carto:
     """
     m.get_root().html.add_child(Element(js_translation))
 
-    st_data = st_folium(m, width="100%", height=600, returned_objects=["all_drawings", "last_object_clicked"])
+    st_data = None
+    try:
+        st_data = st_folium(m, width="100%", height=600, returned_objects=["all_drawings", "last_object_clicked"])
+    except Exception as e:
+        st.error(f"❌ Erreur lors du rendu de la carte Folium : {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
     
     # Check if a drawing was made
     if st_data and st_data.get("all_drawings") and len(st_data["all_drawings"]) > 0:
