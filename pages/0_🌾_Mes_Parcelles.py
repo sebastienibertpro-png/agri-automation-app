@@ -261,9 +261,7 @@ with tab_carto:
             'DEFAULT': '#3498db'
         }
         
-        def get_crop_style(feature):
-            props = feature.get('properties', {})
-            # Use updated culture from mapping if available
+        def get_crop_style(props):
             crop_code = props.get('CULTURE_UPDATED', props.get('CULTURE', props.get('CODE_CULTU', props.get('TYPE', 'DEFAULT'))))
             if isinstance(crop_code, str):
                 crop_code_upper = crop_code.upper()
@@ -283,24 +281,51 @@ with tab_carto:
                 'fillOpacity': 0.6
             }
         
-        tooltip_fields = ['NUM_PARCEL', 'CULTURE_UPDATED', 'SURFACE']
-        avail_fields = telepac_gdf.columns.tolist()
-        final_tooltips = [f for f in tooltip_fields if f in avail_fields]
-        if not final_tooltips:
-            final_tooltips = [f for f in ['NUM_PARCEL', 'CULTURE', 'CODE_CULTU', 'SURFACE'] if f in avail_fields]
+        for idx, row in telepac_gdf.iterrows():
+            geom = row.geometry
+            props = row.drop('geometry').to_dict() if 'geometry' in row else {}
+            style = get_crop_style(props)
             
-        folium.GeoJson(
-            telepac_gdf,
-            style_function=get_crop_style,
-            tooltip=folium.GeoJsonTooltip(fields=final_tooltips) if final_tooltips else None
-        ).add_to(telepac_fg)
+            tooltip_html = f"<b>ID:</b> {props.get('NUM_PARCEL', '')}<br>"
+            tooltip_html += f"<b>CULTURE:</b> {props.get('CULTURE_UPDATED', props.get('CULTURE', props.get('CODE_CULTU', '')))}<br>"
+            surf = props.get('SURFACE', '')
+            if surf: tooltip_html += f"<b>SURFACE:</b> {surf} ha"
+            
+            def add_folium_polygon(poly):
+                locations = [[(lat, lon) for lon, lat in poly.exterior.coords]]
+                for interior in poly.interiors:
+                    locations.append([(lat, lon) for lon, lat in interior.coords])
+                
+                folium.Polygon(
+                    locations=locations,
+                    color=style['color'],
+                    weight=style['weight'],
+                    fill_color=style['fillColor'],
+                    fill_opacity=style['fillOpacity'],
+                    tooltip=tooltip_html,
+                    # We store the ID in a popup so if edited, it might be retrievable, although Draw returns all geoms anyway
+                    popup=str(props.get('NUM_PARCEL', ''))
+                ).add_to(telepac_fg)
+
+            if geom.geom_type == 'Polygon':
+                add_folium_polygon(geom)
+            elif geom.geom_type == 'MultiPolygon':
+                for poly in geom.geoms:
+                    add_folium_polygon(poly)
+        
+
 
     telepac_fg.add_to(m)
     folium.LayerControl().add_to(m)
 
     Fullscreen(position='topright').add_to(m)
     MeasureControl(position='topleft', primary_area_unit='hectares').add_to(m)
-    Draw(export=True, position="topleft", draw_options={'circle': False, 'rectangle': False, 'polyline': False, 'marker': False, 'circlemarker': False, 'polygon': True}).add_to(m)
+    Draw(
+        export=True, 
+        position="topleft", 
+        draw_options={'circle': False, 'rectangle': False, 'polyline': False, 'marker': False, 'circlemarker': False, 'polygon': True},
+        edit_options={'edit': True, 'featureGroup': telepac_fg}
+    ).add_to(m)
 
     js_translation = """
     <script>
