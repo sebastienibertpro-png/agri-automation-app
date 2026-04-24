@@ -248,6 +248,9 @@ with tab_carto:
         # Nettoyage des géométries invalides ou vides avant affichage
         telepac_gdf = telepac_gdf[telepac_gdf.is_valid & ~telepac_gdf.is_empty].copy()
         
+        # Simplification des géométries pour éviter le "lag" dû aux milliers de points GPS (tolérance ~0.5 mètres)
+        telepac_gdf.geometry = telepac_gdf.geometry.simplify(0.000005, preserve_topology=True)
+        
         CROP_COLORS = {
             'BTH': '#f1c40f', 'BLE': '#f1c40f', 'BLÉ': '#f1c40f',
             'ORP': '#e67e22', 'ORH': '#d35400', 'ORGE': '#e67e22',
@@ -366,59 +369,6 @@ with tab_carto:
         }
     }, 100);
     setTimeout(() => clearInterval(checkDraw), 5000);
-
-    // Override Leaflet.Draw Edit behavior to ONLY show handles for the clicked polygon
-    let patchDraw = setInterval(() => {
-        if (typeof L !== 'undefined' && L.EditToolbar && L.EditToolbar.Edit) {
-            clearInterval(patchDraw);
-            
-            let originalEnable = L.EditToolbar.Edit.prototype.enable;
-            let originalDisable = L.EditToolbar.Edit.prototype.disable;
-            
-            L.EditToolbar.Edit.prototype.enable = function () {
-                originalEnable.call(this);
-                let featureGroup = this._featureGroup;
-                
-                // Initially disable all handles
-                featureGroup.eachLayer(function (layer) {
-                    if (layer.editing) {
-                        layer.editing.disable();
-                    }
-                    
-                    // Add click listener
-                    layer.on('click.editMode', function(e) {
-                        // Disable others
-                        featureGroup.eachLayer(function (l) {
-                            if (l.editing && l !== layer) l.editing.disable();
-                        });
-                        // Enable this one
-                        if (layer.editing) {
-                            layer.editing.enable();
-                            if (e.originalEvent) e.originalEvent.stopPropagation();
-                        }
-                    });
-                });
-                
-                this._map.on('click.editMode', function(e) {
-                    featureGroup.eachLayer(function (layer) {
-                        if (layer.editing) layer.editing.disable();
-                    });
-                });
-            };
-            
-            L.EditToolbar.Edit.prototype.disable = function () {
-                originalDisable.call(this);
-                let featureGroup = this._featureGroup;
-                if (featureGroup) {
-                    featureGroup.eachLayer(function (layer) {
-                        layer.off('click.editMode');
-                    });
-                }
-                if (this._map) this._map.off('click.editMode');
-            };
-        }
-    }, 200);
-    setTimeout(() => clearInterval(patchDraw), 5000);
     </script>
     """
     m.get_root().html.add_child(Element(js_translation))
