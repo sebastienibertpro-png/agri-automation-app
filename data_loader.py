@@ -1507,19 +1507,23 @@ class DataLoader:
     def parse_geofolia_json(self, json_content: dict, campaign: int):
         """
         Parses Geofolia JSON 'Field.Json' into a pandas DataFrame compatible with Agridia.
+        Also extracts geometries into a GeoJSON string.
+        Returns: (df_asso: pd.DataFrame, geojson_str: str)
         """
         import pandas as pd
+        import geopandas as gpd
         from shapely import wkt
         from pyproj import Transformer
         
         fields = json_content.get("Fields", [])
         if not fields:
-            return pd.DataFrame()
+            return pd.DataFrame(), None
             
         # Transformer for Lambert 93 (EPSG:2154) to GPS (EPSG:4326)
         transformer = Transformer.from_crs("EPSG:2154", "EPSG:4326", always_xy=True)
         
         parsed_rows = []
+        geo_features = []
         for f in fields:
             # Filter by year
             if int(f.get("HarvestYear", 0)) != int(campaign):
@@ -1550,10 +1554,11 @@ class DataLoader:
             # Geography & Centroid
             gps_coord = ""
             geog_wkt = f.get("Geography", "")
+            geom = None
             if geog_wkt:
                 try:
-                    poly = wkt.loads(geog_wkt)
-                    centroid = poly.centroid
+                    geom = wkt.loads(geog_wkt)
+                    centroid = geom.centroid
                     lon, lat = transformer.transform(centroid.x, centroid.y)
                     gps_coord = f"{lat:.6f}, {lon:.6f}"
                 except:
@@ -1600,8 +1605,25 @@ class DataLoader:
                     row[k] = "" if k not in ['Surface_Référence_Ha', 'ZNT_Riverain', 'ZNT_Aqua'] else 0
 
             parsed_rows.append(row)
+            if geom:
+                geo_features.append({
+                    "geometry": geom,
+                    "CULTURE": f.get("CropName", ""),
+                    "CODE_CULTU": pac_code,
+                    "NUM_ILOT": f.get("IsletNum", ""),
+                    "NUM_PARCEL": id_parcelle,
+                    "SURFACE": area_ha,
+                    "NOM": name
+                })
             
-        return pd.DataFrame(parsed_rows)
+        df_asso = pd.DataFrame(parsed_rows)
+        geojson_str = None
+        if geo_features:
+            gdf = gpd.GeoDataFrame(geo_features, geometry="geometry", crs="EPSG:2154")
+            gdf = gdf.to_crs("EPSG:4326")
+            geojson_str = gdf.to_json()
+            
+        return df_asso, geojson_str
 
     def overwrite_worksheet(self, sheet_name: str, df: pd.DataFrame) -> bool:
         """Fully overwrites a worksheet with a new DataFrame."""
