@@ -377,6 +377,37 @@ with tab_carto:
         }
     }, 100);
     setTimeout(() => clearInterval(checkDraw), 5000);
+
+    // Link the selected polygon (red border) to the Draw control's editable group
+    let linkDraw = setInterval(() => {
+        if (typeof L === 'undefined') return;
+        let maps = Object.values(window).filter(x => x && typeof x.eachLayer === 'function');
+        if (maps.length > 0) {
+            let map = maps[0];
+            let drawGroup = null;
+            
+            // Find the draw feature group
+            for (let key in map) {
+                let control = map[key];
+                if (control && control.options && control.options.edit && control.options.edit.featureGroup) {
+                    drawGroup = control.options.edit.featureGroup;
+                    break;
+                }
+            }
+            
+            if (drawGroup) {
+                map.eachLayer(function(layer) {
+                    // Check if it's our selected polygon
+                    if (layer instanceof L.Polygon && layer.options && layer.options.color === '#e74c3c') {
+                        // Move it to the draw group so it becomes editable!
+                        drawGroup.addLayer(layer);
+                    }
+                });
+                clearInterval(linkDraw);
+            }
+        }
+    }, 500);
+    setTimeout(() => clearInterval(linkDraw), 5000);
     </script>
     """
     m.get_root().html.add_child(Element(js_translation))
