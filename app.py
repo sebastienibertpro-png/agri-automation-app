@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 import os
 import pandas as pd
@@ -442,7 +443,6 @@ with col_factures:
             badge_color = "#2e7d32"
             badge_icon = "✅"
         
-        st.markdown(f"""
         st.markdown(f"""
         <div class="dash-card card-purple">
             <h4 style="color: #7b1fa2;">🤖 Assistant Comptable</h4>
