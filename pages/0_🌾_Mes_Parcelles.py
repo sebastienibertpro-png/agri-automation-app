@@ -315,7 +315,8 @@ with tab_carto:
         
 
 
-    telepac_fg.add_to(m)
+    # telepac_fg is no longer added to m directly here, 
+    # it will be passed via feature_group_to_add to st_folium so it becomes editable!
     folium.LayerControl().add_to(m)
 
     Fullscreen(position='topright').add_to(m)
@@ -323,8 +324,7 @@ with tab_carto:
     Draw(
         export=True, 
         position="topleft", 
-        draw_options={'circle': False, 'rectangle': False, 'polyline': False, 'marker': False, 'circlemarker': False, 'polygon': True},
-        edit_options={'edit': True, 'featureGroup': telepac_fg}
+        draw_options={'circle': False, 'rectangle': False, 'polyline': False, 'marker': False, 'circlemarker': False, 'polygon': True}
     ).add_to(m)
 
     js_translation = """
@@ -371,11 +371,23 @@ with tab_carto:
 
     st_data = None
     try:
-        st_data = st_folium(m, width="100%", height=600, returned_objects=["all_drawings", "last_object_clicked"])
+        # feature_group_to_add is the official streamlit-folium way to pass an editable feature group
+        st_data = st_folium(
+            m, 
+            width="100%", 
+            height=600, 
+            feature_group_to_add=telepac_fg,
+            returned_objects=["all_drawings", "last_object_clicked"]
+        )
     except Exception as e:
-        st.error(f"❌ Erreur lors du rendu de la carte Folium : {str(e)}")
-        import traceback
-        st.code(traceback.format_exc())
+        # Fallback if feature_group_to_add is not supported by the local streamlit-folium version
+        try:
+            telepac_fg.add_to(m)
+            st_data = st_folium(m, width="100%", height=600, returned_objects=["all_drawings", "last_object_clicked"])
+        except Exception as e2:
+            st.error(f"❌ Erreur lors du rendu de la carte Folium : {str(e2)}")
+            import traceback
+            st.code(traceback.format_exc())
     
     # Check if a drawing was made
     if st_data and st_data.get("all_drawings") and len(st_data["all_drawings"]) > 0:
