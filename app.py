@@ -457,6 +457,9 @@ with col_factures:
                 <span><b>Pensez à régler vos factures avant analyse IA</b></span>
             </div>
             """, unsafe_allow_html=True)
+            
+        st.page_link("pages/12_🧮_Assistant_Comptable.py", label="Ouvrir l'Assistant Comptable", icon="🧮")
+        
     except Exception:
         st.markdown("""
         <div class="dash-card card-purple">
